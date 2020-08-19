@@ -11,7 +11,8 @@ import logging
 import logging.config
 import json
 import codecs
-# import re
+import re
+import io
 
 from src.common import LOG_CLI_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, OPS_HELP, SETUP_ZIP, BASE_CONNCFG, BASE_FILTERS_RE, PROC_SRC_BODY_FNAME
 from src.read import srcreader
@@ -21,7 +22,11 @@ from src.zip import gen_setup_zip
 from src.fileandpath import get_conn_cfg_path, get_filters_cfg, exists_currentref, to_jsonfile, save_ref, get_refcodedir, save_warnings
 from src.write import updateref
 
-
+try:
+    file_types = (file, io.IOBase)
+except NameError:
+    file_types = (io.IOBase,)
+    
 class Singleton(object):
 	_instances = {}
 	def __new__(class_, *args, **kwargs):
@@ -36,7 +41,7 @@ class Singleton(object):
 
 def parse_args():
 	
-	parser = argparse.ArgumentParser(description='Migracao de definicoes de base de dados PostgreSQL')
+	parser = argparse.ArgumentParser(description='Diff e migracao de definicoes de base de dados PostgreSQL')
 	
 	projdir = path_join(dirname(abspath(__file__)), 'projetos')	
 	projetos = listdir(projdir)
@@ -56,6 +61,7 @@ def parse_args():
 	parser.add_argument("-p", "--includepublic", help="Incluir schema public", action="store_true")
 	parser.add_argument("-r", "--removecolorder", help="Remover ordenacao das colunas nas tabelas", action="store_true")
 	parser.add_argument("-g", "--genprocsdir", help="Gerar sources dos procedimentos, indicar pasta a criar", action="store")
+	parser.add_argument("-d", "--opsorder", help="Lista de operacoes (sequencia de oporder) a efetuar", action="store")
 	
 	args = parser.parse_args()
 	
@@ -175,7 +181,6 @@ def create_new_proj(p_newproj):
 def check_oper_handler(p_proj, p_oper, p_outprocsdir, o_checkdict, o_replaces, p_connkey=None, include_public=False, include_colorder=False):
 	
 	logger = logging.getLogger('pgsourcing')	
-	logger.info("checking, proj:%s  oper:%s" % (p_proj,p_oper))
 	
 	ret = "None"
 
@@ -187,6 +192,8 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, o_checkdict, o_replaces, p
 		conns = Connections(cfgpath, subkey="conn")
 	
 	if p_oper == "chksrc":
+
+		logger.info("checking, proj:%s  oper:%s" % (p_proj,p_oper))
 		
 		if p_connkey is None:
 			if not conns.checkConn("src"):
@@ -199,6 +206,8 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, o_checkdict, o_replaces, p
 		ret = "From SRC"
 		
 	elif p_oper == "chkdest":
+		
+		logger.info("checking, proj:%s  oper:%s" % (p_proj,p_oper))
 
 		if p_connkey is None:
 			if not conns.checkConn("dest"):
@@ -222,6 +231,39 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, o_checkdict, o_replaces, p
 		
 	return ret
 
+def process_intervals_string(p_input_str):
+	
+	sequence = set()
+	
+	groups = re.split("[,;/#]", p_input_str)
+	
+	for grp in groups:
+		interv = re.split("[:\-.]+", grp)
+		if len(interv) == 1:
+			try:
+				val = int(interv[0])
+				sequence.add(val)
+			except ValueError:
+				pass
+		elif len(interv) == 2:
+			try:
+				if len(interv[0]) == 0:
+					bot = 1
+				else:
+					bot = int(interv[0])
+				top = int(interv[1])
+				if bot > top:
+					tmp = bot
+					bot = top
+					top = tmp
+				if bot < 1:
+					bot = 1	
+				sequence.update(range(bot, top+1))
+			except ValueError:
+				pass
+		
+	return sorted(sequence)
+	
 def update_oper_handler(p_proj, p_oper, p_difdict, updates_ids=None, p_connkey=None):
 	
 	# updates_ids - se None ou lista vazia, aplicar todo o diffdict
@@ -231,9 +273,16 @@ def update_oper_handler(p_proj, p_oper, p_difdict, updates_ids=None, p_connkey=N
 
 	conns = None
 	
+	upd_ids_list = []
+	if not updates_ids is None:
+		if isinstance(updates_ids, str):
+			upd_ids_list = process_intervals_string(updates_ids)
+		elif isinstance(updates_ids, list):
+			upd_ids_list = updates_ids
+	
 	if p_oper == "updref":
 		
-		updateref(p_proj, p_difdict, updates_ids=None)
+		updateref(p_proj, p_difdict, upd_ids_list)
 		
 	elif p_oper == "upddest":
 
@@ -256,12 +305,13 @@ class OpOrderMgr(Singleton):
 	def __init__(self):
 		self.ord = 0
 		
-	def setord(self, p_dict):		
+	def setord(self, p_dict):	
+		# Se linha abaixo falhar, ord nao e' incrementado desnecessariamente	
 		p_dict["oporder"] = self.ord + 1
 		self.ord = self.ord + 1
 
 	
-def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=None, canuse_stdout=False, include_public=False, include_colorder=False):
+def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=None, canuse_stdout=False, include_public=False, include_colorder=False, updates_ids=None):
 	
 	opordmgr = OpOrderMgr()
 	
@@ -368,14 +418,20 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		
 		# Se a operacao for updref ou chkdest o dicionario check_dict sera 
 		#  preenchido.
-		# inputf pode ser filelike ou path
-		print(inputf)
+
+		diffdict = None
+		if isinstance(inputf, str):
+			if exists(inputf):
+				with open(inputf, "r") as fj:
+					diffdict = json.load(fj)
+		elif isinstance(inputf, file_types):
+			diffdict = json.load(inputf)			
+					
+		assert not diffdict is None
 		
-		update_oper_handler(p_proj, p_oper, p_upddict, updates_ids=None, p_connkey=None)
-		
-		# update_oper_handler(p_proj, p_oper, p_upddict, connkey=p_connkey)
-		
-		pass
+		update_oper_handler(p_proj, p_oper, diffdict, updates_ids=updates_ids, p_connkey=p_connkey)
+					
+
 		
 # ######################################################################
 
@@ -400,7 +456,8 @@ def cli_main(canuse_stdout=False):
 					output=args.output, inputf=args.input, 
 					canuse_stdout=canuse_stdout, 
 					include_public=args.includepublic, 
-					include_colorder = not args.removecolorder)
+					include_colorder = not args.removecolorder,
+					updates_ids = args.opsorder)
 					
 	except:
 		logger.exception("")
