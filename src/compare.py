@@ -66,7 +66,7 @@ def sourcediff(p_srca, p_srcb, p_replaces, out_dellist): #, out_addlist):
 	
 	return srca
 	
-def comparegrp(p_leftdic, p_rightdic, grpkeys, p_replaces, p_operorder_byref, o_diff_dict, o_orderedoutkeys): #, newparentgroup=None):
+def comparegrp(p_leftdic, p_rightdic, grpkeys, p_replaces, p_opordmgr, o_diff_dict): 
 		
 	grpkey = grpkeys[-1]
 	tmp_l = p_leftdic[grpkey]
@@ -80,6 +80,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_replaces, p_operorder_byref, o_
 		diff_item = get_diff_item('a', diff_dict, grpkeys)
 
 		#diff_item = _get_diff_item('a',newparentgroup, diff_dict, grpkey)
+		p_opordmgr.setord(diff_item)
 		diff_item["diffoper"] = "insert"
 		diff_item["value"] = deepcopy(tmp_l)
 		
@@ -95,42 +96,34 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_replaces, p_operorder_byref, o_
 				# left only
 				#diff_item = _get_diff_item('b',newparentgroup, diff_dict, grpkey, k)
 				diff_item = get_diff_item('b', diff_dict, klist)
-				p_operorder_byref[0] = p_operorder_byref[0] + 1
-				o_orderedoutkeys[p_operorder_byref[0]] = deepcopy(klist)
-				diff_item["operord"] = p_operorder_byref[0]
+				p_opordmgr.setord(diff_item)
 				diff_item["diffoper"] = "insert"
 				diff_item["newvalue"] = deepcopy(tmp_l[k])
 			elif k in tmp_r.keys() and not k in tmp_l.keys():
 				# right only
 				#diff_item = _get_diff_item('b',newparentgroup, diff_dict, grpkey, k)
 				diff_item = get_diff_item('b1', diff_dict, klist)
-				p_operorder_byref[0] = p_operorder_byref[0] + 1
-				o_orderedoutkeys[p_operorder_byref[0]] = deepcopy(klist)
-				diff_item["operord"] = p_operorder_byref[0]
+				p_opordmgr.setord(diff_item)
 				diff_item["diffoper"] = "delete"
 			else:
 				if isinstance(tmp_l[k], dict) and isinstance(tmp_r[k], dict):
 					#comparegrp(tmp_l, tmp_r, k, diff_dict, newparentgroup=grpkey)
-					comparegrp(tmp_l, tmp_r, klist, p_replaces, p_operorder_byref, diff_dict, o_orderedoutkeys)
+					comparegrp(tmp_l, tmp_r, klist, p_replaces, p_opordmgr, diff_dict)
 				elif isinstance(tmp_l[k], list) and isinstance(tmp_r[k], list):
 					#comparegrp_list(tmp_l, tmp_r, k, diff_dict, newparentgroup=grpkey)
-					comparegrp_list(tmp_l, tmp_r, klist, p_operorder_byref, diff_dict, o_orderedoutkeys)
+					comparegrp_list(tmp_l, tmp_r, klist, p_opordmgr, diff_dict)
 				elif isinstance(tmp_l[k], dict):
 					assert not isinstance(tmp_r[k], list), "dict a comparar com list, chave: %s" % k
 					#diff_item = _get_diff_item('c',newparentgroup, diff_dict, grpkey, k)
 					diff_item = get_diff_item('c', diff_dict, klist)
-					p_operorder_byref[0] = p_operorder_byref[0] + 1
-					o_orderedoutkeys[p_operorder_byref[0]] = deepcopy(klist)
-					diff_item["operord"] = p_operorder_byref[0]
+					p_opordmgr.setord(diff_item)
 					diff_item["diffoper"] = "replace value with dict"
 					diff_item["newvalue"] = deepcopy(tmp_l[k])
 				elif isinstance(tmp_r[k], dict):
 					assert not isinstance(tmp_l[k], list), "list a comparar com dict, chave: %s" % k
 					#diff_item = _get_diff_item('d',newparentgroup, diff_dict, grpkey, k)
 					diff_item = get_diff_item('d', diff_dict, klist)
-					p_operorder_byref[0] = p_operorder_byref[0] + 1
-					o_orderedoutkeys[p_operorder_byref[0]] = deepcopy(klist)
-					diff_item["operord"] = p_operorder_byref[0]
+					p_opordmgr.setord(diff_item)
 					diff_item["diffoper"] = "replace dict with value"
 					diff_item["newvalue"] = deepcopy(tmp_l[k])
 				else:
@@ -143,9 +136,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_replaces, p_operorder_byref, o_
 							
 							diff_item = get_diff_item('e', diff_dict, klist)
 							diff_item["difflines"] = difflist
-							p_operorder_byref[0] = p_operorder_byref[0] + 1
-							o_orderedoutkeys[p_operorder_byref[0]] = deepcopy(klist)
-							diff_item["operord"] = p_operorder_byref[0]
+							p_opordmgr.setord(diff_item)
 							diff_item["diffoper"] = "update"
 							diff_item["newvalue"] = newleft
 					else:
@@ -165,16 +156,14 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_replaces, p_operorder_byref, o_
 						if leftval != rightval:
 							#diff_item = _get_diff_item('f',newparentgroup, diff_dict, grpkey, k)
 							diff_item = get_diff_item('f', diff_dict, klist)
-							p_operorder_byref[0] = p_operorder_byref[0] + 1
-							o_orderedoutkeys[p_operorder_byref[0]] = deepcopy(klist)
-							diff_item["operord"] = p_operorder_byref[0]
+							p_opordmgr.setord(diff_item)
 							diff_item["diffoper"] = "update"
 							diff_item["newvalue"] = leftval
 							diff_item["oldvalue"] = rightval
 						
 
 
-def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_operorder_byref, o_diff_dict, o_orderedoutkeys): #, newparentgroup=None):
+def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict): 
 
 	grpkey = grpkeys[-1]
 	tmp_l = p_leftdic[grpkey]
@@ -184,6 +173,7 @@ def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_operorder_byref, o_diff_di
 		
 		#diff_item = _get_diff_item(newparentgroup, o_diff_dict, grpkey)
 		diff_item = get_diff_item('A', diff_dict, grpkeys)
+		p_opordmgr.setord(diff_item)
 		diff_item["diffoper"] = "insert"
 		diff_item["value"] = deepcopy(tmp_l)
 		
@@ -197,25 +187,17 @@ def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_operorder_byref, o_diff_di
 		for k in sorted(keyset):
 			if k in tmp_l and not k in tmp_r:
 				# left only
-				#diff_item = _get_diff_item(newparentgroup, o_diff_dict, grpkey, k)
 				diff_item = get_diff_item('B', diff_dict, grpkeys)
-				p_operorder_byref[0] = p_operorder_byref[0] + 1
-				o_orderedoutkeys[p_operorder_byref[0]] = deepcopy(grpkeys)
-				diff_item["operord"] = p_operorder_byref[0]
+				p_opordmgr.setord(diff_item)
 				diff_item["diffoper"] = "addtolist"
 			elif k in tmp_r and not k in tmp_l:
 				# right only
-				# diff_item = _get_diff_item(newparentgroup, o_diff_dict, grpkey, k)
 				diff_item = get_diff_item('C', diff_dict, grpkeys)
-				p_operorder_byref[0] = p_operorder_byref[0] + 1
-				o_orderedoutkeys[p_operorder_byref[0]] = deepcopy(grpkeys)
-				diff_item["operord"] = p_operorder_byref[0]
+				p_opordmgr.setord(diff_item)
 				diff_item["diffoper"] = "removefrom"
 										
 
-def comparing(p_proj, p_check_dict, p_comparison_mode, p_replaces, o_diff_dict, o_ordered_diffkeys):
-	
-	operorder = [0] # Como lista, para poder ser passado "por referencia"
+def comparing(p_proj, p_check_dict, p_comparison_mode, p_replaces, p_opordmgr, o_diff_dict):
 	
 	raw_ref_json = load_currentref(p_proj)
 		
@@ -243,9 +225,9 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_replaces, o_diff_dict, 
 		#o_diff_dict[grp] = {}
 		
 		if grp in listgroups:
-			comparegrp_list(l_dict, r_dict, [grp], operorder, o_diff_dict, o_ordered_diffkeys)
+			comparegrp_list(l_dict, r_dict, [grp], p_opordmgr, o_diff_dict)
 		else:	
-			comparegrp(l_dict, r_dict, [grp], p_replaces, operorder, o_diff_dict, o_ordered_diffkeys)
+			comparegrp(l_dict, r_dict, [grp], p_replaces, p_opordmgr, o_diff_dict)
 			#comparegrp(l_dict, r_dict, grp, o_diff_dict)
 			## remover grupo se vier vazio
 			

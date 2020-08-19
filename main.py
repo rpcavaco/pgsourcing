@@ -22,6 +22,14 @@ from src.fileandpath import get_conn_cfg_path, get_filters_cfg, exists_currentre
 from src.write import updateref
 
 
+class Singleton(object):
+	_instances = {}
+	def __new__(class_, *args, **kwargs):
+		if class_ not in class_._instances:
+			class_._instances[class_] = super(Singleton, class_).__new__(class_, *args, **kwargs)
+		return class_._instances[class_]
+
+
 # ######################################################################
 # Config, setup, bootstrap
 # ######################################################################		
@@ -243,9 +251,20 @@ def update_oper_handler(p_proj, p_oper, p_difdict, updates_ids=None, p_connkey=N
 		#srcreader(conns.getConn(p_connkey), o_checkdict)
 
 
+class OpOrderMgr(Singleton):
+	
+	def __init__(self):
+		self.ord = 0
+		
+	def setord(self, p_dict):		
+		p_dict["oporder"] = self.ord + 1
+		self.ord = self.ord + 1
+
 	
 def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=None, canuse_stdout=False, include_public=False, include_colorder=False):
-
+	
+	opordmgr = OpOrderMgr()
+	
 	logger = logging.getLogger('pgsourcing')	
 	
 	refcodedir = get_refcodedir(p_proj)
@@ -308,10 +327,8 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				do_compare = True
 		
 		comparing(p_proj, check_dict["content"], 
-						comparison_mode, replaces, root_diff_dict["content"]) #, ordered_diffkeys)
+						comparison_mode, replaces, opordmgr, root_diff_dict["content"])
 						
-		# root_diff_dict["oporder"] = ordered_diffkeys
-			
 		## TODO - deve haver uma verificacao final de coerencia
 		## Sequencias - tipo da seq. == tipo do campo serial em que e usada
 
