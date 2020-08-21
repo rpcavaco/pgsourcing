@@ -47,7 +47,6 @@ def changegrp(p_chg_group, p_currdiff_block, p_updates_ids_list, p_keys_byref, p
 								p_chg_group[k] = diff_item["newvalue"]
 								changed = True
 								#print("-->", p_chg_group)	
-								# raise RuntimeError, "stop"
 							elif diff_item["diffoper"] == "update":
 								p_chg_group[k] = diff_item["newvalue"]
 								changed = True

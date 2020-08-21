@@ -98,6 +98,9 @@ def parse_args():
 		if args.oper in OPS_INPUT and args.input is None:
 			parser.print_help()
 			raise RuntimeError("Operacao '%s' exige indicacao ficheiro de entrada com opcao -i" % args.oper)
+			
+	if args.input:
+		assert exists(args.input), "Ficheiro de entrada inexistente: '%s'" % args.input
 		
 	return args, proj
 

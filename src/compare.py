@@ -61,8 +61,16 @@ def sourcediff(p_srca, p_srcb, p_replaces, out_dellist): #, out_addlist):
 		
 	rawlistA= srca.splitlines(True)
 	rawlistB = srcb.splitlines(True)
-	listA = [re.sub(' +', ' ', ln.strip()).lower() for ln in rawlistA if len(ln.strip()) > 0]
-	listB = [re.sub(' +', ' ', ln.strip()).lower() for ln in rawlistB if len(ln.strip()) > 0]
+	
+	patt = r"^--(.*)$"
+	substitute = r"/* \1 */"
+	#listA = [re.sub(' +', ' ', ln.strip()).lower() for ln in rawlistA if len(ln.strip()) > 0]
+	#listB = [re.sub(' +', ' ', ln.strip()).lower() for ln in rawlistB if len(ln.strip()) > 0]
+	#listA = [ln.strip().lower() for ln in rawlistA if len(ln.strip()) > 0]
+	#listB = [ln.strip().lower() for ln in rawlistB if len(ln.strip()) > 0]
+	# startswith
+	listA = [re.sub(patt, substitute, ln.strip()).lower() for ln in rawlistA if len(ln.strip()) > 0]
+	listB = [re.sub(patt, substitute, ln.strip()).lower() for ln in rawlistB if len(ln.strip()) > 0]
 	
 	diff = [l.strip() for l in list(dodiff(listA, listB)) if l.strip()]
 	
