@@ -59,6 +59,12 @@ BASE_CONNCFG = {
 	}
 }
 
+CFG_GROUPS = [
+	"owners", "roles", "schemas", 
+	"sequences", "tables", "procedures"
+]
+
+CFG_LISTGROUPS = ["owners"]
 
 
 

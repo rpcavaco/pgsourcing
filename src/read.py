@@ -7,7 +7,7 @@ from os.path import exists, join as path_join
 
 
 from src.sql import SQL
-from src.common import OLDER_PG, PROC_SRC_BODY_FNAME
+from src.common import OLDER_PG, PROC_SRC_BODY_FNAME, CFG_GROUPS
 
 WARN_KEYS = {
 	"PROC_SU_OWNED": "Procedimentos cujo owner e' 'postgres'",
@@ -706,11 +706,6 @@ def srcreader(p_conn, p_filters_cfg, p_outprocs_dir, out_dict, include_public=Fa
 			
 			logger.info("reading finished.")
 
-	groups = [
-		"schemas", "roles", "tables", 
-		"sequences", "procedures"
-	]
-		
 	if "content" in out_dict.keys() and "replace" in p_filters_cfg.keys():
 		
 		chdict = out_dict["content"]	
@@ -718,7 +713,7 @@ def srcreader(p_conn, p_filters_cfg, p_outprocs_dir, out_dict, include_public=Fa
 			
 			for grp in chdict.keys():
 				
-				if not grp in groups:
+				if not grp in CFG_GROUPS:
 					continue
 					
 				for sch in chdict[grp].keys():

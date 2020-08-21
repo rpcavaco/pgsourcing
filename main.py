@@ -235,9 +235,9 @@ def process_intervals_string(p_input_str):
 	
 	sequence = set()
 	
-	groups = re.split("[,;/#]", p_input_str)
+	regroups = re.split("[,;/#]", p_input_str)
 	
-	for grp in groups:
+	for grp in regroups:
 		interv = re.split("[:\-.]+", grp)
 		if len(interv) == 1:
 			try:
@@ -272,6 +272,7 @@ def update_oper_handler(p_proj, p_oper, p_difdict, updates_ids=None, p_connkey=N
 	logger.info("updating, proj:%s  oper:%s" % (p_proj,p_oper))
 
 	conns = None
+	ret_changed = "None"
 	
 	upd_ids_list = []
 	if not updates_ids is None:
@@ -282,7 +283,17 @@ def update_oper_handler(p_proj, p_oper, p_difdict, updates_ids=None, p_connkey=N
 	
 	if p_oper == "updref":
 		
-		updateref(p_proj, p_difdict, upd_ids_list)
+		newref_dict = updateref(p_proj, p_difdict, upd_ids_list)
+		if not newref_dict is None:
+		
+			now_dt = dt.now()
+		
+			base_ts = now_dt.strftime('%Y%m%dT%H%M%S')
+			newref_dict["timestamp"] = base_ts
+
+			save_ref(p_proj, newref_dict, now_dt)
+
+			logger.info("reference changed, proj:%s" % (p_proj,))
 		
 	elif p_oper == "upddest":
 
@@ -298,6 +309,8 @@ def update_oper_handler(p_proj, p_oper, p_difdict, updates_ids=None, p_connkey=N
 		else:	
 			connkey = p_connkey		
 		#srcreader(conns.getConn(p_connkey), o_checkdict)
+		
+	return ret_changed
 
 
 class OpOrderMgr(Singleton):
@@ -307,7 +320,7 @@ class OpOrderMgr(Singleton):
 		
 	def setord(self, p_dict):	
 		# Se linha abaixo falhar, ord nao e' incrementado desnecessariamente	
-		p_dict["oporder"] = self.ord + 1
+		p_dict["operorder"] = self.ord + 1
 		self.ord = self.ord + 1
 
 	
@@ -354,6 +367,8 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 					if not k.startswith("warning"):
 						ref_dict[k] = check_dict[k]
 				save_ref(p_proj, ref_dict, now_dt)
+
+				logger.info("reference created, proj:%s" % (p_proj,))
 				
 			else:
 				
