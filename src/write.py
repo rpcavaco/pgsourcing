@@ -19,7 +19,7 @@ def changegrp_list(p_chg_group_list, p_currdiff_block_list, p_updates_ids_list):
 				
 	return changed
 
-def changegrp(p_chg_group, p_currdiff_block, p_updates_ids_list, p_keys_byref):	
+def changegrp(p_chg_group, p_currdiff_block, p_updates_ids_list, p_keys_byref, p_limkeys_list):	
 	
 	changed = False
 	
@@ -39,21 +39,23 @@ def changegrp(p_chg_group, p_currdiff_block, p_updates_ids_list, p_keys_byref):
 			else:
 				if "diffoper" in diff_item.keys():
 					if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:
-						#print(diff_item["operorder"], p_updates_ids_list)
-						if diff_item["diffoper"] == "insert":
-							#print(p_keys_byref, k, "oper:", diff_item["diffoper"], "new:", diff_item["newvalue"])	
-							p_chg_group[k] = diff_item["newvalue"]
-							changed = True
-							#print("-->", p_chg_group)	
-							# raise RuntimeError, "stop"
-						elif diff_item["diffoper"] == "update":
-							p_chg_group[k] = diff_item["newvalue"]
-							changed = True
-						elif diff_item["diffoper"] == "delete":
-							p_chg_group.pop(k, None)
-							changed = True						
+						#print(k)
+						if len(p_limkeys_list) < 1 or k in p_limkeys_list:
+							#print(diff_item["operorder"], p_updates_ids_list)
+							if diff_item["diffoper"] == "insert":
+								#print(p_keys_byref, k, "oper:", diff_item["diffoper"], "new:", diff_item["newvalue"])	
+								p_chg_group[k] = diff_item["newvalue"]
+								changed = True
+								#print("-->", p_chg_group)	
+								# raise RuntimeError, "stop"
+							elif diff_item["diffoper"] == "update":
+								p_chg_group[k] = diff_item["newvalue"]
+								changed = True
+							elif diff_item["diffoper"] == "delete":
+								p_chg_group.pop(k, None)
+								changed = True						
 				else:
-					changed = changed | changegrp(p_chg_group[k], diff_item, p_updates_ids_list, p_keys_byref+[k]) 
+					changed = changed | changegrp(p_chg_group[k], diff_item, p_updates_ids_list, p_keys_byref+[k], p_limkeys_list) 
 					
 	elif isinstance(p_currdiff_block, list):
 		
@@ -62,9 +64,10 @@ def changegrp(p_chg_group, p_currdiff_block, p_updates_ids_list, p_keys_byref):
 	return changed
 
 	
-def updateref(p_proj, p_difdict, updates_ids_list):
+def updateref(p_proj, p_difdict, updates_ids_list, limkeys_list):
 	
-	print("updates_ids_list:", updates_ids_list)
+	# print("updates_ids_list:", updates_ids_list)
+	# print("limkeys_list:", limkeys_list)
 	
 	changed = False
 	root_ref_json = load_currentref(p_proj)
@@ -82,16 +85,13 @@ def updateref(p_proj, p_difdict, updates_ids_list):
 			
 			if grp in ref_json.keys():
 				
-				print("   grp:", grp)
-			
 				if grp in CFG_LISTGROUPS:
 					
 					changed = changed | changegrp_list(ref_json[grp], currdiff_block, updates_ids_list)
 								
 				else:
 					
-					changed = changed | changegrp(ref_json[grp], currdiff_block, updates_ids_list, [grp]) 
-					# print("tree", grp, currdiff_block.keys())
+					changed = changed | changegrp(ref_json[grp], currdiff_block, updates_ids_list, [grp], limkeys_list) 
 					
 	if changed:
 		return root_ref_json

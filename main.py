@@ -62,6 +62,7 @@ def parse_args():
 	parser.add_argument("-r", "--removecolorder", help="Remover ordenacao das colunas nas tabelas", action="store_true")
 	parser.add_argument("-g", "--genprocsdir", help="Gerar sources dos procedimentos, indicar pasta a criar", action="store")
 	parser.add_argument("-d", "--opsorder", help="Lista de operacoes (sequencia de oporder) a efetuar", action="store")
+	parser.add_argument("-k", "--limkeys", help="Filtro de atributios a alterar: apenas estes atributos serao alterados", action="store")
 	
 	args = parser.parse_args()
 	
@@ -264,7 +265,7 @@ def process_intervals_string(p_input_str):
 		
 	return sorted(sequence)
 	
-def update_oper_handler(p_proj, p_oper, p_difdict, updates_ids=None, p_connkey=None):
+def update_oper_handler(p_proj, p_oper, p_difdict, updates_ids=None, p_connkey=None, limkeys=None):
 	
 	# updates_ids - se None ou lista vazia, aplicar todo o diffdict
 	
@@ -280,10 +281,14 @@ def update_oper_handler(p_proj, p_oper, p_difdict, updates_ids=None, p_connkey=N
 			upd_ids_list = process_intervals_string(updates_ids)
 		elif isinstance(updates_ids, list):
 			upd_ids_list = updates_ids
+			
+	limkeys_list = []
+	if not limkeys is None:
+		limkeys_list.extend(re.split("[ \,;]+", limkeys))
 	
 	if p_oper == "updref":
 		
-		newref_dict = updateref(p_proj, p_difdict, upd_ids_list)
+		newref_dict = updateref(p_proj, p_difdict, upd_ids_list, limkeys_list)
 		if not newref_dict is None:
 		
 			now_dt = dt.now()
@@ -324,7 +329,9 @@ class OpOrderMgr(Singleton):
 		self.ord = self.ord + 1
 
 	
-def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=None, canuse_stdout=False, include_public=False, include_colorder=False, updates_ids=None):
+def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=None, 
+		canuse_stdout=False, include_public=False, include_colorder=False, 
+		updates_ids=None, limkeys=None):
 	
 	opordmgr = OpOrderMgr()
 	
@@ -336,7 +343,9 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	root_diff_dict = { "content": {} }
 	#ordered_diffkeys = {}
 	replaces = []
-	comparison_mode = check_oper_handler(p_proj, p_oper, refcodedir, check_dict, replaces, p_connkey=p_connkey, include_public=include_public, include_colorder=include_colorder)
+	comparison_mode = check_oper_handler(p_proj, p_oper, refcodedir, check_dict, \
+		replaces, p_connkey=p_connkey, include_public=include_public, 
+		include_colorder=include_colorder)
 	
 	# Se a operacao for chksrc ou chkdest o dicionario check_dict sera 
 	#  preenchido.
@@ -444,7 +453,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 					
 		assert not diffdict is None
 		
-		update_oper_handler(p_proj, p_oper, diffdict, updates_ids=updates_ids, p_connkey=p_connkey)
+		update_oper_handler(p_proj, p_oper, diffdict, updates_ids=updates_ids, p_connkey=p_connkey, limkeys=limkeys)
 					
 
 		
@@ -472,7 +481,8 @@ def cli_main(canuse_stdout=False):
 					canuse_stdout=canuse_stdout, 
 					include_public=args.includepublic, 
 					include_colorder = not args.removecolorder,
-					updates_ids = args.opsorder)
+					updates_ids = args.opsorder,
+					limkeys = args.limkeys)
 					
 	except:
 		logger.exception("")
