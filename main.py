@@ -14,7 +14,7 @@ import codecs
 import re
 import io
 
-from src.common import LOG_CLI_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, OPS_HELP, SETUP_ZIP, BASE_CONNCFG, BASE_FILTERS_RE, PROC_SRC_BODY_FNAME
+from src.common import LOG_CLI_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, OPS_HELP, OPS_CHECK, SETUP_ZIP, BASE_CONNCFG, BASE_FILTERS_RE, PROC_SRC_BODY_FNAME
 from src.read import srcreader
 from src.connect import Connections
 from src.compare import comparing
@@ -191,49 +191,55 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, o_checkdict, o_replaces, p
 	conns = None
 	connkey = None
 	
-	if p_oper in OPS_CONNECTED:
-		cfgpath = get_conn_cfg_path(p_proj)
-		conns = Connections(cfgpath, subkey="conn")
+	if p_oper in OPS_CHECK:
 	
-	if p_oper == "chksrc":
+		if p_oper in OPS_CONNECTED:
 
-		logger.info("checking, proj:%s  oper:%s" % (p_proj,p_oper))
-		
-		if p_connkey is None:
-			if not conns.checkConn("src"):
-				raise RuntimeError("Chksource: connection identificada com 'src' nao existe, necessario indicar chave respetiva")
-			else:
-				connkey = 'src'
-		else:	
-			connkey = p_connkey		
-				
-		ret = "From SRC"
-		
-	elif p_oper == "chkdest":
-		
-		logger.info("checking, proj:%s  oper:%s" % (p_proj,p_oper))
+			cfgpath = get_conn_cfg_path(p_proj)
+			conns = Connections(cfgpath, subkey="conn")
+			
+			if p_connkey is None:
+			
+				if p_oper == "chksrc":
 
-		if p_connkey is None:
-			if not conns.checkConn("dest"):
-				raise RuntimeError("Chkdest: connection identificada com 'dest' nao existe, necessario indicar chave respetiva")
-			else:
-				connkey = 'dest'
-		else:	
-			connkey = p_connkey		
+					if not conns.checkConn("src"):
+						raise RuntimeError("Chksource: connection identificada com 'src' nao existe, necessario indicar chave respetiva")
+					else:
+						connkey = 'src'
 
-		ret = "From REF"
-		
-	if not connkey is None:
-		
-		filters_cfg = get_filters_cfg(p_proj, connkey)
+				elif p_oper == "chkdest":
 
-		del o_replaces[:]
-		if "replace" in filters_cfg.keys():
-			o_replaces.extend(filters_cfg["replace"])
+					if not conns.checkConn("dest"):
+						raise RuntimeError("Chksource: connection identificada com 'dest' nao existe, necessario indicar chave respetiva")
+					else:
+						connkey = 'dest'
 
-		srcreader(conns.getConn(connkey), filters_cfg, p_outprocsdir, o_checkdict, include_public=include_public, include_colorder=include_colorder)
+			else:	
+				connkey = p_connkey		
 		
-	return ret
+		if p_oper == "chksrc":
+
+			logger.info("checking, proj:%s  oper:%s" % (p_proj,p_oper))
+			outprocs_dir = p_outprocsdir
+			ret = "From SRC"
+			
+		elif p_oper == "chkdest":
+			
+			logger.info("checking, proj:%s  oper:%s" % (p_proj,p_oper))
+			outprocs_dir = None
+			ret = "From REF"
+		
+		if not connkey is None:
+			
+			filters_cfg = get_filters_cfg(p_proj, connkey)
+
+			o_replaces.clear()
+			if "transformschema" in filters_cfg.keys():
+				o_replaces.update(filters_cfg["transformschema"])
+
+			srcreader(conns.getConn(connkey), filters_cfg, o_checkdict, outprocs_dir=outprocs_dir, include_public=include_public, include_colorder=include_colorder)
+		
+	return ret, connkey
 
 def process_intervals_string(p_input_str):
 	
@@ -268,7 +274,7 @@ def process_intervals_string(p_input_str):
 		
 	return sorted(sequence)
 	
-def update_oper_handler(p_proj, p_oper, p_difdict, updates_ids=None, p_connkey=None, limkeys=None):
+def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict, updates_ids=None, p_connkey=None, limkeys=None, include_public=False, include_colorder=False):
 	
 	# updates_ids - se None ou lista vazia, aplicar todo o diffdict
 	
@@ -276,6 +282,7 @@ def update_oper_handler(p_proj, p_oper, p_difdict, updates_ids=None, p_connkey=N
 	logger.info("updating, proj:%s  oper:%s" % (p_proj,p_oper))
 
 	conns = None
+	connkey = None
 	ret_changed = "None"
 	
 	upd_ids_list = []
@@ -288,35 +295,77 @@ def update_oper_handler(p_proj, p_oper, p_difdict, updates_ids=None, p_connkey=N
 	limkeys_list = []
 	if not limkeys is None:
 		limkeys_list.extend(re.split("[ \,;]+", limkeys))
+
+	now_dt = dt.now()
+	base_ts = now_dt.strftime('%Y%m%dT%H%M%S')
+
+	assert not diffdict is None
+
+	# if p_oper in OPS_CONNECTED:
+		
+		# cfgpath = get_conn_cfg_path(p_proj)
+		# conns = Connections(cfgpath, subkey="conn")
+
+		# if p_connkey is None:
+			# if not conns.checkConn("dest"):
+				# raise RuntimeError("Chkdest: connection identificada com 'dest' nao existe, necessario indicar chave respetiva")
+			# else:
+				# connkey = 'dest'
+		# else:	
+			# connkey = p_connkey		
 	
 	if p_oper == "updref":
-		
-		newref_dict = updateref(p_proj, p_difdict, upd_ids_list, limkeys_list)
+				
+		newref_dict = updateref(p_proj, diffdict, upd_ids_list, limkeys_list)
 		if not newref_dict is None:
 		
-			now_dt = dt.now()
-		
-			base_ts = now_dt.strftime('%Y%m%dT%H%M%S')
-			newref_dict["timestamp"] = base_ts
+			newref_dict["timestamp"] = base_ts			
+			newref_dict["project"] = p_proj		
+			newref_dict["pgsourcing_output_type"] = "reference"			
 
 			save_ref(p_proj, newref_dict, now_dt)
 
 			logger.info("reference changed, proj:%s" % (p_proj,))
 		
 	elif p_oper == "upddest":
+		
+		out_sql_src = updatedb(p_proj, diffdict, upd_ids_list, limkeys_list)
+		
+		print("out_sql_src", out_sql_src)
 
-		if p_oper in OPS_CONNECTED:
-			cfgpath = get_conn_cfg_path(p_proj)
-			conns = Connections(cfgpath)
+		
+		# # assert not conns is None and not connkey is None, "upddest, conns ou connkey em falta"
 
-		if p_connkey is None:
-			if not conns.checkConn("dest"):
-				raise RuntimeError("Chkdest: connection identificada com 'dest' nao existe, necessario indicar chave respetiva")
-			else:
-				connkey = 'dest'
-		else:	
-			connkey = p_connkey		
-		#srcreader(conns.getConn(p_connkey), o_checkdict)
+		# filters_cfg = get_filters_cfg(p_proj, connkey)
+
+		# transformschema = {}
+		# if "transformschema" in filters_cfg.keys():
+			# transformschema.update(filters_cfg["transformschema"])
+			
+		# check_dict = {}
+		# destreader(conns.getConn(connkey), filters_cfg, check_dict, include_public=include_public, include_colorder=include_colorder)
+		
+		# check_dict["timestamp"] = base_ts		
+		# check_dict["project"] = p_proj		
+		# check_dict["pgsourcing_output_type"] = "rawcheck"	
+
+		# root_diff_dict = { "content": {} }
+		# root_diff_dict["project"] = p_proj
+		# root_diff_dict["timestamp"] = base_ts
+		# root_diff_dict["pgsourcing_output_type"] = "diff"
+		
+		# comp_mode = "From REF"
+		
+		# #print(check_dict["content"].keys())		
+		# do_output(check_dict["content"], output='upddest_check.json', diff=False)
+
+		# comparing(p_proj, check_dict["content"], 
+			# comp_mode, transformschema, p_opordermgr, root_diff_dict["content"],
+			# to_dest=True)
+
+		# #print(root_diff_dict["content"].keys())		
+		
+		# do_output(root_diff_dict["content"], output='upddest_intermedia.json', diff=True)
 		
 	return ret_changed
 
@@ -345,8 +394,9 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	check_dict = { }
 	root_diff_dict = { "content": {} }
 	#ordered_diffkeys = {}
-	replaces = []
-	comparison_mode = check_oper_handler(p_proj, p_oper, refcodedir, check_dict, \
+	replaces = {}
+	
+	comparison_mode, connkey = check_oper_handler(p_proj, p_oper, refcodedir, check_dict, \
 		replaces, p_connkey=p_connkey, include_public=include_public, 
 		include_colorder=include_colorder)
 	
@@ -362,8 +412,11 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		base_ts = now_dt.strftime('%Y%m%dT%H%M%S')
 		check_dict["project"] = p_proj
 		check_dict["timestamp"] = base_ts
+		check_dict["pgsourcing_output_type"] = "rawcheck"
+
 		root_diff_dict["project"] = p_proj
 		root_diff_dict["timestamp"] = base_ts
+		root_diff_dict["pgsourcing_output_type"] = "diff"
 		
 		do_compare = False
 		if comparison_mode == "From SRC":
@@ -376,7 +429,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				
 				# Extrair warnings antes de gravar
 				for k in check_dict:
-					if not k.startswith("warning"):
+					if not k.startswith("warning") and k != "pgsourcing_output_type":
 						ref_dict[k] = check_dict[k]
 				save_ref(p_proj, ref_dict, now_dt)
 
@@ -403,17 +456,21 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			else:
 				do_compare = True
 		
-		comparing(p_proj, check_dict["content"], 
-						comparison_mode, replaces, opordmgr, root_diff_dict["content"])
+		if do_compare:
+
+			comparing(p_proj, check_dict["content"], 
+				comparison_mode, replaces, opordmgr, root_diff_dict["content"])
 						
 		## TODO - deve haver uma verificacao final de coerencia
 		## Sequencias - tipo da seq. == tipo do campo serial em que e usada
-
-		if root_diff_dict["content"]:
+		
+		if "content" in root_diff_dict.keys() and root_diff_dict["content"]:
 			
 			logger.info("result: DIFF FOUND (proj '%s')" % p_proj)
 			out_json = deepcopy(root_diff_dict)
 			out_json["pgsourcing_output_type"] = "diff"
+			out_json["comparison_dir"] = comparison_mode
+			out_json["connkey"] = connkey
 			do_output(out_json, output=output, interactive=canuse_stdout, diff=True)
 			
 			if not newgenprocsdir is None:
@@ -438,11 +495,12 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 										fl.write(src)									
 				
 		else:
+			
 			logger.info("result: NO DIFF (proj '%s')" % p_proj)
-			do_output(check_dict, output=output, interactive=canuse_stdout)
+			# do_output(check_dict, output=output, interactive=canuse_stdout)
 			
 	else:
-		
+
 		# Se a operacao for updref ou chkdest o dicionario check_dict sera 
 		#  preenchido.
 
@@ -452,11 +510,12 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				with open(inputf, "r") as fj:
 					diffdict = json.load(fj)
 		elif isinstance(inputf, file_types):
-			diffdict = json.load(inputf)			
-					
-		assert not diffdict is None
-		
-		update_oper_handler(p_proj, p_oper, diffdict, updates_ids=updates_ids, p_connkey=p_connkey, limkeys=limkeys)
+			diffdict = json.load(inputf)	
+			
+		update_oper_handler(p_proj, p_oper, opordmgr, 
+			diffdict, updates_ids=updates_ids, p_connkey=p_connkey, 
+			limkeys=limkeys, include_public=include_public, 
+			include_colorder=include_colorder)
 					
 
 		

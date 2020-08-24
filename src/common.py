@@ -25,8 +25,9 @@ LOG_CLI_CFG = {
 
 LANG = "pt"
 OPS = ["chksrc", "chkdest", "updref", "upddest"]
-OPS_CONNECTED = OPS
-OPS_INPUT = ["updref", "upddest"]
+OPS_CHECK = ["chksrc", "chkdest"]
+OPS_CONNECTED = ["chksrc", "chkdest", "upddest"]
+OPS_INPUT = ["updref"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
 
@@ -61,6 +62,11 @@ BASE_CONNCFG = {
 
 CFG_GROUPS = [
 	"owners", "roles", "schemas", 
+	"sequences", "tables", "procedures"
+]
+
+CFG_DEST_GROUPS = [
+	"roles", "schemas", 
 	"sequences", "tables", "procedures"
 ]
 

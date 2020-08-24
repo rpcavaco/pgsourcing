@@ -7,7 +7,7 @@ from os.path import exists, join as path_join
 
 
 from src.sql import SQL
-from src.common import OLDER_PG, PROC_SRC_BODY_FNAME, CFG_GROUPS
+from src.common import OLDER_PG, PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_LISTGROUPS, OPS_CHECK
 
 WARN_KEYS = {
 	"PROC_SU_OWNED": "Procedimentos cujo owner e' 'postgres'",
@@ -582,7 +582,7 @@ def gen_proc_file(p_genprocsdir, p_schema, p_proc_row, winendings=True):
 			fl.write(gen_proc_ftr(p_schema, p_proc_row))						
 						
 
-def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_genprocsdir, out_dict):
+def procs(p_cursor, p_filters_cfg, in_trigger_functions, out_dict, genprocsdir=None):
 	
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
 	assert "schemas" in out_dict["content"].keys(), "'content.schemas' em falta no dic. de saida"
@@ -637,7 +637,8 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_genprocsdir, out_dict
 				if not row[item] is None:
 					pdict[item] = row[item]
 
-			gen_proc_file(p_genprocsdir, sch, row)
+			if not genprocsdir is None:
+				gen_proc_file(genprocsdir, sch, row)
 					
 		wherecl = "and procedure_schema = %s and procedure_name = ANY(%s)"
 
@@ -659,9 +660,10 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_genprocsdir, out_dict
 				if not row[item] is None:
 					pdict[item] = row[item]
 
-			gen_proc_file(p_genprocsdir, sch, row)
+			if not genprocsdir is None:
+				gen_proc_file(genprocsdir, sch, row)
 		
-def srcreader(p_conn, p_filters_cfg, p_outprocs_dir, out_dict, include_public=False, include_colorder=False):
+def srcreader(p_conn, p_filters_cfg, out_dict, outprocs_dir=None, include_public=False, include_colorder=False):
 	
 	logger = logging.getLogger('pgsourcing')
 	with p_conn as cnobj:
@@ -702,26 +704,90 @@ def srcreader(p_conn, p_filters_cfg, p_outprocs_dir, out_dict, include_public=Fa
 			indexes(cr, out_dict)
 					
 			logger.info("reading procedures ..")
-			procs(cr, p_filters_cfg, trigger_functions, p_outprocs_dir, out_dict)
+			procs(cr, p_filters_cfg, trigger_functions, out_dict, genprocsdir=outprocs_dir)
 			
 			logger.info("reading finished.")
 
-	if "content" in out_dict.keys() and "replace" in p_filters_cfg.keys():
+	# if "content" in out_dict.keys() and "replace" in p_filters_cfg.keys():
 		
-		chdict = out_dict["content"]	
-		for from_schema, to_schema in p_filters_cfg["replace"]:
+		# chdict = out_dict["content"]	
+		# for from_schema, to_schema in p_filters_cfg["replace"]:
 			
-			for grp in chdict.keys():
+			# for grp in chdict.keys():
 				
-				if not grp in CFG_GROUPS:
-					continue
-					
-				for sch in chdict[grp].keys():
+				# if not grp in CFG_GROUPS:
+					# continue
 
-					if sch == from_schema:					
-						chdict[grp][to_schema] = chdict[grp].pop(sch)
-					
+				# if grp in CFG_LISTGROUPS:
+					# continue
+										
+				# for sch in chdict[grp].keys():
+
+					# if sch == from_schema:					
+						# chdict[grp][to_schema] = chdict[grp].pop(sch)
+
+# def destreader(p_conn, p_filters_cfg, out_dict, include_public=False, include_colorder=False):
+	
+	# logger = logging.getLogger('pgsourcing')
+	# with p_conn as cnobj:
+
+		# if cnobj.dict_cursor_factory is None:
+			# raise RuntimeError("destreader precisa de cursor dictionary, este driver nao parece ter um")
+
+		# cn = cnobj.getConn()
+		# trigger_functions = set()
+		
+		# with cn.cursor(cursor_factory=cnobj.dict_cursor_factory) as cr:
 			
+			# logger.info("reading roles and schemas ..")
+			
+			# schemas(cr, p_filters_cfg, include_public, out_dict)			
+			# ownership(cr, p_filters_cfg, out_dict)		
+			# roles(cr, out_dict)
+			
+			# logger.info("reading tables ..")			
+			# tables(cr, p_filters_cfg, out_dict)
+
+			# if not "sequences" in out_dict["content"].keys():
+				# out_dict["content"]["sequences"] = {}
+			
+			# logger.info("reading cols ..")
+			# columns(cr, out_dict, include_colorder)		
+			
+			# logger.info("reading triggers ..")
+			# triggers(cr, trigger_functions, out_dict)	
+			
+			# logger.info("reading sequences ..")
+			# sequences(cr, out_dict)
+			
+			# logger.info("reading constraints ..")
+			# constraints(cr, out_dict)
+			
+			# logger.info("reading indexes ..")
+			# indexes(cr, out_dict)
+					
+			# logger.info("reading procedures ..")
+			# procs(cr, p_filters_cfg, trigger_functions, out_dict)
+			
+			# logger.info("reading finished.")
+
+	# if "content" in out_dict.keys() and "replace" in p_filters_cfg.keys():
+		
+		# chdict = out_dict["content"]	
+		# for from_schema, to_schema in p_filters_cfg["replace"]:
+			
+			# for grp in chdict.keys():
+				
+				# if not grp in CFG_GROUPS:
+					# continue
+					
+				# if grp in CFG_LISTGROUPS:
+					# continue
+					
+				# for sch in chdict[grp].keys():
+
+					# if sch == from_schema:					
+						# chdict[grp][to_schema] = chdict[grp].pop(sch)
 
 			
 

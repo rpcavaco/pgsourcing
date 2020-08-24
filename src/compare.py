@@ -7,7 +7,7 @@ from os.path import exists
 from copy import deepcopy
 from difflib import unified_diff as dodiff
 
-from src.common import PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_LISTGROUPS
+from src.common import PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_DEST_GROUPS, CFG_LISTGROUPS
 from src.fileandpath import load_currentref
 
 # def _get_diff_item(p_fase, p_parentgrp, p_diff_dict, p_grpkey, p_k=None):
@@ -42,7 +42,7 @@ def get_diff_item(p_fase, p_diff_dict, p_grpkeys, b_leaf_is_list=False):
 	return diff_dict
 		
 
-def sourcediff(p_srca, p_srcb, p_replaces, out_dellist): #, out_addlist):
+def sourcediff(p_srca, p_srcb, p_transformschema, out_dellist): #, out_addlist):
 	
 	del out_dellist[:]
 
@@ -56,8 +56,10 @@ def sourcediff(p_srca, p_srcb, p_replaces, out_dellist): #, out_addlist):
 	else:
 		srcb = p_srcb.decode('utf-8')
 		
-	for from_schema, to_schema in p_replaces:
-		srca = srca.replace(to_schema, from_schema)
+	if p_transformschema:
+		if "procedures" in p_transformschema["types"]:
+			for trans in p_transformschema["trans"]:
+				srca = srca.replace(trans["src"], trans["dest"])
 		
 	rawlistA= srca.splitlines(True)
 	rawlistB = srcb.splitlines(True)
@@ -78,7 +80,7 @@ def sourcediff(p_srca, p_srcb, p_replaces, out_dellist): #, out_addlist):
 	
 	return srca
 	
-def comparegrp(p_leftdic, p_rightdic, grpkeys, p_replaces, p_opordmgr, o_diff_dict): 
+def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_diff_dict): 
 		
 	grpkey = grpkeys[-1]
 	tmp_l = p_leftdic[grpkey]
@@ -119,7 +121,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_replaces, p_opordmgr, o_diff_di
 				diff_item["diffoper"] = "delete"
 			else:
 				if isinstance(tmp_l[k], dict) and isinstance(tmp_r[k], dict):
-					comparegrp(tmp_l, tmp_r, klist, p_replaces, p_opordmgr, diff_dict)
+					comparegrp(tmp_l, tmp_r, klist, p_transformschema, p_opordmgr, diff_dict)
 				elif isinstance(tmp_l[k], list) and isinstance(tmp_r[k], list):
 					comparegrp_list(tmp_l, tmp_r, klist, p_opordmgr, diff_dict)
 				elif isinstance(tmp_l[k], dict):
@@ -139,7 +141,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_replaces, p_opordmgr, o_diff_di
 						
 						# source de funcao / procedimento
 						difflist = []
-						newleft = sourcediff(tmp_l[k], tmp_r[k], p_replaces, difflist)
+						newleft = sourcediff(tmp_l[k], tmp_r[k], p_transformschema, difflist)
 						if len(difflist) > 0:
 							diff_item = get_diff_item('e', diff_dict, klist)
 							diff_item["difflines"] = difflist
@@ -152,14 +154,18 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_replaces, p_opordmgr, o_diff_di
 						rightval = tmp_r[k]
 						leftval = tmp_l[k]
 						
-						if grpkeys[-1] == "index":
-							for from_schema, to_schema in p_replaces:
-								leftval = leftval.replace(to_schema, from_schema)
-						elif grpkeys[-2] == "trigger":
-							if k == "function_schema":
-								for from_schema, to_schema in p_replaces:
-									leftval = leftval.replace(to_schema, from_schema)
-
+						if p_transformschema:
+						
+							if grpkeys[-1] == "index":
+								if "tables" in p_transformschema["types"] or "indexes" in p_transformschema["types"]:
+									for trans in p_transformschema["trans"]:
+										leftval = leftval.replace(trans["src"], trans["dest"])
+							elif grpkeys[-2] == "trigger":
+								if k == "function_schema":
+									if "procedures" in p_transformschema["types"] or "triggers" in p_transformschema["types"]:
+										for trans in p_transformschema["trans"]:
+											leftval = leftval.replace(trans["src"], trans["dest"])
+											
 						if leftval != rightval:
 							diff_item = get_diff_item('f', diff_dict, klist)
 							p_opordmgr.setord(diff_item)
@@ -212,7 +218,7 @@ def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict):
 				root_diff_item.append(deepcopy(diff_item))
 										
 
-def comparing(p_proj, p_check_dict, p_comparison_mode, p_replaces, p_opordmgr, o_diff_dict):
+def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opordmgr, o_diff_dict):
 	
 	raw_ref_json = load_currentref(p_proj)
 		
@@ -220,35 +226,61 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_replaces, p_opordmgr, o
 	
 	ref_json = raw_ref_json["content"]
 	
+	print("comparison_mode:", p_comparison_mode)
+
 	if p_comparison_mode == "From SRC": 
+				
 		l_dict = p_check_dict
 		r_dict = ref_json
-	else:
+
+		grplist = CFG_GROUPS
+		
+	else:	
+			
 		r_dict = p_check_dict
 		l_dict = ref_json
-		
-	# Coparar lista schemas~
+
+		if p_transformschema:
+			
+			
+			for sch in l_dict["schemas"].keys():
+				for trans in p_transformschema["trans"]:
+					if sch == trans["src"]:
+						l_dict["schemas"][trans["dest"]] = l_dict["schemas"].pop(sch)
+						break
+
+			for tk in p_transformschema["types"]:
+				if tk == "schemas":
+					continue
+				if tk in l_dict.keys():
+					for sch in l_dict[tk].keys():
+						for trans in p_transformschema["trans"]:
+							if sch == trans["src"]:
+								l_dict[tk][trans["dest"]] = l_dict[tk].pop(sch)
+								break			
+			
+		grplist = CFG_DEST_GROUPS
 	
-	for grp in CFG_GROUPS:
+	for grp in grplist:
 		
 		if grp in CFG_LISTGROUPS:
 			comparegrp_list(l_dict, r_dict, [grp], p_opordmgr, o_diff_dict)
 		else:	
-			comparegrp(l_dict, r_dict, [grp], p_replaces, p_opordmgr, o_diff_dict)
+			comparegrp(l_dict, r_dict, [grp], p_transformschema, p_opordmgr, o_diff_dict)
 			
 	chdict = o_diff_dict	
-	for from_schema, to_schema in p_replaces:
+	# for from_schema, to_schema in p_replaces:
 
-		for grp in chdict.keys():
+		# for grp in chdict.keys():
 			
-			if not grp in CFG_GROUPS:
-				continue
-			if grp in CFG_LISTGROUPS:
-				continue
+			# if not grp in CFG_GROUPS:
+				# continue
+			# if grp in CFG_LISTGROUPS:
+				# continue
 				
-			for sch in chdict[grp].keys():
+			# for sch in chdict[grp].keys():
 
-				if sch == to_schema:					
-					chdict[grp][from_schema] = chdict[grp].pop(sch)
+				# if sch == to_schema:					
+					# chdict[grp][from_schema+"_"] = chdict[grp].pop(sch)
 			
 			
