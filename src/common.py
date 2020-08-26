@@ -26,8 +26,9 @@ LOG_CLI_CFG = {
 LANG = "pt"
 OPS = ["chksrc", "chkdest", "updref", "upddest"]
 OPS_CHECK = ["chksrc", "chkdest"]
-OPS_CONNECTED = ["chksrc", "chkdest", "upddest"]
-OPS_INPUT = ["updref"]
+OPS_CONNECTED = ["chksrc", "chkdest"]
+OPS_INPUT = ["updref", "upddest"]
+OPS_OUTPUT = ["upddest"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
 
@@ -72,5 +73,8 @@ CFG_DEST_GROUPS = [
 
 CFG_LISTGROUPS = ["owners"]
 
+FLOAT_TYPES = ["numeric", "float"]
+INT_TYPES = ["integer", "smallint"]
 
+COL_ITEMS_CHG_AVOIDING_SUBSTITUTION = ["default", "nullable"]
 

@@ -7,7 +7,7 @@ from os.path import exists, join as path_join
 
 
 from src.sql import SQL
-from src.common import OLDER_PG, PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_LISTGROUPS, OPS_CHECK
+from src.common import OLDER_PG, PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_LISTGROUPS, OPS_CHECK, FLOAT_TYPES, INT_TYPES
 
 WARN_KEYS = {
 	"PROC_SU_OWNED": "Procedimentos cujo owner e' 'postgres'",
@@ -262,6 +262,10 @@ def tables(p_cursor, p_filters_cfg, out_dict):
 				"owner": row["tableowner"]
 			}
 			
+			if not row["tablespace"] is None:
+				sch_dict[row["tablename"]]["tablespace"] = row["tablespace"]
+				
+			
 	## TODO - contar registos, ler dados das parameterstables
 
 def columns(p_cursor, out_dict, p_include_colorder):
@@ -277,7 +281,8 @@ def columns(p_cursor, out_dict, p_include_colorder):
 					("character_maximum_length", "char_max_len"), 
 					("numeric_precision", "num_precision"),
 					("numeric_precision_radix", "num_prec_radix"),
-					("datetime_precision", "dttime_precision")
+					("numeric_scale", "num_scale"),
+					#("datetime_precision", "dttime_precision")
 				]
 	
 	for schema_name in tables_root.keys():
@@ -313,30 +318,50 @@ def columns(p_cursor, out_dict, p_include_colorder):
 					
 					if not row[opt_colname] is None:
 						
-						col_dict[opt_key] = row[opt_colname]	
-						
 						# detetar dependencias entre schemas, avaliando se
 						# sao invocadas sequencias de outros schemas
 						#
 						if opt_key == "default":
-
-							match = pattern.match(col_dict[opt_key])
-							if not match is None:
+							
+							if col_dict["type"] in FLOAT_TYPES:								
+								try:
+									parsed_val =  float(row[opt_colname])
+								except ValueError:
+									parsed_val =  row[opt_colname]
+							elif col_dict["type"] in INT_TYPES:								
+								try:
+									parsed_val =  int(row[opt_colname])
+								except ValueError:
+									parsed_val =  row[opt_colname]
+							else:
+								parsed_val =  row[opt_colname]
 								
-								found_schema = match.group("schema")
-								seqname = match.group("seqname")
+							col_dict[opt_key] = parsed_val
+							
+							if isinstance(parsed_val, basestring):
 
-								# coletar nomes de sequencia em uso
+								match = pattern.match(parsed_val)
+								if not match is None:
+									
+									found_schema = match.group("schema")
+									seqname = match.group("seqname")
+
+									# coletar nomes de sequencia em uso
+									
+									if not schema_name in out_dict["content"]["sequences"].keys():
+										seqs = out_dict["content"]["sequences"][schema_name] = {}
+									else:
+										seqs = out_dict["content"]["sequences"][schema_name]
+										
+									if not seqname in seqs.keys():
+										seqs[seqname] = {}
+										
+									schema_dependency(found_schema, schema_name, "sequences")	
 								
-								if not schema_name in out_dict["content"]["sequences"].keys():
-									seqs = out_dict["content"]["sequences"][schema_name] = {}
-								else:
-									seqs = out_dict["content"]["sequences"][schema_name]
-									
-								if not seqname in seqs.keys():
-									seqs[seqname] = {}
-									
-								schema_dependency(found_schema, schema_name, "sequences")	
+						else:
+
+							col_dict[opt_key] = row[opt_colname]	
+						
 
 		#print(schema_name, unreadable_tables)
 
@@ -363,11 +388,12 @@ def constraints(p_cursor, out_dict):
 				else:
 					constrs_dict = tables_root[schema_name][table_name][dk]
 
-				constr_list = constrs_dict[row["constraint_name"]] = []
-
-				ck = "column_name"
-				if not row[ck] is None:
-					constr_list.append( row[ck]	)			
+				constr_list = constrs_dict[row["constraint_name"]] = {
+				
+					"index_tablespace": row["idxtblspc"],
+					"columns": row["column_names"]
+				
+				}
 
 			p_cursor.execute(SQL["CHECKS"], (schema_name, table_name))
 
@@ -451,7 +477,7 @@ def indexes(p_cursor, out_dict):
 					else:
 						constrs_dict = tables_root[schema_name][table_name][dk]
 						
-					constrs_dict[row["indexname"]] = row["indexdef"]
+					constrs_dict[row["indexname"]] = { "idxdesc": row["indexdef"] }
 
 def sequences(p_cursor, out_dict):
 	

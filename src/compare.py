@@ -28,6 +28,33 @@ from src.fileandpath import load_currentref
 		# ret = root[p_grpkey][p_k]
 	# return ret
 
+def do_transformschema(p_transformschema, p_obj, p_k):
+	if p_k == "idxdesc":
+		if "tables" in p_transformschema["types"] or "indexes" in p_transformschema["types"]:
+			for trans in p_transformschema["trans"]:
+				p_obj[p_k] = p_obj[p_k].replace(trans["src"], trans["dest"])
+	elif p_k == "function_schema":
+		if "procedures" in p_transformschema["types"] or "triggers" in p_transformschema["types"]:
+			for trans in p_transformschema["trans"]:
+				p_obj[p_k] = p_obj[p_k].replace(trans["src"], trans["dest"])
+	elif p_k == "index_tablespace":
+		if "tables" in p_transformschema["types"] or "indexes" in p_transformschema["types"]:
+			for trans in p_transformschema["trans"]:
+				p_obj[p_k] = p_obj[p_k].replace(trans["src"], trans["dest"])
+					
+def traverse_replaceval(p_transformschema, p_obj, p_mode):
+
+	if not p_transformschema:
+		return
+		
+	for k in p_obj.keys():	
+		
+		do_transformschema(p_transformschema, p_obj, k)	
+
+		if isinstance(p_obj[k], dict):
+			traverse_replaceval(p_transformschema, p_obj[k], p_mode)
+		
+	
 def get_diff_item(p_fase, p_diff_dict, p_grpkeys, b_leaf_is_list=False):
 	
 	diff_dict = p_diff_dict
@@ -86,6 +113,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 	tmp_l = p_leftdic[grpkey]
 	
 	diff_dict = o_diff_dict
+	ret = None
 		
 	#print("comparegrp", grpkeys, diff_dict)
 	
@@ -95,8 +123,10 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 
 		#diff_item = _get_diff_item('a',newparentgroup, diff_dict, grpkey)
 		p_opordmgr.setord(diff_item)
-		diff_item["diffoper"] = "insert"
-		diff_item["value"] = deepcopy(tmp_l)
+		diff_item["diffoper"] = "insert"   
+		newvalue = deepcopy(tmp_l)
+		traverse_replaceval(p_transformschema, newvalue, "insert A")
+		diff_item["value"] = newvalue
 		
 	else:
 	
@@ -105,6 +135,10 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 		keyset.update(tmp_r.keys())
 		
 		for k in sorted(keyset):
+			
+			# if k == "pkey":
+				# print(grpkeys, k)
+				
 			klist  = grpkeys+[k]
 			if k in tmp_l.keys() and not k in tmp_r.keys():
 				# left only
@@ -112,7 +146,9 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 				diff_item = get_diff_item('b', diff_dict, klist)
 				p_opordmgr.setord(diff_item)
 				diff_item["diffoper"] = "insert"
-				diff_item["newvalue"] = deepcopy(tmp_l[k])
+				newvalue = deepcopy(tmp_l[k])
+				traverse_replaceval(p_transformschema, newvalue, "insert B")
+				diff_item["newvalue"] = newvalue
 			elif k in tmp_r.keys() and not k in tmp_l.keys():
 				# right only
 				#diff_item = _get_diff_item('b',newparentgroup, diff_dict, grpkey, k)
@@ -121,9 +157,25 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 				diff_item["diffoper"] = "delete"
 			else:
 				if isinstance(tmp_l[k], dict) and isinstance(tmp_r[k], dict):
-					comparegrp(tmp_l, tmp_r, klist, p_transformschema, p_opordmgr, diff_dict)
+					upperlevel_op = comparegrp(tmp_l, tmp_r, klist, p_transformschema, p_opordmgr, diff_dict)
+					if upperlevel_op:
+						if k == upperlevel_op["key"] and grpkeys == upperlevel_op["keychain"]:
+							diff_item = get_diff_item('b2', diff_dict, klist)
+							diff_item["diffoper"] = "update"
+							diff_item["newvalue"] = deepcopy(tmp_l[k])
+						else:
+							return upperlevel_op
+
 				elif isinstance(tmp_l[k], list) and isinstance(tmp_r[k], list):
-					comparegrp_list(tmp_l, tmp_r, klist, p_opordmgr, diff_dict)
+					upperlevel_op = comparegrp_list(tmp_l, tmp_r, klist, p_opordmgr, diff_dict)
+					if upperlevel_op:
+						if k == upperlevel_op["key"] and grpkeys == upperlevel_op["keychain"]:
+							diff_item = get_diff_item('b3', diff_dict, klist)
+							diff_item["diffoper"] = "update"
+							diff_item["newvalue"] = deepcopy(tmp_l[k])
+						else:
+							return upperlevel_op
+						
 				elif isinstance(tmp_l[k], dict):
 					assert not isinstance(tmp_r[k], list), "dict a comparar com list, chave: %s" % k
 					diff_item = get_diff_item('c', diff_dict, klist)
@@ -149,22 +201,25 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 							diff_item["diffoper"] = "update"
 							diff_item["newvalue"] = newleft
 							
+					# elif k == "pkey":
+						
+						
+						
+						# rightval = tmp_r[k]						
+						# if p_transformschema:
+							# do_transformschema(p_transformschema, tmp_l, k)	
+						# leftval = tmp_l[k]	
+						
+						# print("leftval", leftval)
+						# print("rightval", rightval)
+						
+						
 					else:
 
-						rightval = tmp_r[k]
-						leftval = tmp_l[k]
-						
+						rightval = tmp_r[k]						
 						if p_transformschema:
-						
-							if grpkeys[-1] == "index":
-								if "tables" in p_transformschema["types"] or "indexes" in p_transformschema["types"]:
-									for trans in p_transformschema["trans"]:
-										leftval = leftval.replace(trans["src"], trans["dest"])
-							elif grpkeys[-2] == "trigger":
-								if k == "function_schema":
-									if "procedures" in p_transformschema["types"] or "triggers" in p_transformschema["types"]:
-										for trans in p_transformschema["trans"]:
-											leftval = leftval.replace(trans["src"], trans["dest"])
+							do_transformschema(p_transformschema, tmp_l, k)	
+						leftval = tmp_l[k]	
 											
 						if leftval != rightval:
 							diff_item = get_diff_item('f', diff_dict, klist)
@@ -172,6 +227,8 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 							diff_item["diffoper"] = "update"
 							diff_item["newvalue"] = leftval
 							diff_item["oldvalue"] = rightval
+							
+	return ret
 						
 
 
@@ -181,6 +238,8 @@ def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict):
 	tmp_l = p_leftdic[grpkey]
 	diff_dict = o_diff_dict
 	root_diff_item = None
+	
+	ret = None
 	
 	if not grpkey in p_rightdic.keys():
 		
@@ -198,7 +257,15 @@ def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict):
 		
 		
 		for k in sorted(keyset):
+			
 			if k in tmp_l and not k in tmp_r:
+				
+				if "pkey" in grpkeys:
+					
+					ki = grpkeys.index("pkey")
+					ret = {"op": "update",  "keychain": grpkeys[:ki+1], "key": grpkeys[ki+1]}
+					break
+					
 				# left only
 				diff_item = {}
 				p_opordmgr.setord(diff_item)
@@ -216,6 +283,8 @@ def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict):
 				if root_diff_item is None:
 					root_diff_item = get_diff_item('B', diff_dict, grpkeys, b_leaf_is_list=True)
 				root_diff_item.append(deepcopy(diff_item))
+				
+	return ret
 										
 
 def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opordmgr, o_diff_dict):
@@ -226,7 +295,7 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 	
 	ref_json = raw_ref_json["content"]
 	
-	print("comparison_mode:", p_comparison_mode)
+	# print("comparison_mode:", p_comparison_mode)
 
 	if p_comparison_mode == "From SRC": 
 				
@@ -283,4 +352,4 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 				# if sch == to_schema:					
 					# chdict[grp][from_schema+"_"] = chdict[grp].pop(sch)
 			
-			
+

@@ -38,28 +38,48 @@ SQL = {
 				and relnamespace::regnamespace::text = %s
 				and c.relname = %s
 			) a""",
-	"TABLES": """SELECT schemaname, tablename, tableowner
+	"TABLES": """SELECT schemaname, tablename, tableowner, tablespace
 		FROM pg_tables
 		WHERE schemaname NOT LIKE 'pg\_%'""",
 	"COLUMNS": """SELECT column_name, ordinal_position,
 			column_default, is_nullable, data_type,
 			character_maximum_length, numeric_precision,
-			numeric_precision_radix, datetime_precision,
+			numeric_precision_radix, numeric_scale, datetime_precision,
 			udt_name
 		FROM information_schema.columns
 		WHERE table_schema = %s
 			AND table_name = %s
 		ORDER BY ordinal_position""",
-	"PKEYS": """select
-			tc.constraint_name,
-			kcu.column_name
-		from information_schema.table_constraints as tc
-		join information_schema.key_column_usage as kcu 
-			using (constraint_schema, constraint_name, table_name)
-		WHERE tc.constraint_schema = %s
-			AND tc.table_name = %s
-			and tc.constraint_type = 'PRIMARY KEY'
-		ORDER BY kcu.ordinal_position""",
+	# "PKEYS": """select
+			# tc.constraint_name,
+			# kcu.column_name
+		# from information_schema.table_constraints as tc
+		# join information_schema.key_column_usage as kcu 
+			# using (constraint_schema, constraint_name, table_name)
+		# WHERE tc.constraint_schema = %s
+			# AND tc.table_name = %s
+			# and tc.constraint_type = 'PRIMARY KEY'
+		# ORDER BY kcu.ordinal_position""",
+	"PKEYS": """select idxtblspc, conname as constraint_name, json_agg(attname) column_names
+		from
+		(select n3.nspname as idxtblspc, c.conname, t.oid, 
+		unnest(c.conkey) attnum
+		FROM pg_constraint c 
+		JOIN pg_class t
+			ON c.conrelid = t.oid
+		JOIN pg_namespace n2
+		  ON n2.oid = t.relnamespace
+		JOIN pg_class i
+			ON c.conindid = i.oid
+		JOIN pg_namespace n3
+		  ON n3.oid = i.relnamespace 
+		WHERE contype IN ('p')
+		AND n2.nspname = %s
+		AND t.relname = %s) a
+		JOIN pg_attribute atr
+			ON a.oid = atr.attrelid 
+			and a.attnum = atr.attnum
+		GROUP BY idxtblspc, conname""",
 	"FKEYS": r"""select conname, cdef
 			from
 			(

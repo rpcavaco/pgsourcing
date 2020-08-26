@@ -14,13 +14,13 @@ import codecs
 import re
 import io
 
-from src.common import LOG_CLI_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, OPS_HELP, OPS_CHECK, SETUP_ZIP, BASE_CONNCFG, BASE_FILTERS_RE, PROC_SRC_BODY_FNAME
+from src.common import LOG_CLI_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, OPS_OUTPUT, OPS_HELP, OPS_CHECK, SETUP_ZIP, BASE_CONNCFG, BASE_FILTERS_RE, PROC_SRC_BODY_FNAME
 from src.read import srcreader
 from src.connect import Connections
 from src.compare import comparing
 from src.zip import gen_setup_zip
 from src.fileandpath import get_conn_cfg_path, get_filters_cfg, exists_currentref, to_jsonfile, save_ref, get_refcodedir, save_warnings
-from src.write import updateref
+from src.write import updateref, updatedb
 
 try:
     file_types = (file, io.IOBase)
@@ -98,6 +98,10 @@ def parse_args():
 		if args.oper in OPS_INPUT and args.input is None:
 			parser.print_help()
 			raise RuntimeError("Operacao '%s' exige indicacao ficheiro de entrada com opcao -i" % args.oper)
+
+		if args.oper in OPS_OUTPUT and args.output is None:
+			parser.print_help()
+			raise RuntimeError("Operacao '%s' exige indicacao ficheiro de saida com opcao -o" % args.oper)
 			
 	if args.input:
 		assert exists(args.input), "Ficheiro de entrada inexistente: '%s'" % args.input
@@ -139,6 +143,41 @@ def do_output(p_obj, output=None, interactive=False, diff=False):
 					
 			if dosave:
 				to_jsonfile(p_obj, output)
+				
+def do_linesoutput(p_obj, output=None, interactive=False):
+	
+	outer_sep = ";\n"
+
+	if len(p_obj) > 0:
+		
+		finallines = []
+		for item in p_obj:
+			if isinstance(item, basestring):
+				finallines.append(item + outer_sep)
+			elif isinstance(item, list):
+				finallines.append("\n".join(item) + outer_sep)
+		
+		if output is None:
+			if interactive:
+				out_str = "\n".join(finallines[:5])
+				print(out_str) 
+		else:
+			dosave = False
+			if exists(output) and interactive:
+				prompt = "Ficheiro de saida existe, sobreescrever ? (s/n)"
+				try:
+					resp = raw_input(prompt)
+				except NameError:
+					resp = input(prompt)
+				if resp.lower() == 's':
+					dosave = True
+			else:
+				dosave = True
+					
+			if dosave:
+				with open(output, "w") as fj:
+					fj.writelines("\n".join(finallines))
+
 			
 def check_filesystem():
 	
@@ -274,7 +313,10 @@ def process_intervals_string(p_input_str):
 		
 	return sorted(sequence)
 	
-def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict, updates_ids=None, p_connkey=None, limkeys=None, include_public=False, include_colorder=False):
+def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict, 
+		updates_ids=None, p_connkey=None, limkeys=None, 
+		include_public=False, include_colorder=False,
+		output=None, canuse_stdout=False):
 	
 	# updates_ids - se None ou lista vazia, aplicar todo o diffdict
 	
@@ -287,7 +329,7 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict, updates_ids=None
 	
 	upd_ids_list = []
 	if not updates_ids is None:
-		if isinstance(updates_ids, str):
+		if isinstance(updates_ids, basestring):
 			upd_ids_list = process_intervals_string(updates_ids)
 		elif isinstance(updates_ids, list):
 			upd_ids_list = updates_ids
@@ -329,43 +371,10 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict, updates_ids=None
 		
 	elif p_oper == "upddest":
 		
-		out_sql_src = updatedb(p_proj, diffdict, upd_ids_list, limkeys_list)
-		
-		print("out_sql_src", out_sql_src)
+		out_sql_src = updatedb(p_proj, diffdict, upd_ids_list, limkeys_list)			
+		do_linesoutput(out_sql_src, output=output, interactive=canuse_stdout)
 
-		
-		# # assert not conns is None and not connkey is None, "upddest, conns ou connkey em falta"
-
-		# filters_cfg = get_filters_cfg(p_proj, connkey)
-
-		# transformschema = {}
-		# if "transformschema" in filters_cfg.keys():
-			# transformschema.update(filters_cfg["transformschema"])
-			
-		# check_dict = {}
-		# destreader(conns.getConn(connkey), filters_cfg, check_dict, include_public=include_public, include_colorder=include_colorder)
-		
-		# check_dict["timestamp"] = base_ts		
-		# check_dict["project"] = p_proj		
-		# check_dict["pgsourcing_output_type"] = "rawcheck"	
-
-		# root_diff_dict = { "content": {} }
-		# root_diff_dict["project"] = p_proj
-		# root_diff_dict["timestamp"] = base_ts
-		# root_diff_dict["pgsourcing_output_type"] = "diff"
-		
-		# comp_mode = "From REF"
-		
-		# #print(check_dict["content"].keys())		
-		# do_output(check_dict["content"], output='upddest_check.json', diff=False)
-
-		# comparing(p_proj, check_dict["content"], 
-			# comp_mode, transformschema, p_opordermgr, root_diff_dict["content"],
-			# to_dest=True)
-
-		# #print(root_diff_dict["content"].keys())		
-		
-		# do_output(root_diff_dict["content"], output='upddest_intermedia.json', diff=True)
+		logger.info("dest change script for proj. %s, %s" % (p_proj,output))
 		
 	return ret_changed
 
@@ -505,7 +514,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		#  preenchido.
 
 		diffdict = None
-		if isinstance(inputf, str):
+		if isinstance(inputf, basestring):
 			if exists(inputf):
 				with open(inputf, "r") as fj:
 					diffdict = json.load(fj)
@@ -515,10 +524,10 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		update_oper_handler(p_proj, p_oper, opordmgr, 
 			diffdict, updates_ids=updates_ids, p_connkey=p_connkey, 
 			limkeys=limkeys, include_public=include_public, 
-			include_colorder=include_colorder)
+			include_colorder=include_colorder, output=output, 
+			canuse_stdout=canuse_stdout)
 					
-
-		
+	
 # ######################################################################
 
 def cli_main(canuse_stdout=False):
