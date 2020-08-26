@@ -6,6 +6,9 @@ from src.common import CFG_GROUPS, CFG_LISTGROUPS, COL_ITEMS_CHG_AVOIDING_SUBSTI
 
 SQL_CREATE_PK = """%s ADD CONSTRAINT %s PRIMARY KEY (%s)
     USING INDEX TABLESPACE %s"""
+    
+SQL_CREATE_UNIQUE = """%s ADD CONSTRAINT %s UNIQUE (%s)
+    USING INDEX TABLESPACE %s"""
 
 SQL_CREATE_CONSTR = "%s ADD CONSTRAINT %s %s"
 
@@ -347,6 +350,22 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 										nv = di["newvalue"]
 										out_sql_src.append(nv["idxdesc"])						
 
+					if "unique" in diff_item.keys():							
+						if "diffoper" in diff_item["unique"].keys():	
+							if len(p_updates_ids_list) < 1 or diff_item["unique"]["operorder"] in p_updates_ids_list:						
+								if diff_item["unique"]["diffoper"] == "insert":
+									for cnstrname in diff_item["unique"]["newvalue"].keys():
+										nv = diff_item["unique"]["newvalue"][cnstrname]
+										out_sql_src.append(SQL_CREATE_UNIQUE % (tmplt % (sch, tname), cnstrname, ",".join(nv["columns"]), nv["index_tablespace"]))	
+						else:
+							for pkname in diff_item["unique"].keys():	
+								di = diff_item["unique"][pkname]
+								if "diffoper" in di.keys():
+									if di["diffoper"] in ("insert", "update"):
+										if di["diffoper"] == "update":
+											out_sql_src.append(SQL_DROP_CONSTR % (tmpltd % (sch, tname), pkname))
+										nv = di["newvalue"]
+										out_sql_src.append(SQL_CREATE_UNIQUE % (tmplt % (sch, tname), pkname, ",".join(nv["columns"]), nv["index_tablespace"]))									
 						
 						
 									

@@ -35,7 +35,7 @@ PROC_SRC_BODY_FNAME = "body"
 #  ou "update" (com "newvalue" igual 'a totalidade do objeto,
 #  num nivel na arvore acima daquele onde a diferenca foi
 #  detetada.
-UPPERLEVELOPS_KEYS = ["pkey", "check", "index"]
+UPPERLEVELOPS_KEYS = ["pkey", "check", "index", "unique"]
 
 OPS_HELP = {
 	"pt": {

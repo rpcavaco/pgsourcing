@@ -417,7 +417,12 @@ def constraints(p_cursor, out_dict):
 				else:
 					constrs_dict = tables_root[schema_name][table_name][dk]
 
-				constrs_dict[row["conname"]] = row["cdef"]		
+				constr_list = constrs_dict[row["constraint_name"]] = {
+				
+					"index_tablespace": row["idxtblspc"],
+					"columns": row["column_names"]
+				
+				}
 
 			p_cursor.execute(SQL["FKEYS"], (schema_name, table_name))
 			
@@ -465,10 +470,15 @@ def indexes(p_cursor, out_dict):
 			else:
 				pkeys = []
 
+			if "unique" in tables_root[schema_name][table_name].keys():
+				unique = tables_root[schema_name][table_name]["unique"].keys()
+			else:
+				unique = []
+
 			p_cursor.execute(SQL["INDEXES"], (schema_name, table_name))
 			for row in p_cursor:
 				
-				if not row["indexname"] in pkeys:	
+				if not row["indexname"] in pkeys and not row["indexname"] in unique:	
 												
 					dk = "index"
 					if not dk in tables_root[schema_name][table_name]:

@@ -56,8 +56,7 @@ def traverse_replaceval(p_transformschema, p_obj, p_mode):
 		do_transformschema(p_transformschema, p_obj, k)	
 
 		if isinstance(p_obj[k], dict):
-			traverse_replaceval(p_transformschema, p_obj[k], p_mode)
-		
+			traverse_replaceval(p_transformschema, p_obj[k], p_mode)		
 	
 def get_diff_item(p_fase, p_diff_dict, p_grpkeys, b_leaf_is_list=False):
 	
@@ -70,8 +69,7 @@ def get_diff_item(p_fase, p_diff_dict, p_grpkeys, b_leaf_is_list=False):
 				diff_dict[k] = {}
 		diff_dict = diff_dict[k]
 		
-	return diff_dict
-		
+	return diff_dict		
 
 def sourcediff(p_srca, p_srcb, p_transformschema, out_dellist): #, out_addlist):
 	

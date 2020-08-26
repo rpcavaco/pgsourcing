@@ -98,25 +98,26 @@ SQL = {
 		WHERE contype IN ('c')
 		AND n2.nspname = %s
 		AND t.relname = %s""",
-	"UNIQUE": r"""select conname, cdef
-			from
-			(
-				select b.conname, b.cdef,
-				(regexp_split_to_array(b.table_from, E'\\.'))[2] as table_name
-				from 
-				( 
-					SELECT 
-					  conrelid::regclass::text AS table_from,
-					  conname,
-					  pg_get_constraintdef(c.oid) AS cdef 
-					FROM pg_constraint c 
-					JOIN pg_namespace n 
-					  ON n.oid = c.connamespace 
-					WHERE contype IN ('u') 
-					AND n.nspname = %s 
-				) b
-			) a
-			where a.table_name = %s""",
+	"UNIQUE": """select idxtblspc, conname as constraint_name, json_agg(attname) column_names
+		from
+		(select n3.nspname as idxtblspc, c.conname, t.oid, 
+		unnest(c.conkey) attnum
+		FROM pg_constraint c 
+		JOIN pg_class t
+			ON c.conrelid = t.oid
+		JOIN pg_namespace n2
+		  ON n2.oid = t.relnamespace
+		JOIN pg_class i
+			ON c.conindid = i.oid
+		JOIN pg_namespace n3
+		  ON n3.oid = i.relnamespace 
+		WHERE contype IN ('u')
+		AND n2.nspname = %s
+		AND t.relname = %s) a
+		JOIN pg_attribute atr
+			ON a.oid = atr.attrelid 
+			and a.attnum = atr.attnum
+		GROUP BY idxtblspc, conname""",		
 	"INDEXES": """SELECT indexname, indexdef
 			FROM
 				pg_indexes
