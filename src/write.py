@@ -290,6 +290,10 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 						table_operation(sch, tname, diff_item, delmode, out_sql_src)
 					
 				else:
+
+					if "owner" in diff_item.keys():	
+						if diff_item["owner"]["diffoper"] == "update":
+							out_sql_src.append("ALTER TABLE %s.%s OWNER to %s" % (sch, tname, diff_item["owner"]["newvalue"]))						
 					
 					if "cols" in diff_item.keys():							
 						for colname in diff_item["cols"].keys():						
