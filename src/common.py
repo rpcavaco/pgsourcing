@@ -21,8 +21,6 @@ LOG_CLI_CFG = {
 # Config de versao -- NAO EDITAR
 ########################################################################
 
-
-
 LANG = "pt"
 OPS = ["chksrc", "chkdest", "updref", "upddest"]
 OPS_CHECK = ["chksrc", "chkdest"]
@@ -31,6 +29,13 @@ OPS_INPUT = ["updref", "upddest"]
 OPS_OUTPUT = ["upddest"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
+
+# Upper level ops: chaves para as quais uma alteracao num detalhe obriga a 
+#  destruir e recriar o objeto completo, determinando uma operacao de 
+#  ou "update" (com "newvalue" igual 'a totalidade do objeto,
+#  num nivel na arvore acima daquele onde a diferenca foi
+#  detetada.
+UPPERLEVELOPS_KEYS = ["pkey", "check", "index"]
 
 OPS_HELP = {
 	"pt": {

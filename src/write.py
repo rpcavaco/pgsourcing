@@ -4,12 +4,12 @@ import re
 from src.fileandpath import load_currentref
 from src.common import CFG_GROUPS, CFG_LISTGROUPS, COL_ITEMS_CHG_AVOIDING_SUBSTITUTION
 
-SQL_CREATE_PK = """ALTER TABLE %s.%s
-    ADD CONSTRAINT %s PRIMARY KEY (%s)
+SQL_CREATE_PK = """%s ADD CONSTRAINT %s PRIMARY KEY (%s)
     USING INDEX TABLESPACE %s"""
-    
-SQL_DROP_CONSTR = """ALTER TABLE %s.%s
-	DROP CONSTRAINT %s"""
+
+SQL_CREATE_CONSTR = "%s ADD CONSTRAINT %s %s"
+
+SQL_DROP_CONSTR = "%s DROP CONSTRAINT %s"
 
 
 def changegrp_list(p_chg_group_list, p_currdiff_block_list, p_updates_ids_list):
@@ -263,6 +263,12 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 	out_sql_src = []
 	
 	# delmode: NODEL DEL CASCADE 
+	if delmode is None or delmode == "NODEL":
+		tmpltd = "-- ALTER TABLE %s.%s"
+	else:
+		tmpltd = "ALTER TABLE %s.%s"
+		
+	tmplt = "ALTER TABLE %s.%s"
 	
 	grpkey = "tables"
 	
@@ -286,26 +292,61 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 						for colname in diff_item["cols"].keys():						
 							col_operation(sch, tname, colname, diff_item["cols"][colname], delmode, p_updates_ids_list, out_sql_src)
 
-					if "pkey" in diff_item.keys():	
-						
+					if "pkey" in diff_item.keys():							
 						if "diffoper" in diff_item["pkey"].keys():	
 							if len(p_updates_ids_list) < 1 or diff_item["pkey"]["operorder"] in p_updates_ids_list:						
-
-								if diff_item["pkey"]["diffoper"] in ("insert", "update"):
+								if diff_item["pkey"]["diffoper"] == "insert":
 									for cnstrname in diff_item["pkey"]["newvalue"].keys():
-										if diff_item["pkey"]["diffoper"] == "update":
-											out_sql_src.append(SQL_DROP_CONSTR % (sch, tname, cnstrname))
 										nv = diff_item["pkey"]["newvalue"][cnstrname]
-										out_sql_src.append(SQL_CREATE_PK % (sch, tname, cnstrname, ",".join(nv["columns"]), nv["index_tablespace"]))	
+										out_sql_src.append(SQL_CREATE_PK % (tmplt % (sch, tname), cnstrname, ",".join(nv["columns"]), nv["index_tablespace"]))	
+						else:
+							for pkname in diff_item["pkey"].keys():	
+								di = diff_item["pkey"][pkname]
+								if "diffoper" in di.keys():
+									if di["diffoper"] in ("insert", "update"):
+										if di["diffoper"] == "update":
+											out_sql_src.append(SQL_DROP_CONSTR % (tmpltd % (sch, tname), pkname))
+										nv = di["newvalue"]
+										out_sql_src.append(SQL_CREATE_PK % (tmplt % (sch, tname), pkname, ",".join(nv["columns"]), nv["index_tablespace"]))									
 
-								elif diff_item["pkey"]["diffoper"] == "delete":
-									
-									pass #SQL_DROP_CONSTR
-									
+					if "check" in diff_item.keys():	
+						if "diffoper" in diff_item["check"].keys():	
+							if len(p_updates_ids_list) < 1 or diff_item["check"]["operorder"] in p_updates_ids_list:						
+								if diff_item["check"]["diffoper"] == "insert":
+									for cnstrname in diff_item["check"]["newvalue"].keys():
+										nv = diff_item["check"]["newvalue"][cnstrname]
+										out_sql_src.append(SQL_CREATE_CONSTR % (tmplt % (sch, tname), cnstrname, nv["chkdesc"]))	
+						else:
+							for cname in diff_item["check"].keys():	
+								di = diff_item["check"][cname]
+								if "diffoper" in di.keys():
+									if di["diffoper"] in ("insert", "update"):
+										if di["diffoper"] == "update":
+											out_sql_src.append(SQL_DROP_CONSTR % (tmpltd % (sch, tname), cname))
+										nv = di["newvalue"]
+										out_sql_src.append(SQL_CREATE_CONSTR % (tmplt % (sch, tname), cname, nv["chkdesc"]))								
 
-					# elif "check" in diff_item.keys():							
-						# for colname in diff_item["cols"].keys():						
-							# col_operation(sch, tname, colname, diff_item["cols"][colname], delmode, out_sql_src)
+					if "index" in diff_item.keys():	
+						if "diffoper" in diff_item["index"].keys():	
+							if len(p_updates_ids_list) < 1 or diff_item["index"]["operorder"] in p_updates_ids_list:						
+								if diff_item["index"]["diffoper"] == "insert":
+									for cnstrname in diff_item["index"]["newvalue"].keys():
+										nv = diff_item["index"]["newvalue"][cnstrname]
+										out_sql_src.append(nv["idxdesc"])
+						else:
+							for cname in diff_item["index"].keys():	
+								di = diff_item["index"][cname]
+								if "diffoper" in di.keys():
+									if di["diffoper"] in ("insert", "update"):
+										if di["diffoper"] == "update":
+											if delmode is None or delmode == "NODEL":
+												xtmpl = "-- DROP INDEX %s.%s"
+											else:
+												xtmpl = "DROP INDEX %s.%s"
+											out_sql_src.append(xtmpl % (sch, cname))
+										nv = di["newvalue"]
+										out_sql_src.append(nv["idxdesc"])						
+
 						
 						
 									

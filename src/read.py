@@ -405,7 +405,7 @@ def constraints(p_cursor, out_dict):
 				else:
 					constrs_dict = tables_root[schema_name][table_name][dk]
 
-				constrs_dict[row["conname"]] = row["cdef"]		
+				constrs_dict[row["conname"]] = { "chkdesc": row["cdef"]	}	
 
 			p_cursor.execute(SQL["UNIQUE"], (schema_name, table_name))
 
@@ -466,18 +466,23 @@ def indexes(p_cursor, out_dict):
 				pkeys = []
 
 			p_cursor.execute(SQL["INDEXES"], (schema_name, table_name))
-
 			for row in p_cursor:
 				
 				if not row["indexname"] in pkeys:	
-							
+												
 					dk = "index"
 					if not dk in tables_root[schema_name][table_name]:
 						constrs_dict = tables_root[schema_name][table_name][dk] = {}
 					else:
 						constrs_dict = tables_root[schema_name][table_name][dk]
 						
-					constrs_dict[row["indexname"]] = { "idxdesc": row["indexdef"] }
+					idxdef = row["indexdef"] 
+					idxt1 = "ON %s" % table_name
+					idxt2 = "ON %s.%s" % (schema_name, table_name)
+					if idxt1 in idxdef:
+						idxdef = idxdef.replace(idxt1, idxt2)
+						
+					constrs_dict[row["indexname"]] = { "idxdesc": idxdef }
 
 def sequences(p_cursor, out_dict):
 	

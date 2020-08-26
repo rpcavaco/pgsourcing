@@ -50,16 +50,6 @@ SQL = {
 		WHERE table_schema = %s
 			AND table_name = %s
 		ORDER BY ordinal_position""",
-	# "PKEYS": """select
-			# tc.constraint_name,
-			# kcu.column_name
-		# from information_schema.table_constraints as tc
-		# join information_schema.key_column_usage as kcu 
-			# using (constraint_schema, constraint_name, table_name)
-		# WHERE tc.constraint_schema = %s
-			# AND tc.table_name = %s
-			# and tc.constraint_type = 'PRIMARY KEY'
-		# ORDER BY kcu.ordinal_position""",
 	"PKEYS": """select idxtblspc, conname as constraint_name, json_agg(attname) column_names
 		from
 		(select n3.nspname as idxtblspc, c.conname, t.oid, 
@@ -99,25 +89,15 @@ SQL = {
 				) b
 			) a
 			where a.table_name = %s""",
-	"CHECKS": r"""select conname, cdef
-			from
-			(
-				select b.conname, b.cdef,
-				(regexp_split_to_array(b.table_from, E'\\.'))[2] as table_name
-				from 
-				( 
-					SELECT 
-					  conrelid::regclass::text AS table_from,
-					  conname,
-					  pg_get_constraintdef(c.oid) AS cdef 
-					FROM pg_constraint c 
-					JOIN pg_namespace n 
-					  ON n.oid = c.connamespace 
-					WHERE contype IN ('c') 
-					AND n.nspname = %s 
-				) b
-			) a
-			where a.table_name = %s""",
+	"CHECKS": r"""select c.conname, pg_get_constraintdef(c.oid) AS cdef
+		FROM pg_constraint c 
+		JOIN pg_class t
+			ON c.conrelid = t.oid
+		JOIN pg_namespace n2
+		  ON n2.oid = t.relnamespace
+		WHERE contype IN ('c')
+		AND n2.nspname = %s
+		AND t.relname = %s""",
 	"UNIQUE": r"""select conname, cdef
 			from
 			(
@@ -209,26 +189,5 @@ SQL = {
 				 left join pg_namespace ns1 on c.relnamespace = ns1.oid
 				 left join pg_proc p on t.tgfoid = p.oid
 				 left join pg_namespace ns2 on p.pronamespace = ns2.oid
-				 where not tgisinternal""",
-	# "CONSTRAINTS": """select
-			# tc.constraint_name,
-			# tc.constraint_schema || '.' || tc.table_name || '.' ||
-				# kcu.column_name as physical_full_name,
-			# -- tc.constraint_schema,
-			# -- tc.table_name,
-			# kcu.column_name,
-			# ccu.table_name as foreign_table_name,
-			# ccu.column_name as foreign_column_name,
-			# tc.constraint_type
-		# from information_schema.table_constraints as tc
-		# join information_schema.key_column_usage as kcu on
-			# (tc.constraint_name = kcu.constraint_name and
-			# tc.table_name = kcu.table_name)
-		# join information_schema.constraint_column_usage as ccu on
-            # ccu.constraint_name = tc.constraint_name
-        # WHERE tc.constraint_schema = %s
-			# AND tc.table_name = %s"""
-		# # ORDER BY tc.constraint_schema, physical_full_name,
-			# # tc.constraint_name, foreign_table_name,
-			# # foreign_column_name"""
+				 where not tgisinternal"""
 }
