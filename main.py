@@ -17,7 +17,7 @@ import io
 from src.common import LOG_CLI_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, OPS_OUTPUT, OPS_HELP, OPS_CHECK, SETUP_ZIP, BASE_CONNCFG, BASE_FILTERS_RE, PROC_SRC_BODY_FNAME
 from src.read import srcreader
 from src.connect import Connections
-from src.compare import comparing
+from src.compare import comparing, keychains
 from src.zip import gen_setup_zip
 from src.fileandpath import get_conn_cfg_path, get_filters_cfg, exists_currentref, to_jsonfile, save_ref, get_refcodedir, save_warnings
 from src.write import updateref, updatedb
@@ -63,6 +63,7 @@ def parse_args():
 	parser.add_argument("-g", "--genprocsdir", help="Gerar sources dos procedimentos, indicar pasta a criar", action="store")
 	parser.add_argument("-d", "--opsorder", help="Lista de operacoes (sequencia de oporder) a efetuar", action="store")
 	parser.add_argument("-k", "--limkeys", help="Filtro de atributios a alterar: apenas estes atributos serao alterados", action="store")
+	parser.add_argument("-m", "--delmode", help="Modo apagamento: NODEL (default), DEL, CASCADE", action="store")
 	
 	args = parser.parse_args()
 	
@@ -153,7 +154,11 @@ def do_linesoutput(p_obj, output=None, interactive=False):
 		finallines = []
 		for item in p_obj:
 			if isinstance(item, basestring):
-				finallines.append(item + outer_sep)
+				if len(item) > 0:
+					if item.strip().endswith('##'):
+						finallines.append(item + "\n")
+					else:
+						finallines.append(item + outer_sep)
 			elif isinstance(item, list):
 				finallines.append("\n".join(item) + outer_sep)
 		
@@ -175,8 +180,8 @@ def do_linesoutput(p_obj, output=None, interactive=False):
 				dosave = True
 					
 			if dosave:
-				with open(output, "w") as fj:
-					fj.writelines("\n".join(finallines))
+				with codecs.open(output, "w", encoding="utf-8") as fj:
+					fj.write("\n".join(finallines))
 
 			
 def check_filesystem():
@@ -316,7 +321,9 @@ def process_intervals_string(p_input_str):
 def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict, 
 		updates_ids=None, p_connkey=None, limkeys=None, 
 		include_public=False, include_colorder=False,
-		output=None, canuse_stdout=False):
+		output=None, canuse_stdout=False, delmode="NODEL"):
+
+	# delmode: NODEL DEL CASCADE 
 	
 	# updates_ids - se None ou lista vazia, aplicar todo o diffdict
 	
@@ -371,7 +378,7 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 		
 	elif p_oper == "upddest":
 		
-		out_sql_src = updatedb(p_proj, diffdict, upd_ids_list, limkeys_list)			
+		out_sql_src = updatedb(p_proj, diffdict, upd_ids_list, limkeys_list, delmode=delmode)			
 		do_linesoutput(out_sql_src, output=output, interactive=canuse_stdout)
 
 		logger.info("dest change script for proj. %s, %s" % (p_proj,output))
@@ -392,7 +399,7 @@ class OpOrderMgr(Singleton):
 	
 def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=None, 
 		canuse_stdout=False, include_public=False, include_colorder=False, 
-		updates_ids=None, limkeys=None):
+		updates_ids=None, limkeys=None, delmode=None):
 	
 	opordmgr = OpOrderMgr()
 	
@@ -519,13 +526,18 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				with open(inputf, "r") as fj:
 					diffdict = json.load(fj)
 		elif isinstance(inputf, file_types):
-			diffdict = json.load(inputf)	
+			diffdict = json.load(inputf)
+			
+		if delmode is None:
+			dlmd = "NODEL"
+		else:
+			dlmd = 	delmode
 			
 		update_oper_handler(p_proj, p_oper, opordmgr, 
 			diffdict, updates_ids=updates_ids, p_connkey=p_connkey, 
 			limkeys=limkeys, include_public=include_public, 
 			include_colorder=include_colorder, output=output, 
-			canuse_stdout=canuse_stdout)
+			canuse_stdout=canuse_stdout, delmode=dlmd)
 					
 	
 # ######################################################################
@@ -553,7 +565,8 @@ def cli_main(canuse_stdout=False):
 					include_public=args.includepublic, 
 					include_colorder = not args.removecolorder,
 					updates_ids = args.opsorder,
-					limkeys = args.limkeys)
+					limkeys = args.limkeys,
+					delmode = args.delmode)
 					
 	except:
 		logger.exception("")
@@ -561,7 +574,6 @@ def cli_main(canuse_stdout=False):
 
 if __name__ == "__main__":
 	cli_main(canuse_stdout=True)
-	
 
 ## incluir Postgis_full_version(), version() 
 ## Select table() pgr_version()

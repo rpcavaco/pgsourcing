@@ -35,7 +35,10 @@ PROC_SRC_BODY_FNAME = "body"
 #  ou "update" (com "newvalue" igual 'a totalidade do objeto,
 #  num nivel na arvore acima daquele onde a diferenca foi
 #  detetada.
-UPPERLEVELOPS_KEYS = ["pkey", "check", "index", "unique"]
+#
+# Valor indica a profundidade da alteracao abaixo da chave indicada
+#
+UPPERLEVELOPS = { "pkey": 1, "check": 1, "index": 1, "unique": 1, "procedures": 2 }
 
 OPS_HELP = {
 	"pt": {
