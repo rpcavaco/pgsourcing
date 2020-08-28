@@ -346,6 +346,7 @@ def columns(p_cursor, out_dict, p_include_colorder):
 	assert "tables" in out_dict["content"].keys(), "'content.tables' em falta no dic. de saida"
 
 	pattern = re.compile(r"nextval\('  (?P<schema>[^\.]+) \. (?P<seqname>[0-9A-Za-z_]+)  ", re.VERBOSE)			
+	pattern2 = re.compile(r"nextval\('  (?P<seqname>[0-9A-Za-z_]+)  ", re.VERBOSE)			
 
 	tables_root = out_dict["content"]["tables"]
 	optionals = [
@@ -353,7 +354,7 @@ def columns(p_cursor, out_dict, p_include_colorder):
 					("character_maximum_length", "char_max_len"), 
 					("numeric_precision", "num_precision"),
 					("numeric_precision_radix", "num_prec_radix"),
-					("numeric_scale", "num_scale"),
+					("numeric_scale", "num_scale")
 					#("datetime_precision", "dttime_precision")
 				]
 	
@@ -362,7 +363,7 @@ def columns(p_cursor, out_dict, p_include_colorder):
 		unreadable_tables = []
 		
 		for table_name in tables_root[schema_name].keys():
-
+			
 			p_cursor.execute(SQL["COLUMNS"], (schema_name, table_name))
 			
 			if p_cursor.rowcount < 1:
@@ -408,27 +409,39 @@ def columns(p_cursor, out_dict, p_include_colorder):
 							else:
 								parsed_val =  row[opt_colname]
 								
-							col_dict[opt_key] = parsed_val
-							
 							if isinstance(parsed_val, basestring):
-
+								
 								match = pattern.match(parsed_val)
 								if not match is None:
 									
 									found_schema = match.group("schema")
 									seqname = match.group("seqname")
-
-									# coletar nomes de sequencia em uso
-									
-									if not schema_name in out_dict["content"]["sequences"].keys():
-										seqs = out_dict["content"]["sequences"][schema_name] = {}
+									# coletar nomes de sequencia em uso									
+									if not found_schema in out_dict["content"]["sequences"].keys():
+										seqs = out_dict["content"]["sequences"][found_schema] = {}
 									else:
-										seqs = out_dict["content"]["sequences"][schema_name]
-										
+										seqs = out_dict["content"]["sequences"][found_schema]										
 									if not seqname in seqs.keys():
-										seqs[seqname] = {}
-										
-									schema_dependency(found_schema, schema_name, "sequences")	
+										seqs[seqname] = {}										
+									if found_schema != schema_name:
+										schema_dependency(found_schema, schema_name, "sequences")											
+									col_dict[opt_key] = parsed_val	
+									
+								else:
+
+									match = pattern2.match(parsed_val)
+									if not match is None:
+										seqname = match.group("seqname")
+										# coletar nomes de sequencia em uso , usar o prorprio schema da tabela										
+										if not schema_name in out_dict["content"]["sequences"].keys():
+											seqs = out_dict["content"]["sequences"][schema_name] = {}
+										else:
+											seqs = out_dict["content"]["sequences"][schema_name]											
+										if not seqname in seqs.keys():
+											seqs[seqname] = {}											
+										col_dict[opt_key] = parsed_val.replace(seqname, "%s.%s" % (schema_name, seqname))												
+									else:										
+										col_dict[opt_key] = parsed_val
 								
 						else:
 

@@ -575,7 +575,5 @@ def cli_main(canuse_stdout=False):
 if __name__ == "__main__":
 	cli_main(canuse_stdout=True)
 
-## incluir Postgis_full_version(), version() 
-## Select table() pgr_version()
 
 

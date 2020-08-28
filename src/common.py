@@ -68,7 +68,7 @@ CFG_DEST_GROUPS = [
 
 CFG_LISTGROUPS = ["owners"]
 
-CFG_SHALLOW_GROUPS = ["schemas"]
+CFG_SHALLOW_GROUPS = ["schemas", "roles"]
 SHALLOW_DEPTH = 2
 
 FLOAT_TYPES = ["numeric", "float"]
@@ -84,6 +84,6 @@ COL_ITEMS_CHG_AVOIDING_SUBSTITUTION = ["default", "nullable"]
 #
 # Valor indica a profundidade da alteracao abaixo da chave indicada
 #
-UPPERLEVELOPS = { "pkey": 1, "check": 1, "index": 1, "unique": 1, "procedures": 2 }
+UPPERLEVELOPS = { "pkey": 1, "cols": 1, "check": 1, "index": 1, "unique": 1, "trigger": 1, "procedures": 2, "roles": 1 }
 
 

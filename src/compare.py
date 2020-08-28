@@ -28,10 +28,17 @@ def do_transformschema(p_transformschema, p_obj, p_k):
 		if "tables" in p_transformschema["types"] or "indexes" in p_transformschema["types"]:
 			for trans in p_transformschema["trans"]:
 				p_obj[p_k] = p_obj[p_k].replace(trans["src"], trans["dest"])
+	elif p_k == "default":
+		if "tables" in p_transformschema["types"]:
+			for trans in p_transformschema["trans"]:
+				p_obj[p_k] = p_obj[p_k].replace(trans["src"], trans["dest"])
 					
 def traverse_replaceval(p_transformschema, p_obj, p_mode):
 
 	if not p_transformschema:
+		return
+		
+	if not isinstance(p_obj, dict):
 		return
 		
 	for k in p_obj.keys():	
@@ -446,8 +453,9 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 	else:	
 			
 		r_dict = p_check_dict
+		
 		l_dict = ref_json
-
+		
 		if p_transformschema:
 			
 			
@@ -466,7 +474,7 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 							if sch == trans["src"]:
 								l_dict[tk][trans["dest"]] = l_dict[tk].pop(sch)
 								break			
-			
+
 		grplist = CFG_DEST_GROUPS
 	
 	for grp in grplist:
