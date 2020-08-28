@@ -4,9 +4,6 @@ import logging
 # Config de instalacao (a alterar numa instalacao, se necessario)
 ########################################################################
 
-# Versao antiga de Postgresql (Pre-11) ?
-OLDER_PG = True
-
 # Config de logging
 LOG_CLI_CFG = {
   # "format" : "%(asctime)s %(levelname)-8s %(name)s %(message)s",

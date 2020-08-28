@@ -138,7 +138,7 @@ SQL = {
 				pg_indexes
 			WHERE
 				schemaname = %s and tablename = %s""",
-	"PROCS_OLD": """SELECT procedure_schema, procedure_name, args, return_type,
+	"PROCS_PRE11": """SELECT procedure_schema, procedure_name, args, return_type,
 				procedure_owner, language_type, %s, provolatile
 			FROM
 			  (SELECT ns1.nspname as procedure_schema, 
@@ -157,7 +157,7 @@ SQL = {
 				-- and p.prokind in ('f', 'p')
 				AND NOT p.proisagg) a
 				where not procedure_schema in ('pg_catalog', 'information_schema')""" % (PROC_SRC_BODY_FNAME,PROC_SRC_BODY_FNAME),
-	"PROCS_NEW": """SELECT procedure_schema, procedure_name, args, return_type,
+	"PROCS_FROM11": """SELECT procedure_schema, procedure_name, args, return_type,
 				procedure_owner, language_type, %s, provolatile
 			FROM
 			  (SELECT ns1.nspname as procedure_schema, 

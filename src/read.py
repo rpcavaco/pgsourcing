@@ -9,7 +9,7 @@ from psycopg2.errors import UndefinedFunction
 
 
 from src.sql import SQL
-from src.common import OLDER_PG, PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_LISTGROUPS, OPS_CHECK, FLOAT_TYPES, INT_TYPES
+from src.common import PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_LISTGROUPS, OPS_CHECK, FLOAT_TYPES, INT_TYPES
 
 WARN_KEYS = {
 	"PROC_SU_OWNED": "Procedimentos cujo owner e' 'postgres'",
@@ -717,7 +717,7 @@ def gen_proc_file(p_genprocsdir, p_schema, p_proc_row, winendings=True):
 			fl.write(gen_proc_ftr(p_schema, p_proc_row))						
 						
 
-def procs(p_cursor, p_filters_cfg, in_trigger_functions, out_dict, genprocsdir=None):
+def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dict, genprocsdir=None):
 	
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
 	assert "schemas" in out_dict["content"].keys(), "'content.schemas' em falta no dic. de saida"
@@ -731,10 +731,10 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, out_dict, genprocsdir=N
 	items = ["args", "return_type", "procedure_owner", 
 			 "language_type", PROC_SRC_BODY_FNAME, "provolatile"]
 
-	if OLDER_PG:
-		dict_key = "PROCS_OLD"
+	if p_majorversion < 11:
+		dict_key = "PROCS_PRE11"
 	else:
-		dict_key = "PROCS_NEW"
+		dict_key = "PROCS_FROM11"
 
 	for sch in out_dict["content"]["schemas"]:
 		
@@ -845,7 +845,7 @@ def srcreader(p_conn, p_filters_cfg, out_dict, outprocs_dir=None, include_public
 			indexes(cr, out_dict)
 					
 			logger.info("reading procedures ..")
-			procs(cr, p_filters_cfg, trigger_functions, out_dict, genprocsdir=outprocs_dir)
+			procs(cr, p_filters_cfg, trigger_functions, majorversion, out_dict, genprocsdir=outprocs_dir)
 			
 			logger.info("reading finished.")
 			
