@@ -5,6 +5,8 @@ import codecs
 
 from os.path import exists, join as path_join
 
+from psycopg2.errors import UndefinedFunction
+
 
 from src.sql import SQL
 from src.common import OLDER_PG, PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_LISTGROUPS, OPS_CHECK, FLOAT_TYPES, INT_TYPES
@@ -95,6 +97,76 @@ def schema_dependency(p_found_schema, p_schema_name, p_typekey):
 		else:
 			if not seqname in schdepobj[p_found_schema][p_typekey]:
 				schdepobj[p_found_schema][p_typekey].append(seqname)
+
+def srvanddb_metadata(p_conn, out_dict):
+
+	if not "pg_metadata" in out_dict.keys():
+		out_dict["pg_metadata"] = {}	
+		
+	logger = logging.getLogger('pgsourcing')
+		
+	cn = p_conn.getConn()
+	
+	do_run = True
+	step = 0
+	count = 0
+	ret_majorversion = None
+	
+	while do_run and count <= 6:
+		
+		count += 1
+		try:
+			
+			with cn.cursor(cursor_factory=p_conn.dict_cursor_factory) as cr:		
+
+				step_mark = 1
+				if step == step_mark:
+					out_dict["pg_metadata"]["pg_version"] = "unknown"
+				elif step < step_mark:
+					step = step_mark
+					cr.execute("select version()")
+					row = cr.fetchone()	
+					out_dict["pg_metadata"]["pg_version"] = row[0]
+					
+					m = re.match("PostgreSQL[\s]+(\d\.\d)", row[0])
+					if m:
+						vval = float(m.group(1))
+						if vval >= 10:
+							majorver = int(vval) 
+						else:
+							majorver = vval
+						ret_majorversion = majorver
+						out_dict["pg_metadata"]["pg_major_version"] = majorver
+
+				step_mark = 2
+				if step == step_mark:
+					out_dict["pg_metadata"]["postgis"] = { "found": "false" }
+				elif step < step_mark:
+					step = step_mark		
+					cr.execute("select Postgis_full_version()")
+					row = cr.fetchone()	
+					out_dict["pg_metadata"]["postgis"] = { "found": "true", "version": row[0] }
+
+				step_mark = 3
+				if step == step_mark:
+					out_dict["pg_metadata"]["pgrouting"] = { "found": "false" }
+				elif step < step_mark:
+					step = step_mark				
+					cr.execute("select pgr_version()")
+					row = cr.fetchone()	
+					out_dict["pg_metadata"]["pgrouting"] = { "found": "true", "version": row[0] }
+				
+				do_run = False
+
+		except UndefinedFunction as e:
+			cn.rollback()
+				
+		except Exception as e:			 
+			logger.exception("")
+			cn.rollback()
+			
+	return ret_majorversion
+			
 
 def schemas(p_cursor, p_filters_cfg, p_include_public, out_dict):
 	
@@ -494,7 +566,7 @@ def indexes(p_cursor, out_dict):
 						
 					constrs_dict[row["indexname"]] = { "idxdesc": idxdef }
 
-def sequences(p_cursor, out_dict):
+def sequences(p_conn, p_majorversion, out_dict):
 	
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
 
@@ -503,32 +575,54 @@ def sequences(p_cursor, out_dict):
 		
 	seq_root = out_dict["content"]["sequences"]
 	items = [
-			"data_type", "numeric_precision", "numeric_precision_radix", "numeric_scale",
 			"start_value", "minimum_value", "maximum_value", "increment", "cycle_option"
 			]
 
-	for schema_name in seq_root.keys():
+	logger = logging.getLogger('pgsourcing')
 		
-		for seq_name in seq_root[schema_name].keys():
+	cn = p_conn.getConn()
+	
+	try:
+		
+		with cn.cursor(cursor_factory=p_conn.dict_cursor_factory) as cr:		
 
-			p_cursor.execute(SQL["SEQUENCES"], (schema_name, seq_name))
-
-			the_dict = seq_root[schema_name][seq_name]
-			row = p_cursor.fetchone()
-			
-			if row is None:
-				#raise RuntimeError, p_cursor.mogrify(SQL["SEQUENCES"], (schema_name, seq_name))
-				the_dict["error"] = "unreadable"
-			else:
-				for item in items:
-					# print(item, row[item])
-					if not row[item] is None:
-						the_dict[item] = row[item]	
-						
-				p_cursor.execute(SQL["SEQ_CURRVAL"], (schema_name, seq_name))				
-				row = p_cursor.fetchone()
+			for schema_name in seq_root.keys():
 				
-				the_dict["current"] = row["current_value"]	
+				for seq_name in seq_root[schema_name].keys():
+
+					cr.execute(SQL["SEQUENCES"], (schema_name, seq_name))
+
+					the_dict = seq_root[schema_name][seq_name]
+					row =  cr.fetchone()
+					
+					if row is None:
+						#raise RuntimeError, cr.mogrify(SQL["SEQUENCES"], (schema_name, seq_name))
+						the_dict["error"] = "unreadable"
+					else:
+						for item in items:
+							# print(item, row[item])
+							if not row[item] is None:
+								the_dict[item] = row[item]	
+								
+						cr.execute(SQL["SEQ_CURRVAL"], (schema_name, seq_name))				
+						row = cr.fetchone()						
+						the_dict["current"] = row["current_value"]	
+						
+						if p_majorversion < 10:
+							cr.execute(SQL["SEQ_CACHEVALUE_PRE10"] % (schema_name, seq_name))				
+						else: 
+							cr.execute(SQL["SEQ_CACHEVALUE_FROM10"] % (schema_name, seq_name))				
+						row = cr.fetchone()						
+						the_dict["cache_value"] = row[0]	
+						
+						cr.execute(SQL["SEQ_OWNER"], (schema_name, seq_name))				
+						row = cr.fetchone()						
+						the_dict["owner"] = row[0]	
+						
+
+	except Exception as e:			 
+		logger.exception("")
+		cn.rollback()
 
 def triggers(p_cursor, out_trigger_functions, out_dict):
 	
@@ -712,9 +806,13 @@ def srcreader(p_conn, p_filters_cfg, out_dict, outprocs_dir=None, include_public
 		if cnobj.dict_cursor_factory is None:
 			raise RuntimeError("srcreader precisa de cursor dictionary, este driver nao parece ter um")
 
-		cn = cnobj.getConn()
 		trigger_functions = set()
 		
+		logger.info("reading server and db metadata ...")
+		
+		majorversion = srvanddb_metadata(cnobj, out_dict)
+			
+		cn = cnobj.getConn()
 		with cn.cursor(cursor_factory=cnobj.dict_cursor_factory) as cr:
 			
 			logger.info("reading roles and schemas ..")
@@ -735,8 +833,10 @@ def srcreader(p_conn, p_filters_cfg, out_dict, outprocs_dir=None, include_public
 			logger.info("reading triggers ..")
 			triggers(cr, trigger_functions, out_dict)	
 			
-			logger.info("reading sequences ..")
-			sequences(cr, out_dict)
+		logger.info("reading sequences ..")
+		sequences(cnobj, majorversion, out_dict)
+
+		with cn.cursor(cursor_factory=cnobj.dict_cursor_factory) as cr:
 			
 			logger.info("reading constraints ..")
 			constraints(cr, out_dict)

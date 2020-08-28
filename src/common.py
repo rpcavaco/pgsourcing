@@ -30,16 +30,6 @@ OPS_OUTPUT = ["upddest"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
 
-# Upper level ops: chaves para as quais uma alteracao num detalhe obriga a 
-#  destruir e recriar o objeto completo, determinando uma operacao de 
-#  ou "update" (com "newvalue" igual 'a totalidade do objeto,
-#  num nivel na arvore acima daquele onde a diferenca foi
-#  detetada.
-#
-# Valor indica a profundidade da alteracao abaixo da chave indicada
-#
-UPPERLEVELOPS = { "pkey": 1, "check": 1, "index": 1, "unique": 1, "procedures": 2 }
-
 OPS_HELP = {
 	"pt": {
 		"chksrc": "comparar b.d. fonte com o repositorio de referencia",
@@ -81,8 +71,22 @@ CFG_DEST_GROUPS = [
 
 CFG_LISTGROUPS = ["owners"]
 
+CFG_SHALLOW_GROUPS = ["schemas"]
+SHALLOW_DEPTH = 2
+
 FLOAT_TYPES = ["numeric", "float"]
 INT_TYPES = ["integer", "smallint"]
 
 COL_ITEMS_CHG_AVOIDING_SUBSTITUTION = ["default", "nullable"]
+
+# Upper level ops: chaves para as quais uma alteracao num detalhe obriga a 
+#  destruir e recriar o objeto completo, determinando uma operacao de 
+#  ou "update" (com "newvalue" igual 'a totalidade do objeto,
+#  num nivel na arvore acima daquele onde a diferenca foi
+#  detetada.
+#
+# Valor indica a profundidade da alteracao abaixo da chave indicada
+#
+UPPERLEVELOPS = { "pkey": 1, "check": 1, "index": 1, "unique": 1, "procedures": 2 }
+
 

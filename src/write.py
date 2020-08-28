@@ -182,7 +182,7 @@ def table_operation(p_sch, p_tname, p_diff_item, p_delmode, p_out_sql_src):
 		if "owner" in p_diff_item["newvalue"]:
 			p_out_sql_src.append("ALTER TABLE %s.%s OWNER to %s" % (p_sch, p_tname, p_diff_item["newvalue"]["owner"]))
 
-def col_operation(p_sch, p_tname, p_colname, p_diff_item, p_delmode, p_updates_ids_list, p_out_sql_src):
+def col_operation(p_sch, p_tname, p_colname, p_diff_item, p_delmode, p_updates_ids_list, p_out_sql_src, p_out_hdr_flag):
 	
 	if p_delmode is None or p_delmode == "NODEL":
 		tmpltd = "-- ALTER TABLE %s.%s"
@@ -194,6 +194,8 @@ def col_operation(p_sch, p_tname, p_colname, p_diff_item, p_delmode, p_updates_i
 	if "diffoper" in p_diff_item.keys():
 		
 		if len(p_updates_ids_list) < 1 or p_diff_item["operorder"] in p_updates_ids_list:
+			
+			print_tablehdr(p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)
 		
 			if p_diff_item["diffoper"] == "delete":
 				
@@ -229,7 +231,9 @@ def col_operation(p_sch, p_tname, p_colname, p_diff_item, p_delmode, p_updates_i
 					continue
 				
 				if len(p_updates_ids_list) > 0 and not p_diff_item[k]["operorder"] in p_updates_ids_list:	
-					continue			
+					continue
+					
+				print_tablehdr(p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)				
 				
 				if k == "default":				
 					if p_diff_item[k]["diffoper"] == "delete":					
@@ -249,6 +253,8 @@ def col_operation(p_sch, p_tname, p_colname, p_diff_item, p_delmode, p_updates_i
 							p_out_sql_src.append("ALTER TABLE %s.%s ALTER COLUMN %s DROP NOT NULL" % (p_sch, p_tname, p_colname))
 							
 		else:
+			
+			print_tablehdr(p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)
 			
 			# remover ...
 			p_out_sql_src.append(tmpltd % (p_sch, p_tname))
@@ -287,6 +293,29 @@ def create_function(p_schema, p_name, p_new_value, o_sql_linebuffer, replace=Fal
 	o_sql_linebuffer.append("\n$BODY$;\n\n")
 	
 	o_sql_linebuffer.append("ALTER FUNCTION %s.%s OWNER to %s" % (p_schema, p_name, p_new_value["procedure_owner"]))
+
+def create_sequence(p_schema, p_name, p_new_value, o_sql_linebuffer):
+
+	cr = "CREATE SEQUENCE %s.%s\n"
+		
+	o_sql_linebuffer.append(cr % (p_schema, p_name))	
+	o_sql_linebuffer.append("\tINCREMENT %s\n" % p_new_value["increment"])
+	o_sql_linebuffer.append("\tSTART %s\n" % p_new_value["start_value"])
+	o_sql_linebuffer.append("\tMINVALUE %s\n" % p_new_value["minimum_value"])
+	o_sql_linebuffer.append("\tMAXVALUE %s\n" % p_new_value["maximum_value"])
+	if p_new_value["cycle_option"] != "NO":
+		o_sql_linebuffer.append("\tCYCLE\n")
+	o_sql_linebuffer.append("\tCACHE %s;\n" % p_new_value["cache_value"])
+
+	if "current" in p_new_value.keys():
+		o_sql_linebuffer.append("\nSELECT setval('%s.%s', %s, true);\n" % (p_schema, p_name, p_new_value["current"]))
+		
+	o_sql_linebuffer.append("\nALTER SEQUENCE %s.%s OWNER to %s" % (p_schema, p_name, p_new_value["owner"]))
+
+def print_tablehdr(p_sch, p_name, p_out_sql_src, o_flag_byref):
+	if not o_flag_byref[0]:
+		p_out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Table %s.%s\n" % (p_sch, p_name) + "-- " + "".join(['#'] * 77))
+		o_flag_byref[0] = True
 	
 def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 	
@@ -297,39 +326,114 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 	if delmode is None or delmode == "NODEL":
 		tmpltd = "-- ALTER TABLE %s.%s"
 		tmplpd = "-- DROP FUNCTION %s.%s"
+		tmplsd = "-- DROP SEQUENCE %s.%s"
 	else:
 		tmpltd = "ALTER TABLE %s.%s"
 		tmplpd = "DROP FUNCTION %s.%s"
+		tmplsd = "DROP SEQUENCE %s.%s"
 		
 	tmplt = "ALTER TABLE %s.%s"
-	tmplp = "DROP FUNCTION %s.%s"
+
+	# grpkey = "roles"
+
+	grpkey = "schemas"
+	
+	if grpkey in diff_content.keys():	
+		
+		header_printed = False
+	
+		currdiff_block = diff_content[grpkey]			
+		for sch in currdiff_block.keys():
+			
+			diff_item = currdiff_block[sch]
+			assert "diffoper" in diff_item.keys()
+			
+			if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
+
+				if not header_printed:
+					out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Schemas\n" + "-- " + "".join(['#'] * 77))
+					header_printed = True
+				
+				if diff_item["diffoper"] == "insert":
+					out_sql_src.append("CREATE SCHEMA %s AUTHORIZATION %s" % (sch, diff_item["newvalue"]["auth"]))
+				elif diff_item["diffoper"] == "delete":
+					if delmode == "NODEL":
+						xtmpl = "-- DROP SCHEMA %s"
+					elif delmode == "DEL":
+						xtmpl = "DROP SCHEMA %s"
+					elif delmode == "CASCADE":
+						xtmpl = "DROP SCHEMA %s CASCADE"
+					else:
+						xtmpl = "??????? %s"
+					out_sql_src.append(xtmpl % sch)
+	
+	grpkey = "sequences"
+	
+	if grpkey in diff_content.keys():	
+	
+		header_printed = False
+
+		currdiff_block = diff_content[grpkey]			
+		for sch in currdiff_block.keys():
+			
+			for sname in currdiff_block[sch].keys():
+
+				diff_item = currdiff_block[sch][sname]	
+				assert "diffoper" in diff_item.keys()
+				
+				if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
+
+					if not header_printed:
+						out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Sequence %s.%s\n" % (sch, sname) + "-- " + "".join(['#'] * 77))
+						header_printed = True
+					
+				
+					if diff_item["diffoper"] == "insert":
+						flines = []
+						create_sequence(sch, sname, diff_item["newvalue"], flines)						
+						out_sql_src.append("".join(flines))
+
+					elif diff_item["diffoper"] == "update":
+						out_sql_src.append(tmplsd % (sch, sname))
+						flines = []
+						create_sequence(sch, sname, diff_item["newvalue"], flines)						
+						out_sql_src.append("".join(flines))
+
+					elif diff_item["diffoper"] == "delete":
+						out_sql_src.append(tmplsd % (sch, sname))
 	
 	grpkey = "tables"
 	
 	if grpkey in diff_content.keys():	
+
+		header_printed = [False]
 			
 		currdiff_block = diff_content[grpkey]			
 		for sch in currdiff_block.keys():	
 					
 			for tname in currdiff_block[sch].keys():
 				
+				header_printed[0] = False
+				
 				diff_item = currdiff_block[sch][tname]	
-							
+
 				if "diffoper" in diff_item.keys():						
 					
-					if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:						
+					if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
+						print_tablehdr(sch, tname, out_sql_src, header_printed)					
 						table_operation(sch, tname, diff_item, delmode, out_sql_src)
 					
 				else:
 
 					if "owner" in diff_item.keys():	
 						if diff_item["owner"]["diffoper"] == "update":
-							if len(p_updates_ids_list) < 1 or diff_item["owner"]["operorder"] in p_updates_ids_list:	
+							if len(p_updates_ids_list) < 1 or diff_item["owner"]["operorder"] in p_updates_ids_list:
+								print_tablehdr(sch, tname, out_sql_src, header_printed)	
 								out_sql_src.append("ALTER TABLE %s.%s OWNER to %s" % (sch, tname, diff_item["owner"]["newvalue"]))						
 					
 					if "cols" in diff_item.keys():							
 						for colname in diff_item["cols"].keys():						
-							col_operation(sch, tname, colname, diff_item["cols"][colname], delmode, p_updates_ids_list, out_sql_src)
+							col_operation(sch, tname, colname, diff_item["cols"][colname], delmode, p_updates_ids_list, out_sql_src, header_printed)
 
 					if "pkey" in diff_item.keys():							
 						if "diffoper" in diff_item["pkey"].keys():	
@@ -337,6 +441,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 								if diff_item["pkey"]["diffoper"] == "insert":
 									for cnstrname in diff_item["pkey"]["newvalue"].keys():
 										nv = diff_item["pkey"]["newvalue"][cnstrname]
+										print_tablehdr(sch, tname, out_sql_src, header_printed)
 										out_sql_src.append(SQL_CREATE_PK % (tmplt % (sch, tname), cnstrname, ",".join(nv["columns"]), nv["index_tablespace"]))	
 						else:
 							for pkname in diff_item["pkey"].keys():	
@@ -348,9 +453,11 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 												if delmode == "CASCADE":
 													xtmpl = SQL_DROP_CONSTR + " CASCADE"
 												else:
-													xtmpl = SQL_DROP_CONSTR																								
+													xtmpl = SQL_DROP_CONSTR	
+												print_tablehdr(sch, tname, out_sql_src, header_printed)																								
 												out_sql_src.append(xtmpl % (tmpltd % (sch, tname), pkname))
 											nv = di["newvalue"]
+											print_tablehdr(sch, tname, out_sql_src, header_printed)
 											out_sql_src.append(SQL_CREATE_PK % (tmplt % (sch, tname), pkname, ",".join(nv["columns"]), nv["index_tablespace"]))									
 
 					if "check" in diff_item.keys():	
@@ -359,6 +466,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 								if diff_item["check"]["diffoper"] == "insert":
 									for cnstrname in diff_item["check"]["newvalue"].keys():
 										nv = diff_item["check"]["newvalue"][cnstrname]
+										print_tablehdr(sch, tname, out_sql_src, header_printed)
 										out_sql_src.append(SQL_CREATE_CONSTR % (tmplt % (sch, tname), cnstrname, nv["chkdesc"]))	
 						else:
 							for cname in diff_item["check"].keys():	
@@ -370,9 +478,11 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 												if delmode == "CASCADE":
 													xtmpl = SQL_DROP_CONSTR + " CASCADE"
 												else:
-													xtmpl = SQL_DROP_CONSTR												
+													xtmpl = SQL_DROP_CONSTR		
+												print_tablehdr(sch, tname, out_sql_src, header_printed)										
 												out_sql_src.append(xtmpl % (tmpltd % (sch, tname), cname))
 											nv = di["newvalue"]
+											print_tablehdr(sch, tname, out_sql_src, header_printed)
 											out_sql_src.append(SQL_CREATE_CONSTR % (tmplt % (sch, tname), cname, nv["chkdesc"]))								
 
 					if "index" in diff_item.keys():	
@@ -381,6 +491,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 								if diff_item["index"]["diffoper"] == "insert":
 									for cnstrname in diff_item["index"]["newvalue"].keys():
 										nv = diff_item["index"]["newvalue"][cnstrname]
+										print_tablehdr(sch, tname, out_sql_src, header_printed)
 										out_sql_src.append(nv["idxdesc"])
 						else:
 							for cname in diff_item["index"].keys():	
@@ -396,8 +507,10 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 														xtmpl = "DROP INDEX %s.%s CASCADE"
 													else:
 														xtmpl = "DROP INDEX %s.%s"
+												print_tablehdr(sch, tname, out_sql_src, header_printed)
 												out_sql_src.append(xtmpl % (sch, cname))
 											nv = di["newvalue"]
+											print_tablehdr(sch, tname, out_sql_src, header_printed)
 											out_sql_src.append(nv["idxdesc"])						
 
 					if "unique" in diff_item.keys():							
@@ -406,6 +519,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 								if diff_item["unique"]["diffoper"] == "insert":
 									for cnstrname in diff_item["unique"]["newvalue"].keys():
 										nv = diff_item["unique"]["newvalue"][cnstrname]
+										print_tablehdr(sch, tname, out_sql_src, header_printed)
 										out_sql_src.append(SQL_CREATE_UNIQUE % (tmplt % (sch, tname), cnstrname, ",".join(nv["columns"]), nv["index_tablespace"]))	
 						else:
 							for pkname in diff_item["unique"].keys():	
@@ -418,13 +532,17 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 													xtmpl = SQL_DROP_CONSTR + " CASCADE"
 												else:
 													xtmpl = SQL_DROP_CONSTR
+												print_tablehdr(sch, tname, out_sql_src, header_printed)
 												out_sql_src.append(xtmpl % (tmpltd % (sch, tname), pkname))
 											nv = di["newvalue"]
+											print_tablehdr(sch, tname, out_sql_src, header_printed)
 											out_sql_src.append(SQL_CREATE_UNIQUE % (tmplt % (sch, tname), pkname, ",".join(nv["columns"]), nv["index_tablespace"]))									
 						
 	grpkey = "procedures"
 	
 	if grpkey in diff_content.keys():	
+
+		header_printed = False
 			
 		currdiff_block = diff_content[grpkey]			
 		for sch in currdiff_block.keys():
@@ -436,7 +554,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 					
 					if len(p_updates_ids_list) < 1 or proc_blk["operorder"] in p_updates_ids_list:
 						
-						out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Function %s %s\n" % (sch, procname) + "-- " + "".join(['#'] * 77))
+						out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Function %s.%s\n" % (sch, procname) + "-- " + "".join(['#'] * 77))
 					
 						if proc_blk["diffoper"] == "insert":
 							

@@ -2,12 +2,13 @@
 
 import json
 import re
+import logging
 
 from os.path import exists
 from copy import copy, deepcopy
 from difflib import unified_diff as dodiff
 
-from src.common import PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_DEST_GROUPS, CFG_LISTGROUPS, UPPERLEVELOPS
+from src.common import PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_DEST_GROUPS, CFG_LISTGROUPS, UPPERLEVELOPS, CFG_SHALLOW_GROUPS, SHALLOW_DEPTH
 from src.fileandpath import load_currentref
 
 def do_transformschema(p_transformschema, p_obj, p_k):
@@ -172,8 +173,15 @@ def gen_update(p_fase, p_transformschema, p_opordmgr, p_upperlevel_ops, p_keycha
 																			
 def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_diff_dict, level=0): 
 	
+	logger = logging.getLogger('pgsourcing')
+	
 	grpkey = grpkeys[-1]
-	tmp_l = p_leftdic[grpkey]
+	
+	try:
+		tmp_l = p_leftdic[grpkey]
+	except:
+		logger.exception("comparegrp, error retrieving key from leftdict: '%s', level %d" % (grpkey, level))
+		raise
 	
 	diff_dict = o_diff_dict
 	
@@ -183,13 +191,19 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 	
 	if not grpkey in p_rightdic.keys():
 
-		diff_item = get_diff_item('a', diff_dict, grpkeys)
+		try:
+			
+			diff_item = get_diff_item('a', diff_dict, grpkeys)
 
-		p_opordmgr.setord(diff_item)
-		diff_item["diffoper"] = "insert"   
-		newvalue = deepcopy(tmp_l)
-		traverse_replaceval(p_transformschema, newvalue, "insert A")
-		diff_item["value"] = newvalue
+			p_opordmgr.setord(diff_item)
+			diff_item["diffoper"] = "insert"   
+			newvalue = deepcopy(tmp_l)
+			traverse_replaceval(p_transformschema, newvalue, "insert A")
+			diff_item["newvalue"] = newvalue
+			
+		except:
+			logger.exception("comparegrp insert A, group: '%s', level %d" % (grpkey, level))
+			raise
 		
 	else:
 	
@@ -206,11 +220,28 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 			if k in tmp_l.keys() and not k in tmp_r.keys():
 				# left only
 				diff_item = get_diff_item('b', diff_dict, klist)
-				p_opordmgr.setord(diff_item)
-				diff_item["diffoper"] = "insert"
-				newvalue = deepcopy(tmp_l[k])
-				traverse_replaceval(p_transformschema, newvalue, "insert B")
-				diff_item["newvalue"] = newvalue
+				
+				# If starting a new group from scratch
+				#  avoid inserting the whole group as a single insert operation
+				
+				if len(klist) == SHALLOW_DEPTH and not klist[0] in CFG_SHALLOW_GROUPS:
+
+					for newkey in tmp_l[k].keys():
+					
+						newklist  = klist+[newkey]		
+						upperlevel_ops = comparegrp(tmp_l[k], tmp_r, newklist, p_transformschema, p_opordmgr, diff_dict, level=level+1)
+						if upperlevel_ops:
+							dictupdate(ret_upperlevel_ops, upperlevel_ops)
+				
+				else:
+				
+					newvalue = deepcopy(tmp_l[k])
+						
+					p_opordmgr.setord(diff_item)
+					diff_item["diffoper"] = "insert"				
+					traverse_replaceval(p_transformschema, newvalue, "insert B")
+					diff_item["newvalue"] = newvalue
+				
 			elif k in tmp_r.keys() and not k in tmp_l.keys():
 				# right only
 				diff_item = get_diff_item('b1', diff_dict, klist)
@@ -230,7 +261,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						dictupdate(ret_upperlevel_ops, upperlevel_ops)
 						
 				elif isinstance(tmp_l[k], dict):
-					assert not isinstance(tmp_r[k], list), "dict a comparar com list, chave: %s" % k
+					assert not isinstance(tmp_r[k], list), "dict comparing to list, key: %s" % k
 					diff_item = get_diff_item('c', diff_dict, klist)
 					p_opordmgr.setord(diff_item)
 					diff_item["diffoper"] = "replace value with dict"

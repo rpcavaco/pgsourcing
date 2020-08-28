@@ -18,8 +18,13 @@ SQL = {
 	"TABLE_SU_OWNED": """select tablename from pg_tables
 		where schemaname = %s and tableowner = 'postgres'""",	
 	"ROLES": "select * from pg_roles",
+	# "SEQUENCES": """select 
+			# data_type, numeric_precision, numeric_precision_radix, numeric_scale,
+			# start_value, minimum_value, maximum_value, increment, cycle_option
+			# from information_schema.sequences
+			# where sequence_schema = %s
+			# and sequence_name = %s""",
 	"SEQUENCES": """select 
-			data_type, numeric_precision, numeric_precision_radix, numeric_scale,
 			start_value, minimum_value, maximum_value, increment, cycle_option
 			from information_schema.sequences
 			where sequence_schema = %s
@@ -38,6 +43,16 @@ SQL = {
 				and relnamespace::regnamespace::text = %s
 				and c.relname = %s
 			) a""",
+	"SEQ_CACHEVALUE_PRE10": "SELECT cache_value from %s.%s",
+	"SEQ_CACHEVALUE_FROM10": "SELECT seqcache from pg_sequence where seqrelid = '%s.%s'::regclass",
+	"SEQ_OWNER": """select a.rolname
+		from pg_class c
+		join pg_namespace n
+		on c.relnamespace = n.oid
+		join pg_roles a
+		on c.relowner = a.oid
+		where n.nspname = %s
+		and c.relname = %s""",
 	"TABLES": """SELECT schemaname, tablename, tableowner, tablespace
 		FROM pg_tables
 		WHERE schemaname NOT LIKE 'pg\_%'""",
