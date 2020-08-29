@@ -182,7 +182,7 @@ def table_operation(p_sch, p_tname, p_diff_item, p_delmode, p_out_sql_src):
 		if "owner" in p_diff_item["newvalue"]:
 			p_out_sql_src.append("ALTER TABLE %s.%s OWNER to %s" % (p_sch, p_tname, p_diff_item["newvalue"]["owner"]))
 
-def col_operation(p_sch, p_tname, p_colname, p_diff_item, p_delmode, p_updates_ids_list, p_out_sql_src, p_out_hdr_flag):
+def col_operation(docomment, p_sch, p_tname, p_colname, p_diff_item, p_delmode, p_updates_ids_list, p_out_sql_src, p_out_hdr_flag):
 	
 	if p_delmode is None or p_delmode == "NODEL":
 		tmpltd = "-- ALTER TABLE %s.%s"
@@ -200,8 +200,9 @@ def col_operation(p_sch, p_tname, p_colname, p_diff_item, p_delmode, p_updates_i
 
 		if len(p_updates_ids_list) < 1 or p_diff_item["operorder"] in p_updates_ids_list:
 						
-			print_tablehdr(p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)
-			p_out_sql_src.append("-- Op #%d" % p_diff_item["operorder"])
+			print_tablehdr(docomment, p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)
+			if docomment:
+				p_out_sql_src.append("-- Op #%d" % p_diff_item["operorder"])
 		
 			if p_diff_item["diffoper"] == "delete":
 				
@@ -243,8 +244,9 @@ def col_operation(p_sch, p_tname, p_colname, p_diff_item, p_delmode, p_updates_i
 				if len(p_updates_ids_list) > 0 and not p_diff_item[k]["operorder"] in p_updates_ids_list:	
 					continue
 					
-				print_tablehdr(p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)				
-				p_out_sql_src.append("-- Op #%d" % p_diff_item[k]["operorder"])	
+				print_tablehdr(docomment, p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)	
+				if docomment:			
+					p_out_sql_src.append("-- Op #%d" % p_diff_item[k]["operorder"])	
 				
 				if k == "default":				
 					if p_diff_item[k]["diffoper"] == "delete":					
@@ -265,7 +267,7 @@ def col_operation(p_sch, p_tname, p_colname, p_diff_item, p_delmode, p_updates_i
 							
 		else:
 			
-			print_tablehdr(p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)
+			print_tablehdr(docomment, p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)
 			
 			# remover ...
 			p_out_sql_src.append(tmpltd % (p_sch, p_tname))
@@ -352,12 +354,12 @@ def create_trigger(p_trname, p_schema, p_tname, p_new_value, o_sql_linebuffer):
 	o_sql_linebuffer.append("\tEXECUTE PROCEDURE %s.%s();\n" % (p_new_value["function_schema"], p_new_value["function_name"]))
 	
 	
-def print_tablehdr(p_sch, p_name, p_out_sql_src, o_flag_byref):
-	if not o_flag_byref[0]:
+def print_tablehdr(p_docomment, p_sch, p_name, p_out_sql_src, o_flag_byref):
+	if p_docomment and not o_flag_byref[0]:
 		p_out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Table %s.%s\n" % (p_sch, p_name) + "-- " + "".join(['#'] * 77))
 		o_flag_byref[0] = True
 	
-def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
+def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, docomment=True):
 	
 	diff_content = p_difdict["content"]	
 	out_sql_src = []
@@ -388,7 +390,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 			
 			if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
 
-				if not header_printed:
+				if docomment and not header_printed:
 					out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Roles\n" + "-- " + "".join(['#'] * 77))
 					header_printed = True
 					
@@ -431,7 +433,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 			
 			if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
 
-				if not header_printed:
+				if docomment and not header_printed:
 					out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Schemas\n" + "-- " + "".join(['#'] * 77))
 					header_printed = True
 
@@ -470,7 +472,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 				
 				if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
 
-					if not header_printed:
+					if docomment and not header_printed:
 						out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Sequence %s.%s\n" % (sch, sname) + "-- " + "".join(['#'] * 77))
 						header_printed = True
 					
@@ -513,8 +515,9 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 
 					
 					if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
-						print_tablehdr(sch, tname, out_sql_src, header_printed)					
-						out_sql_src.append("-- Op #%d" % diff_item["operorder"])
+						print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)	
+						if docomment:				
+							out_sql_src.append("-- Op #%d" % diff_item["operorder"])
 						table_operation(sch, tname, diff_item, delmode, out_sql_src)
 					
 				else:
@@ -522,13 +525,14 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 					if "owner" in diff_item.keys():	
 						if diff_item["owner"]["diffoper"] == "update":
 							if len(p_updates_ids_list) < 1 or diff_item["owner"]["operorder"] in p_updates_ids_list:
-								print_tablehdr(sch, tname, out_sql_src, header_printed)	
-								out_sql_src.append("-- Op #%d" % diff_item["owner"]["operorder"])
+								print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)	
+								if docomment:
+									out_sql_src.append("-- Op #%d" % diff_item["owner"]["operorder"])
 								out_sql_src.append("ALTER TABLE %s.%s OWNER to %s" % (sch, tname, diff_item["owner"]["newvalue"]))						
 					
 					if "cols" in diff_item.keys():							
 						for colname in diff_item["cols"].keys():						
-							col_operation(sch, tname, colname, diff_item["cols"][colname], delmode, p_updates_ids_list, out_sql_src, header_printed)
+							col_operation(docomment, sch, tname, colname, diff_item["cols"][colname], delmode, p_updates_ids_list, out_sql_src, header_printed)
 
 					if "pkey" in diff_item.keys():	
 												
@@ -541,8 +545,9 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 							di = diff_item["pkey"][pkname]
 							if "diffoper" in di.keys():
 								if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
-									print_tablehdr(sch, tname, out_sql_src, header_printed)																								
-									out_sql_src.append("-- Op #%d" % di["operorder"])
+									print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)		
+									if docomment:																						
+										out_sql_src.append("-- Op #%d" % di["operorder"])
 									if di["diffoper"] in ("insert", "update"):
 										if di["diffoper"] == "update":
 											out_sql_src.append(xtmpl % (tmpltd % (sch, tname), pkname))
@@ -563,8 +568,9 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 							if "diffoper" in di.keys():
 								if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
 									if di["diffoper"] in ("insert", "update"):
-										print_tablehdr(sch, tname, out_sql_src, header_printed)
-										out_sql_src.append("-- Op #%d" % di["operorder"])
+										print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
+										if docomment:
+											out_sql_src.append("-- Op #%d" % di["operorder"])
 										if di["diffoper"] == "update":
 											out_sql_src.append(xtmpl % (tmpltd % (sch, tname), cname))
 										nv = di["newvalue"]
@@ -586,8 +592,9 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 							if "diffoper" in di.keys():
 								if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
 									if di["diffoper"] in ("insert", "update"):
-										print_tablehdr(sch, tname, out_sql_src, header_printed)
-										out_sql_src.append("-- Op #%d" % di["operorder"])
+										print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
+										if docomment:
+											out_sql_src.append("-- Op #%d" % di["operorder"])
 										if di["diffoper"] == "update":
 											out_sql_src.append(xtmpl % (sch, cname))
 										nv = di["newvalue"]
@@ -607,8 +614,9 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 							if "diffoper" in di.keys():
 								if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
 									if di["diffoper"] in ("insert", "update"):
-										print_tablehdr(sch, tname, out_sql_src, header_printed)
-										out_sql_src.append("-- Op #%d" % di["operorder"])
+										print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
+										if docomment:
+											out_sql_src.append("-- Op #%d" % di["operorder"])
 										if di["diffoper"] == "update":
 											out_sql_src.append(xtmpl % (tmpltd % (sch, tname), pkname))
 										nv = di["newvalue"]
@@ -630,8 +638,9 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 							if "diffoper" in di.keys():
 								if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
 									if di["diffoper"] in ("insert", "update"):
-										print_tablehdr(sch, tname, out_sql_src, header_printed)
-										out_sql_src.append("-- Op #%d" % di["operorder"])
+										print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
+										if docomment:
+											out_sql_src.append("-- Op #%d" % di["operorder"])
 										if di["diffoper"] == "update":
 											out_sql_src.append(xtmpl % (trname, sch, tname))
 										nv = di["newvalue"]
@@ -661,9 +670,9 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 					
 					if len(p_updates_ids_list) < 1 or proc_blk["operorder"] in p_updates_ids_list:
 						
-						out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Function %s.%s\n" % (sch, procname) + "-- " + "".join(['#'] * 77))
-
-						out_sql_src.append("-- Op #%d" % proc_blk["operorder"])
+						if docomment:
+							out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Function %s.%s\n" % (sch, procname) + "-- " + "".join(['#'] * 77))
+							out_sql_src.append("-- Op #%d" % proc_blk["operorder"])
 					
 						if proc_blk["diffoper"] == "insert":
 							

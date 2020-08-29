@@ -397,16 +397,17 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 	elif p_oper == "upddir":
 		
 		output = StringIO.StringIO()
-		out_sql_src = updatedb(p_proj, diffdict, upd_ids_list, limkeys_list, delmode=delmode)			
-		do_linesoutput(out_sql_src, output=output, interactive=False)
-		
-		script = output.getvalue()
+		out_sql_src = updatedb(p_proj, diffdict, upd_ids_list, limkeys_list, delmode=delmode, docomment=False)			
+		#do_linesoutput(out_sql_src, output=output, interactive=False)		
+		#script = output.getvalue()
 		
 		cnobj = conns.getConn(connkey)
 		cn = cnobj.getConn()
 		with cn.cursor() as cr:
 			# execute_batch(cr, script, (), page_size=10)
-			cr.execute(script)
+			for ln in out_sql_src:
+				print('>>', ln)
+				cr.execute(ln)
 		cn.commit()
 			
 		logger.info("direct dest change for proj. %s" % p_proj)
