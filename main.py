@@ -6,6 +6,8 @@ from os.path import abspath, dirname, exists, join as path_join
 from datetime import datetime as dt
 from copy import deepcopy
 
+from psycopg2.extras import execute_batch
+
 import argparse
 import logging
 import logging.config
@@ -13,8 +15,11 @@ import json
 import codecs
 import re
 import io
+import StringIO
 
-from src.common import LOG_CLI_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, OPS_OUTPUT, OPS_HELP, OPS_CHECK, SETUP_ZIP, BASE_CONNCFG, BASE_FILTERS_RE, PROC_SRC_BODY_FNAME
+from src.common import LOG_CLI_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, \
+		OPS_OUTPUT, OPS_HELP, OPS_CHECK, SETUP_ZIP, BASE_CONNCFG, \
+		BASE_FILTERS_RE, PROC_SRC_BODY_FNAME
 from src.read import srcreader
 from src.connect import Connections
 from src.compare import comparing, keychains
@@ -23,7 +28,7 @@ from src.fileandpath import get_conn_cfg_path, get_filters_cfg, exists_currentre
 from src.write import updateref, updatedb
 
 try:
-    file_types = (file, io.IOBase)
+    file_types = (file, io.IOBase, StringIO.StringIO)
 except NameError:
     file_types = (io.IOBase,)
     
@@ -168,20 +173,26 @@ def do_linesoutput(p_obj, output=None, interactive=False):
 				print(out_str) 
 		else:
 			dosave = False
-			if exists(output) and interactive:
-				prompt = "Ficheiro de saida existe, sobreescrever ? (s/n)"
-				try:
-					resp = raw_input(prompt)
-				except NameError:
-					resp = input(prompt)
-				if resp.lower() == 's':
+			if isinstance(output, basestring):
+				
+				if exists(output) and interactive:
+					prompt = "Ficheiro de saida existe, sobreescrever ? (s/n)"
+					try:
+						resp = raw_input(prompt)
+					except NameError:
+						resp = input(prompt)
+					if resp.lower() == 's':
+						dosave = True
+				else:
 					dosave = True
-			else:
-				dosave = True
 					
-			if dosave:
-				with codecs.open(output, "w", encoding="utf-8") as fj:
-					fj.write("\n".join(finallines))
+				if dosave:
+					with codecs.open(output, "w", encoding="utf-8") as fj:
+						fj.write("\n".join(finallines))
+							
+			elif isinstance(output, file_types):
+				output.write("\n".join(finallines))
+					
 
 			
 def check_filesystem():
@@ -350,18 +361,18 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 
 	assert not diffdict is None
 
-	# if p_oper in OPS_CONNECTED:
+	if p_oper in OPS_CONNECTED:
 		
-		# cfgpath = get_conn_cfg_path(p_proj)
-		# conns = Connections(cfgpath, subkey="conn")
+		cfgpath = get_conn_cfg_path(p_proj)
+		conns = Connections(cfgpath, subkey="conn")
 
-		# if p_connkey is None:
-			# if not conns.checkConn("dest"):
-				# raise RuntimeError("Chkdest: connection identificada com 'dest' nao existe, necessario indicar chave respetiva")
-			# else:
-				# connkey = 'dest'
-		# else:	
-			# connkey = p_connkey		
+		if p_connkey is None:
+			if not conns.checkConn("dest"):
+				raise RuntimeError("Chkdest: connection identificada com 'dest' nao existe, necessario indicar chave respetiva")
+			else:
+				connkey = 'dest'
+		else:	
+			connkey = p_connkey		
 	
 	if p_oper == "updref":
 				
@@ -382,6 +393,23 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 		do_linesoutput(out_sql_src, output=output, interactive=canuse_stdout)
 
 		logger.info("dest change script for proj. %s, %s" % (p_proj,output))
+		
+	elif p_oper == "upddir":
+		
+		output = StringIO.StringIO()
+		out_sql_src = updatedb(p_proj, diffdict, upd_ids_list, limkeys_list, delmode=delmode)			
+		do_linesoutput(out_sql_src, output=output, interactive=False)
+		
+		script = output.getvalue()
+		
+		cnobj = conns.getConn(connkey)
+		cn = cnobj.getConn()
+		with cn.cursor() as cr:
+			# execute_batch(cr, script, (), page_size=10)
+			cr.execute(script)
+		cn.commit()
+			
+		logger.info("direct dest change for proj. %s" % p_proj)
 		
 	return ret_changed
 

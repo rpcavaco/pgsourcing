@@ -19,10 +19,10 @@ LOG_CLI_CFG = {
 ########################################################################
 
 LANG = "pt"
-OPS = ["chksrc", "chkdest", "updref", "upddest"]
+OPS = ["chksrc", "chkdest", "updref", "upddest", "upddir"]
 OPS_CHECK = ["chksrc", "chkdest"]
-OPS_CONNECTED = ["chksrc", "chkdest"]
-OPS_INPUT = ["updref", "upddest"]
+OPS_CONNECTED = ["chksrc", "chkdest", "upddir"]
+OPS_INPUT = ["updref", "upddest", "upddir"]
 OPS_OUTPUT = ["upddest"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
@@ -32,7 +32,8 @@ OPS_HELP = {
 		"chksrc": "comparar b.d. fonte com o repositorio de referencia",
 		"chkdest": "comparar o repositorio de referencia com uma b.d. destino",
 		"updref": "atualizar o repositorio de referencia desde a b.d. fonte",
-		"upddest": "atualizar b.d. destino"
+		"upddest": "gerar script para b.d. destino",
+		"upddir": "atualizar diretamente b.d. destino"
 	}
 }
 

@@ -67,7 +67,7 @@ SQL = {
 		ORDER BY ordinal_position""",
 	"PKEYS": """select idxtblspc, conname as constraint_name, json_agg(attname) column_names
 		from
-		(select n3.nspname as idxtblspc, c.conname, t.oid, 
+		(select ts.spcname as idxtblspc, c.conname, t.oid,
 		unnest(c.conkey) attnum
 		FROM pg_constraint c 
 		JOIN pg_class t
@@ -76,8 +76,8 @@ SQL = {
 		  ON n2.oid = t.relnamespace
 		JOIN pg_class i
 			ON c.conindid = i.oid
-		JOIN pg_namespace n3
-		  ON n3.oid = i.relnamespace 
+		LEFT JOIN pg_tablespace ts
+		  ON ts.oid = i.reltablespace 
 		WHERE contype IN ('p')
 		AND n2.nspname = %s
 		AND t.relname = %s) a

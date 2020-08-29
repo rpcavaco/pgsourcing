@@ -190,9 +190,14 @@ def col_operation(p_sch, p_tname, p_colname, p_diff_item, p_delmode, p_updates_i
 		tmpltd = "ALTER TABLE %s.%s"
 		
 	tmplt = "ALTER TABLE %s.%s"
-		
+
+	if p_delmode == "CASCADE":
+		tmplt2 = "%s DROP COLUMN %s CASCADE"
+	else:
+		tmplt2 = "%s DROP COLUMN %s"
+	
 	if "diffoper" in p_diff_item.keys():
-		
+
 		if len(p_updates_ids_list) < 1 or p_diff_item["operorder"] in p_updates_ids_list:
 						
 			print_tablehdr(p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)
@@ -200,10 +205,6 @@ def col_operation(p_sch, p_tname, p_colname, p_diff_item, p_delmode, p_updates_i
 		
 			if p_diff_item["diffoper"] == "delete":
 				
-				if p_delmode == "CASCADE":
-					tmplt2 = "%s DROP COLUMN %s CASCADE"
-				else:
-					tmplt2 = "%s DROP COLUMN %s"
 				p_out_sql_src.append(tmplt2 % (tmpltd % (p_sch, p_tname), p_colname))
 				
 			elif p_diff_item["diffoper"] == "insert":
@@ -212,9 +213,17 @@ def col_operation(p_sch, p_tname, p_colname, p_diff_item, p_delmode, p_updates_i
 				cont0 = re.sub("\s\s+", " ",   "\t%s %s %s %s" % tuple(colcreatitems[1:]))
 				p_out_sql_src.append("%s ADD COLUMN %s" % (tmplt % (p_sch, p_tname), cont0.strip()))
 
-			if p_diff_item["diffoper"] == "update":			
-				## TODO - implementar o reconhecimento que uma coluna foi renomeada em SRC
-				p_out_sql_src.append("%s RENAME COLUMN %s TO %s" % (tmpltd % (p_sch, p_tname), p_colname, p_diff_item["newvalue"]))
+			elif p_diff_item["diffoper"] == "update":
+
+				p_out_sql_src.append(tmplt2 % (tmpltd % (p_sch, p_tname), p_colname))
+				
+				colcreatitems = col_create(p_tname, p_colname, p_diff_item["newvalue"])
+				cont0 = re.sub("\s\s+", " ",   "\t%s %s %s %s" % tuple(colcreatitems[1:]))
+				p_out_sql_src.append("%s ADD COLUMN %s" % (tmplt % (p_sch, p_tname), cont0.strip()))
+				
+			## TODO - implementar o reconhecimento que uma coluna foi renomeada em SRC
+			# if p_diff_item["diffoper"] == "update":			
+				# p_out_sql_src.append("%s RENAME COLUMN %s TO %s" % (tmpltd % (p_sch, p_tname), p_colname, p_diff_item["newvalue"]))
 
 	else:
 		
@@ -686,10 +695,6 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None):
 							
 							raise RuntimeError, "function %s.%s, wrong diffoper: %s" % (sch, procname, proc_blk["diffoper"])
 					
-					
-						
-									
-								
 						
 	return out_sql_src
 						

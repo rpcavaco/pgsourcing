@@ -16,6 +16,12 @@ WARN_KEYS = {
 	"TABLE_SU_OWNED": "Tabelas cujo owner e' 'postgres'"
 }
 
+SQL_GET_TS = """select ts.spcname
+from pg_database d
+join pg_tablespace ts
+on d.dattablespace = ts.oid
+where d.datname = %s"""
+
 def gen_where_from_re_list(p_filter_fieldname, p_re_list, dojoin=False, intersect=False):	
 	
 	if intersect:
@@ -99,13 +105,15 @@ def schema_dependency(p_found_schema, p_schema_name, p_typekey):
 				schdepobj[p_found_schema][p_typekey].append(seqname)
 
 def srvanddb_metadata(p_conn, out_dict):
-
-	if not "pg_metadata" in out_dict.keys():
-		out_dict["pg_metadata"] = {}	
 		
 	logger = logging.getLogger('pgsourcing')
 		
 	cn = p_conn.getConn()
+	
+	if not "pg_metadata" in out_dict.keys():
+		out_dict["pg_metadata"] = {}	
+	
+	out_dict["pg_metadata"]["database"] = p_conn.getDb()
 	
 	do_run = True
 	step = 0
@@ -117,7 +125,7 @@ def srvanddb_metadata(p_conn, out_dict):
 		count += 1
 		try:
 			
-			with cn.cursor(cursor_factory=p_conn.dict_cursor_factory) as cr:		
+			with cn.cursor() as cr:		
 
 				step_mark = 1
 				if step == step_mark:
@@ -155,7 +163,16 @@ def srvanddb_metadata(p_conn, out_dict):
 					cr.execute("select pgr_version()")
 					row = cr.fetchone()	
 					out_dict["pg_metadata"]["pgrouting"] = { "found": "true", "version": row[0] }
-				
+
+				step_mark = 4
+				if step == step_mark:
+					out_dict["pg_metadata"]["tablespace"] = "NULL"
+				elif step < step_mark:
+					step = step_mark				
+					cr.execute(SQL_GET_TS, (out_dict["pg_metadata"]["database"],))
+					row = cr.fetchone()	
+					out_dict["pg_metadata"]["tablespace"] = row[0]
+									
 				do_run = False
 
 		except UndefinedFunction as e:
@@ -450,7 +467,7 @@ def columns(p_cursor, out_dict, p_include_colorder):
 
 		#print(schema_name, unreadable_tables)
 
-def constraints(p_cursor, out_dict):
+def constraints(p_cursor, p_deftablespace, out_dict):
 	
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
 	assert "tables" in out_dict["content"].keys(), "'content.tables' em falta no dic. de saida"
@@ -472,10 +489,15 @@ def constraints(p_cursor, out_dict):
 					constrs_dict = tables_root[schema_name][table_name][dk] = {}
 				else:
 					constrs_dict = tables_root[schema_name][table_name][dk]
+					
+				if row["idxtblspc"] is None:
+					tblspc = p_deftablespace
+				else:
+					tblspc = row["idxtblspc"]
 
 				constr_list = constrs_dict[row["constraint_name"]] = {
 				
-					"index_tablespace": row["idxtblspc"],
+					"index_tablespace": tblspc,
 					"columns": row["column_names"]
 				
 				}
@@ -852,7 +874,7 @@ def srcreader(p_conn, p_filters_cfg, out_dict, outprocs_dir=None, include_public
 		with cn.cursor(cursor_factory=cnobj.dict_cursor_factory) as cr:
 			
 			logger.info("reading constraints ..")
-			constraints(cr, out_dict)
+			constraints(cr, out_dict["pg_metadata"]["tablespace"], out_dict)
 			
 			logger.info("reading indexes ..")
 			indexes(cr, out_dict)

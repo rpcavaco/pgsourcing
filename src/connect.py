@@ -15,6 +15,7 @@ class Conn(object):
 	def __init__(self, p_dict):
 
 		self.conn = None
+		self.db = None
 
 		self.dict_cursor_factory = None
 		
@@ -27,6 +28,9 @@ class Conn(object):
 		for k in p_dict.keys():
 			if k == "password":
 				newdict[k] = passw
+			elif k == "database":
+				newdict[k] = p_dict[k]
+				self.db = p_dict[k]
 			else:
 				newdict[k] = p_dict[k]
 				
@@ -43,6 +47,11 @@ class Conn(object):
 		if self.conn is None:
 			raise ConnectionError("Conn: getConn on NULL connection")
 		return self.conn
+						
+	def getDb(self):
+		if self.db is None:
+			raise ConnectionError("Conn: getDb is NULL")
+		return self.db
 						
 	def _test(self):
 		ret = False

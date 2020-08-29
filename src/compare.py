@@ -231,19 +231,20 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 				# If starting a new group from scratch
 				#  avoid inserting the whole group as a single insert operation
 				
-				if len(klist) == SHALLOW_DEPTH and not klist[0] in CFG_SHALLOW_GROUPS:
+				if klist[-1] in UPPERLEVELOPS.keys() or (len(klist) == SHALLOW_DEPTH and not klist[0] in CFG_SHALLOW_GROUPS):
 
 					for newkey in tmp_l[k].keys():
 					
 						newklist  = klist+[newkey]		
 						upperlevel_ops = comparegrp(tmp_l[k], tmp_r, newklist, p_transformschema, p_opordmgr, diff_dict, level=level+1)
 						if upperlevel_ops:
+							#print("... 241", upperlevel_ops)
 							dictupdate(ret_upperlevel_ops, upperlevel_ops)
 				
 				else:
-				
+									
 					newvalue = deepcopy(tmp_l[k])
-						
+
 					p_opordmgr.setord(diff_item)
 					diff_item["diffoper"] = "insert"				
 					traverse_replaceval(p_transformschema, newvalue, "insert B")
@@ -260,11 +261,14 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 				if isinstance(tmp_l[k], dict) and isinstance(tmp_r[k], dict):
 					upperlevel_ops = comparegrp(tmp_l, tmp_r, klist, p_transformschema, p_opordmgr, diff_dict, level=level+1)
 					if upperlevel_ops:
+						# if "tables" in upperlevel_ops.keys():
+							# print(".. 292 ..", upperlevel_ops)
 						dictupdate(ret_upperlevel_ops, upperlevel_ops)
 
 				elif isinstance(tmp_l[k], list) and isinstance(tmp_r[k], list):
 					upperlevel_ops = comparegrp_list(tmp_l, tmp_r, klist, p_opordmgr, diff_dict)
 					if upperlevel_ops:
+						# print(".. 298 ..", upperlevel_ops)
 						dictupdate(ret_upperlevel_ops, upperlevel_ops)
 						
 				elif isinstance(tmp_l[k], dict):
@@ -312,7 +316,9 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						if leftval != rightval:
 							
 							pass_diff_construction = False
+
 							for ulk in UPPERLEVELOPS.keys():
+								
 								if ulk in grpkeys:
 									
 									curr_ulop = ret_upperlevel_ops
@@ -337,24 +343,25 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 								diff_item["oldvalue"] = rightval
 	
 	if ret_upperlevel_ops:
-		#for ulk in UPPERLEVELOPS.keys():
+
 		kcl = []
 		keychains(ret_upperlevel_ops, kcl)
 		
+		# print("--------------")
+		# print(ret_upperlevel_ops)
+		# print("--------------")
+		
 		for ulk in UPPERLEVELOPS.keys():
 			offset = UPPERLEVELOPS[ulk]
+			# print('    ', ulk, offset)
 			for kc in kcl:
 				if ulk in kc:
+					# print("..348..", ulk, kc)
 					ki = kc.index(ulk)
 					if len(kc) == (offset + ki + 1):
 						if kc[-1] == grpkey:
 							gen_update('geral', p_transformschema, p_opordmgr, ret_upperlevel_ops, kc, diff_dict, tmp_l)
 							break
-							
-
-			
-		
-		#print("antes ret lvl:", level, l)
 							
 	return ret_upperlevel_ops
 						
@@ -486,9 +493,6 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 		
 		if ret:
 			dictupdate(upperlevel_ops, ret)
-	
-	# with open("lixodiff.json", "w") as of:
-		# json.dump(upperlevel_ops, of, indent=2, sort_keys=True)
 			
 	chdict = o_diff_dict	
 
