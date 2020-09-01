@@ -18,12 +18,6 @@ SQL = {
 	"TABLE_SU_OWNED": """select tablename from pg_tables
 		where schemaname = %s and tableowner = 'postgres'""",	
 	"ROLES": "select * from pg_roles",
-	# "SEQUENCES": """select 
-			# data_type, numeric_precision, numeric_precision_radix, numeric_scale,
-			# start_value, minimum_value, maximum_value, increment, cycle_option
-			# from information_schema.sequences
-			# where sequence_schema = %s
-			# and sequence_name = %s""",
 	"SEQUENCES": """select 
 			start_value, minimum_value, maximum_value, increment, cycle_option
 			from information_schema.sequences
@@ -56,6 +50,11 @@ SQL = {
 	"TABLES": """SELECT schemaname, tablename, tableowner, tablespace
 		FROM pg_tables
 		WHERE schemaname NOT LIKE 'pg\_%'""",
+	"VIEWS": """select schemaname as schema_name,
+		viewname as view_name,
+		viewowner, definition
+		from pg_views
+		where schemaname not in ('information_schema', 'pg_catalog')""",
 	"COLUMNS": """SELECT column_name, ordinal_position,
 			column_default, is_nullable, data_type,
 			character_maximum_length, numeric_precision,
@@ -85,25 +84,45 @@ SQL = {
 			ON a.oid = atr.attrelid 
 			and a.attnum = atr.attnum
 		GROUP BY idxtblspc, conname""",
-	"FKEYS": r"""select conname, cdef
-			from
-			(
-				select b.conname, b.cdef,
-				(regexp_split_to_array(b.table_from, E'\\.'))[2] as table_name
-				from 
-				( 
-					SELECT 
-					  conrelid::regclass::text AS table_from,
-					  conname,
-					  pg_get_constraintdef(c.oid) AS cdef 
-					FROM pg_constraint c 
-					JOIN pg_namespace n 
-					  ON n.oid = c.connamespace 
-					WHERE contype IN ('f') 
-					AND n.nspname = %s 
-				) b
-			) a
-			where a.table_name = %s""",
+	"FKEYS": """SELECT 
+		n2.nspname AS schema_ref,
+		t2.relname AS table_ref,
+		conname, 
+		pg_get_constraintdef(c.oid) AS cdef,
+		CASE c.confmatchtype 
+			WHEN 'f' THEN 'FULL'
+			WHEN 'p' THEN 'PARTIAL'
+			WHEN 's' THEN 'SIMPLE'
+			ELSE ''
+		END matchtype,
+		CASE c.confupdtype 
+			WHEN 'a' THEN 'NO ACTION'
+			WHEN 'r' THEN 'RESTRICT'
+			WHEN 'c' THEN 'CASCADE'
+			WHEN 'n' THEN 'SET NULL'
+			WHEN 'd' THEN 'SET DEFAULT'
+			ELSE ''
+		END updtype,
+		CASE c.confdeltype 
+			WHEN 'a' THEN 'NO ACTION'
+			WHEN 'r' THEN 'RESTRICT'
+			WHEN 'c' THEN 'CASCADE'
+			WHEN 'n' THEN 'SET NULL'
+			WHEN 'd' THEN 'SET DEFAULT'
+			ELSE ''
+		END deltype
+		FROM pg_constraint c 
+		JOIN pg_class t1
+			on t1.oid = c.conrelid
+		JOIN pg_namespace n1
+			ON t1.relnamespace = n1.oid
+		JOIN pg_class t2
+			on t2.oid = c.confrelid
+		JOIN pg_namespace n2
+			ON t2.relnamespace = n2.oid
+		WHERE contype IN ('f') 
+		AND n1.nspname = %s
+		AND t1.relname = %s""",
 	"CHECKS": r"""select c.conname, pg_get_constraintdef(c.oid) AS cdef
 		FROM pg_constraint c 
 		JOIN pg_class t

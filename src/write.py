@@ -578,6 +578,28 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 									elif di["diffoper"] == "delete":
 										out_sql_src.append(xtmpl % (tmpltd % (sch, tname), cname))								
 
+					if "fkey" in diff_item.keys():	
+												
+						if delmode is None or delmode == "NODEL":
+							xtmpl = SQL_DROP_CONSTR + " CASCADE"
+						else:
+							xtmpl = SQL_DROP_CONSTR	
+
+						for cname in diff_item["fkey"].keys():	
+							di = diff_item["fkey"][cname]
+							if "diffoper" in di.keys():
+								if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
+									if di["diffoper"] in ("insert", "update"):
+										print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
+										if docomment:
+											out_sql_src.append("-- Op #%d" % di["operorder"])
+										if di["diffoper"] == "update":
+											out_sql_src.append(xtmpl % (tmpltd % (sch, tname), cname))
+										nv = di["newvalue"]
+										out_sql_src.append(SQL_CREATE_CONSTR % (tmplt % (sch, tname), cname, nv["chkdesc"]))								
+									elif di["diffoper"] == "delete":
+										out_sql_src.append(xtmpl % (tmpltd % (sch, tname), cname))								
+
 					if "index" in diff_item.keys():	
 												
 						if delmode is None or delmode == "NODEL":

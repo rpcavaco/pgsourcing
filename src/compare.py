@@ -179,9 +179,9 @@ def gen_update(p_fase, p_transformschema, p_opordmgr, p_upperlevel_ops, p_keycha
 		
 																			
 def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_diff_dict, level=0): 
-	
+
 	logger = logging.getLogger('pgsourcing')
-	
+
 	grpkey = grpkeys[-1]
 	
 	try:
@@ -189,10 +189,12 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 	except:
 		logger.exception("comparegrp, error retrieving key from leftdict: '%s', level %d" % (grpkey, level))
 		raise
-	
-	diff_dict = o_diff_dict
-	
+		
+	diff_dict = o_diff_dict	
 	ret_upperlevel_ops = {}
+		
+	if "error" in tmp_l.keys():
+		return ret_upperlevel_ops
 		
 	# print("comparegrp", grpkeys) #, diff_dict)
 	
@@ -225,13 +227,14 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 			klist  = grpkeys+[k]
 
 			if k in tmp_l.keys() and not k in tmp_r.keys():
+				
 				# left only
-				diff_item = get_diff_item('b', diff_dict, klist)
 				
 				# If starting a new group from scratch
-				#  avoid inserting the whole group as a single insert operation
-				
+				#  avoid inserting the whole group as a single insert operation				
 				if klist[-1] in UPPERLEVELOPS.keys() or (len(klist) == SHALLOW_DEPTH and not klist[0] in CFG_SHALLOW_GROUPS):
+
+					diff_item = get_diff_item('b', diff_dict, klist)
 
 					for newkey in tmp_l[k].keys():
 					
@@ -244,12 +247,15 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 				else:
 									
 					newvalue = deepcopy(tmp_l[k])
+					if not isinstance(newvalue, dict) or not "error" in newvalue.keys():
 
-					p_opordmgr.setord(diff_item)
-					diff_item["diffoper"] = "insert"				
-					traverse_replaceval(p_transformschema, newvalue, "insert B")
-					diff_item["newvalue"] = newvalue
-				
+						diff_item = get_diff_item('b', diff_dict, klist)
+
+						p_opordmgr.setord(diff_item)
+						diff_item["diffoper"] = "insert"				
+						traverse_replaceval(p_transformschema, newvalue, "insert B")
+						diff_item["newvalue"] = newvalue
+										
 			elif k in tmp_r.keys() and not k in tmp_l.keys():
 				# right only
 				diff_item = get_diff_item('b1', diff_dict, klist)

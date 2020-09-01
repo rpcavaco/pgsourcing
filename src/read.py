@@ -99,10 +99,10 @@ def schema_dependency(p_found_schema, p_schema_name, p_typekey):
 		schdepobj = warnings["schemadependencies"][p_schema_name]
 			
 		if not p_found_schema in schdepobj.keys():
-			schdepobj[p_found_schema] = { p_typekey: [seqname] }
+			schdepobj[p_found_schema] = { p_typekey: [p_schema_name] }
 		else:
 			if not seqname in schdepobj[p_found_schema][p_typekey]:
-				schdepobj[p_found_schema][p_typekey].append(seqname)
+				schdepobj[p_found_schema][p_typekey].append(p_schema_name)
 
 def srvanddb_metadata(p_conn, out_dict):
 		
@@ -357,7 +357,7 @@ def tables(p_cursor, p_filters_cfg, out_dict):
 			
 	## TODO - contar registos, ler dados das parameterstables
 
-def columns(p_cursor, out_dict, p_include_colorder):
+def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 	
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
 	assert "tables" in out_dict["content"].keys(), "'content.tables' em falta no dic. de saida"
@@ -377,14 +377,21 @@ def columns(p_cursor, out_dict, p_include_colorder):
 	
 	for schema_name in tables_root.keys():
 		
-		unreadable_tables = []
+		#unreadable_tables = []
 		
 		for table_name in tables_root[schema_name].keys():
 			
 			p_cursor.execute(SQL["COLUMNS"], (schema_name, table_name))
 			
 			if p_cursor.rowcount < 1:
-				unreadable_tables.append((schema_name, table_name))
+				if schema_name not in o_unreadable_tables_dict.keys():
+					o_unreadable_tables_dict[schema_name] = []
+				o_unreadable_tables_dict[schema_name].append(table_name)
+				
+				if not "error" in tables_root[schema_name][table_name].keys():				
+					tables_root[schema_name][table_name]["error"] = []
+				tables_root[schema_name][table_name]["error"].append("cols unreadable, review permissions")	
+				continue
 
 			for row in p_cursor:
 				
@@ -464,8 +471,7 @@ def columns(p_cursor, out_dict, p_include_colorder):
 
 							col_dict[opt_key] = row[opt_colname]	
 						
-
-		#print(schema_name, unreadable_tables)
+		# print("unreadable_tables:", schema_name, unreadable_tables)
 
 def constraints(p_cursor, p_deftablespace, out_dict):
 	
@@ -479,6 +485,9 @@ def constraints(p_cursor, p_deftablespace, out_dict):
 	for schema_name in tables_root.keys():
 		
 		for table_name in tables_root[schema_name].keys():
+
+			if "error" in tables_root[schema_name][table_name].keys():
+				continue
 
 			p_cursor.execute(SQL["PKEYS"], (schema_name, table_name))
 
@@ -541,19 +550,19 @@ def constraints(p_cursor, p_deftablespace, out_dict):
 				else:
 					constrs_dict = tables_root[schema_name][table_name][dk]
 
-				constrs_dict[row["conname"]] = row["cdef"]
-
+				constrs_dict[row["conname"]] = {				
+					"cdef": row["cdef"],
+					"schema_ref": row["schema_ref"],
+					"table_ref": row["table_ref"],
+					"matchtype": row["matchtype"],
+					"updtype": row["updtype"],
+					"deltype": row["deltype"]				
+				}
 				# detetar dependencias entre schemas, avaliando se
 				# sao invocadas tabelas de outros schemas nas foreign keys
 				#
 
-				match = pattern.match(row["cdef"])
-				if not match is None:
-					
-					found_schema = match.group("schema")
-					tname = match.group("tname")
-					
-					schema_dependency(found_schema, schema_name, "fkeys")
+				schema_dependency(row["schema_ref"], schema_name, "fkeys")
 
 def indexes(p_cursor, out_dict):
 	
@@ -571,6 +580,9 @@ def indexes(p_cursor, out_dict):
 	for schema_name in tables_root.keys():
 		
 		for table_name in tables_root[schema_name].keys():
+
+			if "error" in tables_root[schema_name][table_name].keys():
+				continue
 
 			if "pkey" in tables_root[schema_name][table_name].keys():
 				pkeys = tables_root[schema_name][table_name]["pkey"].keys()
@@ -688,6 +700,9 @@ def triggers(p_cursor, out_trigger_functions, out_dict):
 		t_name = row["table_name"]
 
 		if not t_schema in tables_root.keys() or not t_name in tables_root[t_schema].keys():
+			continue
+			
+		if "error" in tables_root[t_schema][t_name].keys():
 			continue
 		
 		if not dk in tables_root[t_schema][t_name].keys():
@@ -861,9 +876,13 @@ def srcreader(p_conn, p_filters_cfg, out_dict, outprocs_dir=None, include_public
 
 			if not "sequences" in out_dict["content"].keys():
 				out_dict["content"]["sequences"] = {}
+				
+			unreadable_tables = {}
 			
 			logger.info("reading cols ..")
-			columns(cr, out_dict, include_colorder)		
+			columns(cr, include_colorder, unreadable_tables, out_dict)		
+			
+			#print("ur tables:", unreadable_tables)
 			
 			logger.info("reading triggers ..")
 			triggers(cr, trigger_functions, out_dict)	
