@@ -53,8 +53,12 @@ SQL = {
 	"VIEWS": """select schemaname,
 		viewname,
 		viewowner, definition
-		from pg_views
-		where schemaname not in ('information_schema', 'pg_catalog')""",
+		from pg_views""",
+	"MATVIEWS": """select schemaname,
+		matviewname,
+		matviewowner as viewowner, definition,
+		tablespace
+		from pg_matviews""",
 	"COLUMNS": """SELECT column_name, ordinal_position,
 			column_default, is_nullable, data_type,
 			character_maximum_length, numeric_precision,

@@ -82,6 +82,16 @@ def gen_views_where_from_re_list(p_schemafilter_fieldname, p_viewfilter_fieldnam
 			
 	return wherecl
 
+def gen_matviews_where_from_re_list(p_schemafilter_fieldname, p_viewfilter_fieldname, p_curr_schema, p_filters_cfg, dojoin=False, intersect=False):
+
+	wherecl = None
+
+	if "matviews" in p_filters_cfg and len(p_filters_cfg["matviews"].keys()) > 0 and p_curr_schema in p_filters_cfg["matviews"].keys():
+		wherecl = gen_where_from_re_list(p_viewfilter_fieldname, p_filters_cfg["matviews"][p_curr_schema], dojoin=dojoin, intersect=intersect)
+			
+	return wherecl
+
+
 def gen_procs_where_from_re_list(p_schemafilter_fieldname, p_procfilter_fieldname, p_curr_schema, p_filters_cfg, dojoin=False, intersect=False):
 
 	wherecl = None
@@ -379,12 +389,12 @@ def views(p_cursor, p_filters_cfg, out_dict):
 			if sch not in p_filters_cfg["views"].keys():
 				continue 
 			
-		wherecl = gen_views_where_from_re_list("schemaname", "viewname", sch, p_filters_cfg, dojoin=True, intersect=True)
+		wherecl = gen_views_where_from_re_list("schemaname", "viewname", sch, p_filters_cfg)
 		if wherecl is None:
-			wherecl = "and schemaname = '%s'" % sch
+			wherecl = "where schemaname = '%s'" % sch
 		else:
-			wherecl = "and schemaname = '%s' %s" % (sch, wherecl)
-
+			wherecl = "%s and schemaname = '%s'" % (wherecl, sch)
+			
 		sql = "%s %s" % (SQL["VIEWS"], wherecl)
 
 		if not "views" in out_dict["content"].keys():
@@ -419,6 +429,71 @@ def views(p_cursor, p_filters_cfg, out_dict):
 				"vdef": row["definition"]
 			}
 
+def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict):
+
+	# Previously tested on "tables"
+	# assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
+	# assert "schemas" in out_dict["content"].keys(), "'content.schemas' em falta no dic. de saida"
+
+	for sch in out_dict["content"]["schemas"]:
+
+		if "matviews" in p_filters_cfg.keys():
+			if sch not in p_filters_cfg["matviews"].keys():
+				continue 
+			
+		wherecl = gen_matviews_where_from_re_list("schemaname", "matviewname", sch, p_filters_cfg)
+		if wherecl is None:
+			wherecl = "where schemaname = '%s'" % sch
+		else:
+			wherecl = "%s and schemaname = '%s'" % (wherecl, sch)
+
+		sql = "%s %s" % (SQL["MATVIEWS"], wherecl)
+		
+		if not "matviews" in out_dict["content"].keys():
+			out_dict["content"]["matviews"] = {}
+		
+		the_dict = out_dict["content"]["matviews"]
+		#print(p_cursor.description)
+		
+		p_cursor.execute(sql)
+		#print(p_cursor.mogrify(sql))
+
+		for row in p_cursor:
+			
+			# if row["schemaname"] == "information_schema":
+				# continue
+			
+			# if row["schemaname"] == "public" and not p_include_public:
+				# continue
+				
+			# ## remover tabelas internas ArcGIS
+			# m = re.match("i[\d]+", row["tablename"])
+			# if not m is None:
+				# continue
+
+			if not row["schemaname"] in the_dict.keys():
+				sch_dict = the_dict[row["schemaname"]] = {}	
+			else:
+				sch_dict = the_dict[row["schemaname"]]	
+				
+			# if row["ispopulated"]:
+				# pop = "True"
+			# else:
+				# pop = "False"
+			
+			if row["tablespace"] is None:
+				tblspc = p_deftablespace
+			else:
+				tblspc = row["tablespace"]
+				
+			sch_dict[row["matviewname"]] = {
+				"owner": row["viewowner"],
+				"vdef": row["definition"],
+				"tablespace": tblspc
+			}
+
+
+			
 def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 	
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
@@ -962,6 +1037,10 @@ def srcreader(p_conn, p_filters_cfg, out_dict, outprocs_dir=None, include_public
 
 			logger.info("reading views ..")			
 			views(cr, p_filters_cfg, out_dict)
+
+			logger.info("reading mat.views ..")			
+			matviews(cr, p_filters_cfg, 
+			out_dict["pg_metadata"]["tablespace"], out_dict)
 					
 			logger.info("reading procedures ..")
 			procs(cr, p_filters_cfg, trigger_functions, majorversion, out_dict, genprocsdir=outprocs_dir)

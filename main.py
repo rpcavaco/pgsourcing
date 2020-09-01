@@ -163,7 +163,10 @@ def do_linesoutput(p_obj, output=None, interactive=False):
 					if item.strip().endswith('##'):
 						finallines.append(item + "\n")
 					else:
-						finallines.append(item + outer_sep)
+						if item.strip().endswith(';'):
+							finallines.append(item + "\n")
+						else:
+							finallines.append(item + outer_sep)
 			elif isinstance(item, list):
 				finallines.append("\n".join(item) + outer_sep)
 		
