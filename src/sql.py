@@ -228,5 +228,49 @@ SQL = {
 				 left join pg_namespace ns1 on c.relnamespace = ns1.oid
 				 left join pg_proc p on t.tgfoid = p.oid
 				 left join pg_namespace ns2 on p.pronamespace = ns2.oid
-				 where not tgisinternal"""
+				 where not tgisinternal""",
+	"GRANTS": """with ps as (select regexp_split_to_array(unnest(c.relacl)::text, '=|/') AS acl
+		from pg_class c
+		join pg_namespace ns
+			on c.relnamespace = ns.oid
+		where ns.nspname = %s
+		and c.relname = %s)
+		select coalesce(nullif(acl[1], ''), 'public') grantee,
+		(SELECT string_agg(privilege, ', ' ORDER BY privilege ASC)
+					FROM (SELECT
+						CASE ch
+							WHEN 'r' THEN 'SELECT'
+							WHEN 'w' THEN 'UPDATE'
+							WHEN 'a' THEN 'INSERT'
+							WHEN 'd' THEN 'DELETE'
+							WHEN 'D' THEN 'TRUNCATE'
+							WHEN 'x' THEN 'REFERENCES'
+							WHEN 't' THEN 'TRIGGER'
+						END AS privilege
+						FROM regexp_split_to_table(acl[2], '') ch
+					) s
+				) AS privileges,	
+		case acl[2] 
+			when 'arwdDxt' then true
+			else false
+		end allprivs
+		from ps""",
+	"SCHGRANTS": """with ps as (select regexp_split_to_array(unnest(ns.nspacl)::text, '=|/') AS acl
+		from pg_namespace ns
+		where ns.nspname = %s)
+		select coalesce(nullif(acl[1], ''), 'public') grantee,
+		(SELECT string_agg(privilege, ', ' ORDER BY privilege ASC)
+					FROM (SELECT
+						CASE ch
+							WHEN 'U' THEN 'USAGE'
+							WHEN 'C' THEN 'CREATE'
+						END AS privilege
+						FROM regexp_split_to_table(acl[2], '') ch
+					) s
+				) AS privileges,	
+		case acl[2] 
+			when 'UC' then true
+			else false
+		end allprivs
+		from ps"""
 }

@@ -491,6 +491,22 @@ def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict):
 				"vdef": row["definition"],
 				"tablespace": tblspc
 			}
+			
+		for sch in the_dict.keys():			
+			for obj in the_dict[sch].keys():
+				p_cursor.execute(SQL["GRANTS"], (sch, obj))
+				for row in p_cursor:
+					if not "grants" in the_dict[sch][obj].keys():
+						the_dict[sch][obj]["grants"] = {}
+						
+					if row["allprivs"]:
+						privs = "ALL"
+					else:
+						privs = row["privileges"]
+						
+					the_dict[sch][obj]["grants"][row["grantee"]] = {
+						"privs": privs						
+					}
 
 
 			
