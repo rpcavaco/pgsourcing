@@ -73,6 +73,15 @@ def gen_tables_where_from_re_list(p_schemafilter_fieldname, p_tablefilter_fieldn
 			
 	return wherecl
 
+def gen_views_where_from_re_list(p_schemafilter_fieldname, p_viewfilter_fieldname, p_curr_schema, p_filters_cfg, dojoin=False, intersect=False):
+
+	wherecl = None
+
+	if "views" in p_filters_cfg and len(p_filters_cfg["views"].keys()) > 0 and p_curr_schema in p_filters_cfg["views"].keys():
+		wherecl = gen_where_from_re_list(p_viewfilter_fieldname, p_filters_cfg["views"][p_curr_schema], dojoin=dojoin, intersect=intersect)
+			
+	return wherecl
+
 def gen_procs_where_from_re_list(p_schemafilter_fieldname, p_procfilter_fieldname, p_curr_schema, p_filters_cfg, dojoin=False, intersect=False):
 
 	wherecl = None
@@ -309,8 +318,9 @@ def tables(p_cursor, p_filters_cfg, out_dict):
 
 	for sch in out_dict["content"]["schemas"]:
 
-		if sch not in p_filters_cfg["tables"].keys():
-			continue 
+		if "tables" in p_filters_cfg.keys():
+			if sch not in p_filters_cfg["tables"].keys():
+				continue 
 			
 		wherecl = gen_tables_where_from_re_list("schemaname", "tablename", sch, p_filters_cfg, dojoin=True, intersect=True)
 		if wherecl is None:
@@ -356,6 +366,58 @@ def tables(p_cursor, p_filters_cfg, out_dict):
 				
 			
 	## TODO - contar registos, ler dados das parameterstables
+
+def views(p_cursor, p_filters_cfg, out_dict):
+
+	# Previously tested on "tables"
+	# assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
+	# assert "schemas" in out_dict["content"].keys(), "'content.schemas' em falta no dic. de saida"
+
+	for sch in out_dict["content"]["schemas"]:
+
+		if "views" in p_filters_cfg.keys():
+			if sch not in p_filters_cfg["views"].keys():
+				continue 
+			
+		wherecl = gen_views_where_from_re_list("schemaname", "viewname", sch, p_filters_cfg, dojoin=True, intersect=True)
+		if wherecl is None:
+			wherecl = "and schemaname = '%s'" % sch
+		else:
+			wherecl = "and schemaname = '%s' %s" % (sch, wherecl)
+
+		sql = "%s %s" % (SQL["VIEWS"], wherecl)
+
+		if not "views" in out_dict["content"].keys():
+			out_dict["content"]["views"] = {}
+		
+		the_dict = out_dict["content"]["views"]
+		#print(p_cursor.description)
+		
+		p_cursor.execute(sql)
+		#print(p_cursor.mogrify(sql))
+
+		for row in p_cursor:
+
+			# if row["schemaname"] == "information_schema":
+				# continue
+			
+			# if row["schemaname"] == "public" and not p_include_public:
+				# continue
+				
+			# ## remover tabelas internas ArcGIS
+			# m = re.match("i[\d]+", row["tablename"])
+			# if not m is None:
+				# continue
+
+			if not row["schemaname"] in the_dict.keys():
+				sch_dict = the_dict[row["schemaname"]] = {}	
+			else:
+				sch_dict = the_dict[row["schemaname"]]	
+				
+			sch_dict[row["viewname"]] = {
+				"owner": row["viewowner"],
+				"vdef": row["definition"]
+			}
 
 def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 	
@@ -897,6 +959,9 @@ def srcreader(p_conn, p_filters_cfg, out_dict, outprocs_dir=None, include_public
 			
 			logger.info("reading indexes ..")
 			indexes(cr, out_dict)
+
+			logger.info("reading views ..")			
+			views(cr, p_filters_cfg, out_dict)
 					
 			logger.info("reading procedures ..")
 			procs(cr, p_filters_cfg, trigger_functions, majorversion, out_dict, genprocsdir=outprocs_dir)

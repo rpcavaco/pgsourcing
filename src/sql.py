@@ -50,8 +50,8 @@ SQL = {
 	"TABLES": """SELECT schemaname, tablename, tableowner, tablespace
 		FROM pg_tables
 		WHERE schemaname NOT LIKE 'pg\_%'""",
-	"VIEWS": """select schemaname as schema_name,
-		viewname as view_name,
+	"VIEWS": """select schemaname,
+		viewname,
 		viewowner, definition
 		from pg_views
 		where schemaname not in ('information_schema', 'pg_catalog')""",

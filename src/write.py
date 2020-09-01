@@ -397,6 +397,11 @@ def print_tablehdr(p_docomment, p_sch, p_name, p_out_sql_src, o_flag_byref):
 	if p_docomment and not o_flag_byref[0]:
 		p_out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Table %s.%s\n" % (p_sch, p_name) + "-- " + "".join(['#'] * 77))
 		o_flag_byref[0] = True
+
+def print_viewhdr(p_docomment, p_sch, p_name, p_out_sql_src, o_flag_byref):
+	if p_docomment and not o_flag_byref[0]:
+		p_out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- View %s.%s\n" % (p_sch, p_name) + "-- " + "".join(['#'] * 77))
+		o_flag_byref[0] = True
 	
 def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, docomment=True):
 	
@@ -408,10 +413,12 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		tmpltd = "-- ALTER TABLE %s.%s"
 		tmplpd = "-- DROP FUNCTION %s.%s"
 		tmplsd = "-- DROP SEQUENCE %s.%s"
+		tmplvd = "-- DROP VIEW %s.%s"
 	else:
 		tmpltd = "ALTER TABLE %s.%s"
 		tmplpd = "DROP FUNCTION %s.%s"
 		tmplsd = "DROP SEQUENCE %s.%s"
+		tmplvd = "DROP VIEW %s.%s"
 		
 	tmplt = "ALTER TABLE %s.%s"
 
@@ -422,7 +429,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		header_printed = False
 	
 		currdiff_block = diff_content[grpkey]			
-		for role in currdiff_block.keys():
+		for role in sorted(currdiff_block.keys()):
 			
 			diff_item = currdiff_block[role]
 			assert "diffoper" in diff_item.keys()
@@ -465,7 +472,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		header_printed = False
 	
 		currdiff_block = diff_content[grpkey]			
-		for sch in currdiff_block.keys():
+		for sch in sorted(currdiff_block.keys()):
 			
 			diff_item = currdiff_block[sch]
 			assert "diffoper" in diff_item.keys()
@@ -499,12 +506,12 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		header_printed = False
 
 		currdiff_block = diff_content[grpkey]			
-		for sch in currdiff_block.keys():
+		for sch in sorted(currdiff_block.keys()):
 			
 			if sch in dropped_schemas:
 				raise RuntimeError, "CONFLICT: schema to drop '%s' is in use in sequences." % sch
 			
-			for sname in currdiff_block[sch].keys():
+			for sname in sorted(currdiff_block[sch].keys()):
 
 				diff_item = currdiff_block[sch][sname]	
 				assert "diffoper" in diff_item.keys()
@@ -533,19 +540,17 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 	
 	grpkey = "tables"
 	
-	print("delmode A:", delmode)
-	
 	if grpkey in diff_content.keys():	
 
 		header_printed = [False]
 			
 		currdiff_block = diff_content[grpkey]			
-		for sch in currdiff_block.keys():	
+		for sch in sorted(currdiff_block.keys()):	
 
 			if sch in dropped_schemas:
 				raise RuntimeError, "CONFLICT: schema to drop '%s' is in use in tables." % sch
 								
-			for tname in currdiff_block[sch].keys():
+			for tname in sorted(currdiff_block[sch].keys()):
 				
 				header_printed[0] = False
 				
@@ -711,6 +716,36 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 									elif di["diffoper"] == "delete":
 										out_sql_src.append(xtmpl % (trname, sch, tname))
 												
+
+	grpkey = "views"
+
+	if grpkey in diff_content.keys():	
+
+		header_printed = [False]
+			
+		currdiff_block = diff_content[grpkey]			
+		for sch in sorted(currdiff_block.keys()):	
+
+			if sch in dropped_schemas:
+				raise RuntimeError, "CONFLICT: schema to drop '%s' is in use in views." % sch
+								
+			for vname in sorted(currdiff_block[sch].keys()):
+				
+				header_printed[0] = False				
+				diff_item = currdiff_block[sch][vname]	
+				assert "diffoper" in diff_item.keys()					
+				
+				if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
+					print_viewhdr(docomment, sch, vname, out_sql_src, header_printed)	
+					if docomment:				
+						out_sql_src.append("-- Op #%d" % diff_item["operorder"])
+					if diff_item["diffoper"] in ("update", "delete"):
+						out_sql_src.append(tmplvd % (sch,vname))
+					if diff_item["diffoper"] in ("update", "insert"):
+						tmplv = "CREATE OR REPLACE VIEW %s.%s AS %s" 
+						out_sql_src.append(tmplv % (sch,vname, diff_item["newvalue"]["vdef"]))
+						if "owner" in diff_item["newvalue"].keys():
+							out_sql_src.append("ALTER TABLE %s.%s OWNER to %s" % (sch, vname, diff_item["newvalue"]["owner"]))
 						
 	grpkey = "procedures"
 	
@@ -719,12 +754,12 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		header_printed = False
 			
 		currdiff_block = diff_content[grpkey]			
-		for sch in currdiff_block.keys():
+		for sch in sorted(currdiff_block.keys()):
 
 			if sch in dropped_schemas:
 				raise RuntimeError, "CONFLICT: schema to drop '%s' is in use in procedures." % sch
 			
-			for procname in currdiff_block[sch].keys():
+			for procname in sorted(currdiff_block[sch].keys()):
 				
 				proc_blk = currdiff_block[sch][procname]				
 				if "diffoper" in proc_blk.keys():

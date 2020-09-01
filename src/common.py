@@ -42,6 +42,7 @@ SETUP_ZIP = "pgsourcing_setup.zip"
 BASE_FILTERS_RE = {
 	"schema": [],
 	"tables": [],
+	"views": [],
 	"procedures": []
 }
 
@@ -59,12 +60,14 @@ BASE_CONNCFG = {
 
 CFG_GROUPS = [
 	"owners", "roles", "schemas", 
-	"sequences", "tables", "procedures"
+	"sequences", "tables", 
+	"views", "procedures"
 ]
 
 CFG_DEST_GROUPS = [
 	"roles", "schemas", 
-	"sequences", "tables", "procedures"
+	"sequences", "tables", 
+	"views", "procedures"
 ]
 
 CFG_LISTGROUPS = ["owners"]
@@ -85,6 +88,6 @@ COL_ITEMS_CHG_AVOIDING_SUBSTITUTION = ["default", "nullable"]
 #
 # Valor indica a profundidade da alteracao abaixo da chave indicada
 #
-UPPERLEVELOPS = { "pkey": 1, "cols": 1, "check": 1, "index": 1, "unique": 1, "trigger": 1, "procedures": 2, "roles": 1 }
+UPPERLEVELOPS = { "pkey": 1, "cols": 1, "check": 1, "index": 1, "unique": 1, "trigger": 1, "procedures": 2, "roles": 1, "views": 2 }
 
 

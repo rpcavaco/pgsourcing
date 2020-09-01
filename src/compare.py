@@ -32,6 +32,10 @@ def do_transformschema(p_transformschema, p_obj, p_k):
 		if "tables" in p_transformschema["types"] or "indexes" in p_transformschema["types"]:
 			for trans in p_transformschema["trans"]:
 				p_obj[p_k] = p_obj[p_k].replace(trans["src"], trans["dest"])
+	elif p_k == "vdef":
+		if "views" in p_transformschema["types"]:
+			for trans in p_transformschema["trans"]:
+				p_obj[p_k] = p_obj[p_k].replace(trans["src"], trans["dest"])
 	elif p_k == "default":
 		if "tables" in p_transformschema["types"]:
 			for trans in p_transformschema["trans"]:
