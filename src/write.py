@@ -12,6 +12,11 @@ SQL_CREATE_UNIQUE = """%s ADD CONSTRAINT %s UNIQUE (%s)
 
 SQL_CREATE_CONSTR = "%s ADD CONSTRAINT %s %s"
 
+SQL_CREATE_FK = """%s ADD CONSTRAINT %s %s 
+	MATCH %s
+    ON UPDATE %s
+    ON DELETE %s"""
+
 SQL_DROP_CONSTR = "%s DROP CONSTRAINT %s"
 
 
@@ -141,6 +146,8 @@ def col_create(p_tname, p_colname, p_col):
 
 def table_operation(p_sch, p_tname, p_diff_item, p_delmode, p_out_sql_src):	
 
+	tmplt = "ALTER TABLE %s.%s"
+
 	if p_diff_item["diffoper"] == "delete":
 		
 		if p_delmode is None or p_delmode == "NODEL":
@@ -154,31 +161,63 @@ def table_operation(p_sch, p_tname, p_diff_item, p_delmode, p_out_sql_src):
 
 	elif p_diff_item["diffoper"] == "insert":
 		
-		if not "cols" in p_diff_item["newvalue"]:
-			tmplist = ["CREATE TABLE %s.%s" % (p_sch,p_tname)]
-		else:
-			tmplist = ["CREATE TABLE %s.%s" % (p_sch,p_tname), "("]
+		assert "cols" in p_diff_item["newvalue"]
+			# tmplist = ["CREATE TABLE %s.%s" % (p_sch,p_tname)]
+		# else:
+		tmplist = ["CREATE TABLE %s.%s" % (p_sch,p_tname), "("]
 		
-		if "cols" in p_diff_item["newvalue"]:
-			colitems_list = []
-			for colname in p_diff_item["newvalue"]["cols"].keys():
-				col = p_diff_item["newvalue"]["cols"][colname]			
-				colitems = col_create(p_tname, colname, col)					
-				colitems_list.append(colitems)
-					
-			colitems_list.sort(key=lambda ci: ci[0])
-			
-			for cii, cil_item in enumerate(colitems_list):
-				cont0 = re.sub("\s\s+", " ", "%s %s %s %s" % tuple(cil_item[1:]))
-				cont = "\t" + cont0.strip()
-				if cii < (len(colitems_list) - 1):
-					tmplist.append(cont + ",")
-				else:
-					tmplist.append(cont)
-					tmplist.append(")")
+		colitems_list = []
+		
+		for colname in p_diff_item["newvalue"]["cols"].keys():
+			col = p_diff_item["newvalue"]["cols"][colname]			
+			colitems = col_create(p_tname, colname, col)					
+			colitems_list.append(colitems)
+				
+		colitems_list.sort(key=lambda ci: ci[0])
+		
+		for cii, cil_item in enumerate(colitems_list):
+			cont0 = re.sub("\s\s+", " ", "%s %s %s %s" % tuple(cil_item[1:]))
+			cont = "\t" + cont0.strip()
+			if cii < (len(colitems_list) - 1):
+				tmplist.append(cont + ",")
+			else:
+				tmplist.append(cont)
+				tmplist.append(")")
 			
 		p_out_sql_src.append(tmplist)
-		
+
+		if "pkey" in p_diff_item["newvalue"].keys():										
+			for pkname in p_diff_item["newvalue"]["pkey"].keys():	
+				di = p_diff_item["newvalue"]["pkey"][pkname]
+				p_out_sql_src.append(SQL_CREATE_PK % (tmplt % (p_sch, p_tname), pkname, ",".join(di["columns"]), di["index_tablespace"]))	
+
+		if "check" in p_diff_item["newvalue"].keys():	
+			for cname in p_diff_item["newvalue"]["check"].keys():	
+				di = p_diff_item["newvalue"]["check"][cname]
+				p_out_sql_src.append(SQL_CREATE_CONSTR % (tmplt % (p_sch, p_tname), cname, di["chkdesc"]))								
+
+		if "fkey" in p_diff_item["newvalue"].keys():										
+			for cname in p_diff_item["newvalue"]["fkey"].keys():	
+				di = p_diff_item["newvalue"]["fkey"][cname]
+				p_out_sql_src.append(SQL_CREATE_FK % (tmplt % (p_sch, p_tname), cname, di["cdef"], di["matchtype"], di["updtype"], di["deltype"]))								
+
+		if "index" in p_diff_item["newvalue"].keys():	
+			for cname in p_diff_item["newvalue"]["index"].keys():	
+				di = p_diff_item["newvalue"]["index"][cname]
+				p_out_sql_src.append(di["idxdesc"])						
+
+		if "unique" in p_diff_item["newvalue"].keys():							
+			for cname in p_diff_item["newvalue"]["unique"].keys():	
+				di = p_diff_item["newvalue"]["unique"][cname]
+				p_out_sql_src.append(SQL_CREATE_UNIQUE % (tmplt % (p_sch, p_tname), cname, ",".join(di["columns"]), di["index_tablespace"]))									
+
+		if "trigger" in p_diff_item["newvalue"].keys():	
+			for trname in p_diff_item["newvalue"]["trigger"].keys():	
+				di = p_diff_item["newvalue"]["trigger"][trname]
+				flines = []
+				create_trigger(trname, p_sch, p_tname, di, flines)						
+				p_out_sql_src.append("".join(flines))
+
 		if "owner" in p_diff_item["newvalue"]:
 			p_out_sql_src.append("ALTER TABLE %s.%s OWNER to %s" % (p_sch, p_tname, p_diff_item["newvalue"]["owner"]))
 
@@ -494,6 +533,8 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 	
 	grpkey = "tables"
 	
+	print("delmode A:", delmode)
+	
 	if grpkey in diff_content.keys():	
 
 		header_printed = [False]
@@ -510,10 +551,8 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 				
 				diff_item = currdiff_block[sch][tname]	
 
-
 				if "diffoper" in diff_item.keys():						
-
-					
+				
 					if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
 						print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)	
 						if docomment:				
@@ -558,7 +597,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 
 					if "check" in diff_item.keys():	
 												
-						if delmode is None or delmode == "NODEL":
+						if delmode == "CASCADE":
 							xtmpl = SQL_DROP_CONSTR + " CASCADE"
 						else:
 							xtmpl = SQL_DROP_CONSTR	
@@ -567,10 +606,10 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 							di = diff_item["check"][cname]
 							if "diffoper" in di.keys():
 								if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
+									print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
+									if docomment:
+										out_sql_src.append("-- Op #%d" % di["operorder"])
 									if di["diffoper"] in ("insert", "update"):
-										print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
-										if docomment:
-											out_sql_src.append("-- Op #%d" % di["operorder"])
 										if di["diffoper"] == "update":
 											out_sql_src.append(xtmpl % (tmpltd % (sch, tname), cname))
 										nv = di["newvalue"]
@@ -580,7 +619,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 
 					if "fkey" in diff_item.keys():	
 												
-						if delmode is None or delmode == "NODEL":
+						if delmode == "CASCADE":
 							xtmpl = SQL_DROP_CONSTR + " CASCADE"
 						else:
 							xtmpl = SQL_DROP_CONSTR	
@@ -589,14 +628,14 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 							di = diff_item["fkey"][cname]
 							if "diffoper" in di.keys():
 								if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
+									print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
+									if docomment:
+										out_sql_src.append("-- Op #%d" % di["operorder"])
 									if di["diffoper"] in ("insert", "update"):
-										print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
-										if docomment:
-											out_sql_src.append("-- Op #%d" % di["operorder"])
 										if di["diffoper"] == "update":
 											out_sql_src.append(xtmpl % (tmpltd % (sch, tname), cname))
 										nv = di["newvalue"]
-										out_sql_src.append(SQL_CREATE_CONSTR % (tmplt % (sch, tname), cname, nv["chkdesc"]))								
+										out_sql_src.append(SQL_CREATE_FK % (tmplt % (sch, tname), cname, nv["cdef"], nv["matchtype"], nv["updtype"], nv["deltype"]))								
 									elif di["diffoper"] == "delete":
 										out_sql_src.append(xtmpl % (tmpltd % (sch, tname), cname))								
 
@@ -613,10 +652,10 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 							di = diff_item["index"][cname]
 							if "diffoper" in di.keys():
 								if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
+									print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
+									if docomment:
+										out_sql_src.append("-- Op #%d" % di["operorder"])
 									if di["diffoper"] in ("insert", "update"):
-										print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
-										if docomment:
-											out_sql_src.append("-- Op #%d" % di["operorder"])
 										if di["diffoper"] == "update":
 											out_sql_src.append(xtmpl % (sch, cname))
 										nv = di["newvalue"]
@@ -626,7 +665,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 
 					if "unique" in diff_item.keys():							
 
-						if delmode is None or delmode == "NODEL":
+						if delmode == "CASCADE":
 							xtmpl = SQL_DROP_CONSTR + " CASCADE"
 						else:
 							xtmpl = SQL_DROP_CONSTR	
@@ -635,10 +674,10 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 							di = diff_item["unique"][pkname]
 							if "diffoper" in di.keys():
 								if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
+									print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
+									if docomment:
+										out_sql_src.append("-- Op #%d" % di["operorder"])
 									if di["diffoper"] in ("insert", "update"):
-										print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
-										if docomment:
-											out_sql_src.append("-- Op #%d" % di["operorder"])
 										if di["diffoper"] == "update":
 											out_sql_src.append(xtmpl % (tmpltd % (sch, tname), pkname))
 										nv = di["newvalue"]
@@ -659,10 +698,10 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 							di = diff_item["trigger"][trname]
 							if "diffoper" in di.keys():
 								if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
+									print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
+									if docomment:
+										out_sql_src.append("-- Op #%d" % di["operorder"])
 									if di["diffoper"] in ("insert", "update"):
-										print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
-										if docomment:
-											out_sql_src.append("-- Op #%d" % di["operorder"])
 										if di["diffoper"] == "update":
 											out_sql_src.append(xtmpl % (trname, sch, tname))
 										nv = di["newvalue"]
