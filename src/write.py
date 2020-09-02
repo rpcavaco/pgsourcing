@@ -769,17 +769,27 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 										out_sql_src.append("".join(flines))
 									elif di["diffoper"] == "delete":
 										out_sql_src.append(xtmpl % (trname, sch, tname))
-				
-				# diff_item = currdiff_block[sch][tname]
-				# if "grants" in diff_item.keys():
-					# for user_name in diff_item["grants"].keys():
-						# di = diff_item["grants"][user_name]					
-						# if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
-							# print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
-							# if docomment:
-								# out_sql_src.append("-- Op #%d" % di["operorder"])
-							# privs = di["newvalue"]["privs"]
-							# out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, tname, user_name))
+
+					if "grants" in diff_item.keys():
+						for user_name in diff_item["grants"].keys():
+							di = diff_item["grants"][user_name]					
+							if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
+								print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
+								if docomment:
+									out_sql_src.append("-- Op #%d" % di["operorder"])							
+								if di["diffoper"] in ("update", "delete"):
+									if "newvalue" in di.keys():
+										privs = di["newvalue"]	
+									else:
+										privs = "ALL"	
+									if delmode == "NODEL":
+										xtmpl = "-- REVOKE %s ON %s.%s FROM %s"
+									else:
+										xtmpl = "REVOKE %s ON %s.%s FROM %s"
+									out_sql_src.append(xtmpl % (privs, sch, tname, user_name))
+								if di["diffoper"] in ("update", "insert"):
+									privs = di["newvalue"]	
+									out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, tname, user_name))
 
 	grpkey = "views"
 	if grpkey in diff_content.keys():	
