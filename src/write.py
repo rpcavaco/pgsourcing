@@ -1,5 +1,6 @@
 
 import re
+import logging 
 
 from src.fileandpath import load_currentref
 from src.common import CFG_GROUPS, CFG_LISTGROUPS, COL_ITEMS_CHG_AVOIDING_SUBSTITUTION
@@ -413,6 +414,8 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 	diff_content = p_difdict["content"]	
 	out_sql_src = []
 	
+	logger = logging.getLogger('pgsourcing')
+	
 	# delmode: NODEL DEL CASCADE 
 	if delmode is None or delmode == "NODEL":
 		tmpltd = "-- ALTER TABLE %s.%s"
@@ -469,8 +472,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 				elif diff_item["diffoper"] == "delete":
 					out_sql_src.append(xtmpl % role)
 
-	grpkey = "schemas"
-	
+	grpkey = "schemas"	
 	dropped_schemas = []
 	
 	if grpkey in diff_content.keys():	
@@ -481,29 +483,57 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		for sch in sorted(currdiff_block.keys()):
 			
 			diff_item = currdiff_block[sch]
-			assert "diffoper" in diff_item.keys()
-			
-			if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
+			if "diffoper" in diff_item.keys():							
+				if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
 
-				if docomment and not header_printed:
-					out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Schemas\n" + "-- " + "".join(['#'] * 77))
-					header_printed = True
-
-				out_sql_src.append("-- Op #%d" % diff_item["operorder"])
+					if docomment and not header_printed:
+						out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Schemas\n" + "-- " + "".join(['#'] * 77))
+						header_printed = True
+					if docomment:
+						out_sql_src.append("-- Op #%d" % diff_item["operorder"])
 				
-				if diff_item["diffoper"] == "insert":
-					out_sql_src.append("CREATE SCHEMA %s AUTHORIZATION %s" % (sch, diff_item["newvalue"]["auth"]))
-				elif diff_item["diffoper"] == "delete":
-					if delmode == "NODEL":
-						xtmpl = "-- DROP SCHEMA %s"
-					elif delmode == "DEL":
-						xtmpl = "DROP SCHEMA %s"
-					elif delmode == "CASCADE":
-						xtmpl = "DROP SCHEMA %s CASCADE"
-					else:
-						xtmpl = "??????? %s"
-					out_sql_src.append(xtmpl % sch)
-					dropped_schemas.append(sch)
+					if diff_item["diffoper"] in ("delete", "update"):
+						if delmode == "NODEL":
+							xtmpl = "-- DROP SCHEMA %s"
+						elif delmode == "DEL":
+							xtmpl = "DROP SCHEMA %s"
+						elif delmode == "CASCADE":
+							xtmpl = "DROP SCHEMA %s CASCADE"
+						else:
+							xtmpl = "??????? %s"
+						out_sql_src.append(xtmpl % sch)
+						dropped_schemas.append(sch)
+
+					if diff_item["diffoper"] in ("insert", "update"):
+
+						assert "schdetails" in diff_item["newvalue"].keys()
+						di = diff_item["newvalue"]["schdetails"]
+						
+						out_sql_src.append("CREATE SCHEMA %s AUTHORIZATION %s" % (sch, di["auth"]))
+
+						if "grants" in diff_item["newvalue"].keys():
+							for user_name in diff_item["newvalue"]["grants"].keys():
+								privs = diff_item["newvalue"]["grants"][user_name]
+								out_sql_src.append("GRANT %s ON SCHEMA %s TO %s" % (privs, sch, user_name))
+						
+			if "grants" in diff_item.keys():
+				for user_name in diff_item["grants"].keys():
+					di = diff_item["grants"][user_name]					
+					if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
+						if docomment and not header_printed:
+							out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Schemas\n" + "-- " + "".join(['#'] * 77))
+							header_printed = True
+						if docomment:
+							out_sql_src.append("-- Op #%d" % diff_item["operorder"])
+						privs = di["newvalue"]	
+						if di["diffoper"] in ("update", "delete"):
+							if delmode == "NODEL":
+								xtmpl = "-- REVOKE %s ON %s FROM %s"
+							else:
+								xtmpl = "REVOKE %s ON %s FROM %s"
+							out_sql_src.append(xtmpl % (privs, sch, user_name))
+						if di["diffoper"] in ("update", "insert"):
+							out_sql_src.append("GRANT %s ON SCHEMA %s TO %s" % (privs, sch, user_name))
 	
 	grpkey = "sequences"	
 	if grpkey in diff_content.keys():	
@@ -514,36 +544,35 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		for sch in sorted(currdiff_block.keys()):
 			
 			if sch in dropped_schemas:
-				raise RuntimeError, "CONFLICT: schema to drop '%s' is in use in sequences." % sch
+				logger.warning("CONFLICT: schema to drop '%s' is in use in sequences." % sch)
 			
 			for sname in sorted(currdiff_block[sch].keys()):
 
 				diff_item = currdiff_block[sch][sname]	
-				assert "diffoper" in diff_item.keys()
-				
-				if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
+				if "diffoper" in diff_item.keys():				
+					if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
 
-					if docomment and not header_printed:
-						out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Sequence %s.%s\n" % (sch, sname) + "-- " + "".join(['#'] * 77))
-						header_printed = True
-					if docomment:
-						out_sql_src.append("-- Op #%d" % diff_item["operorder"])
-						
-					assert "seqdetails" in diff_item["newvalue"].keys()
+						if docomment and not header_printed:
+							out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Sequence %s.%s\n" % (sch, sname) + "-- " + "".join(['#'] * 77))
+							header_printed = True
+						if docomment:
+							out_sql_src.append("-- Op #%d" % diff_item["operorder"])
+							
+						assert "seqdetails" in diff_item["newvalue"].keys()
 
-					if diff_item["diffoper"] in ("update", "delete"):
-						out_sql_src.append(tmplsd % (sch, sname))
-				
-					if diff_item["diffoper"] in ("update", "insert"):
-						
-						flines = []
-						create_sequence(sch, sname, diff_item["newvalue"]["seqdetails"], flines)						
-						out_sql_src.append("".join(flines))
+						if diff_item["diffoper"] in ("update", "delete"):
+							out_sql_src.append(tmplsd % (sch, sname))
+					
+						if diff_item["diffoper"] in ("update", "insert"):
+							
+							flines = []
+							create_sequence(sch, sname, diff_item["newvalue"]["seqdetails"], flines)						
+							out_sql_src.append("".join(flines))
 
-						if "grants" in diff_item["newvalue"].keys():
-							for user_name in diff_item["newvalue"]["grants"].keys():
-								privs = diff_item["newvalue"]["grants"][user_name]
-								out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, sname, user_name))
+							if "grants" in diff_item["newvalue"].keys():
+								for user_name in diff_item["newvalue"]["grants"].keys():
+									privs = diff_item["newvalue"]["grants"][user_name]
+									out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, sname, user_name))
 							
 				if "grants" in diff_item.keys():
 					for user_name in diff_item["grants"].keys():
@@ -553,9 +582,9 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 								out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Sequence %s.%s\n" % (sch, sname) + "-- " + "".join(['#'] * 77))
 								header_printed = True
 							if docomment:
-								out_sql_src.append("-- Op #%d" % diff_item["operorder"])
+								out_sql_src.append("-- Op #%d" % di["operorder"])
 							privs = di["newvalue"]	
-							if di["diffoper"] in ("update", "delete"):
+							if di["diffoper"] == "delete":
 								if delmode == "NODEL":
 									xtmpl = "-- REVOKE %s ON %s.%s FROM %s"
 								else:
@@ -573,7 +602,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		for sch in sorted(currdiff_block.keys()):	
 
 			if sch in dropped_schemas:
-				raise RuntimeError, "CONFLICT: schema to drop '%s' is in use in tables." % sch
+				logger.warning("CONFLICT: schema to drop '%s' is in use in tables." % sch)
 								
 			for tname in sorted(currdiff_block[sch].keys()):
 				
@@ -761,7 +790,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		for sch in sorted(currdiff_block.keys()):	
 
 			if sch in dropped_schemas:
-				raise RuntimeError, "CONFLICT: schema to drop '%s' is in use in views." % sch
+				logger.warning("CONFLICT: schema to drop '%s' is in use in views." % sch)
 								
 			for vname in sorted(currdiff_block[sch].keys()):
 				
@@ -818,7 +847,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		for sch in sorted(currdiff_block.keys()):	
 
 			if sch in dropped_schemas:
-				raise RuntimeError, "CONFLICT: schema to drop '%s' is in use in matviews." % sch
+				logger.warning("CONFLICT: schema to drop '%s' is in use in matviews." % sch)
 								
 			for vname in sorted(currdiff_block[sch].keys()):
 				
@@ -875,7 +904,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		for sch in sorted(currdiff_block.keys()):
 
 			if sch in dropped_schemas:
-				raise RuntimeError, "CONFLICT: schema to drop '%s' is in use in procedures." % sch
+				logger.warning("CONFLICT: schema to drop '%s' is in use in procedures." % sch)
 			
 			for procname in sorted(currdiff_block[sch].keys()):
 				

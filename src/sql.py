@@ -254,7 +254,6 @@ SQL = {
 				) AS privileges,	
 		case acl[2] 
 			when 'arwdDxt' then true
-			when 'UC' then true  -- schemas
 			when 'rwU' then true -- seqs
 			else false
 		end allprivs

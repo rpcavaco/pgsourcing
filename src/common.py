@@ -92,6 +92,6 @@ COL_ITEMS_CHG_AVOIDING_SUBSTITUTION = ["default", "nullable"]
 #  b) tuplo contendo o valor para a) e uma flag True para indicar que a
 #		alteracao e' para aplcar ao 'parent'
 #
-UPPERLEVELOPS = { "pkey": 1, "cols": 1, "check": 1, "index": 1, "unique": 1, "trigger": 1, "procedures": 2, "roles": 1, "seqdetails": (0, True), "vdetails": (0, True), "mvdetails": (0, True) }
+UPPERLEVELOPS = { "pkey": 1, "cols": 1, "check": 1, "index": 1, "unique": 1, "trigger": 1, "procedures": 2, "roles": 1, "schdetails": (0, True), "seqdetails": (0, True), "vdetails": (0, True), "mvdetails": (0, True) }
 
 

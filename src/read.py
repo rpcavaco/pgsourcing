@@ -203,18 +203,35 @@ def srvanddb_metadata(p_conn, out_dict):
 			
 	return ret_majorversion
 			
-def get_grants(p_the_dict, p_cursor):
-	for sch in p_the_dict.keys():			
-		for obj in p_the_dict[sch].keys():
-			p_cursor.execute(SQL["GRANTS"], (sch, obj))
-			for row in p_cursor:
-				if not "grants" in p_the_dict[sch][obj].keys():
-					p_the_dict[sch][obj]["grants"] = {}					
-				if row["allprivs"]:
-					privs = "ALL"
-				else:
-					privs = row["privileges"]					
-				p_the_dict[sch][obj]["grants"][row["grantee"]] = privs
+def get_grants(p_the_dict, p_cursor, forschemas=False):
+
+	def _getit(p_pthe_dict, p_pcursor, p_sch, p_obj = None):
+		if not p_obj is None:
+			p_pcursor.execute(SQL["GRANTS"], (p_sch, p_obj))
+		else:
+			p_pcursor.execute(SQL["SCHGRANTS"], (p_sch,))
+		for row in p_pcursor:
+			if row["allprivs"]:
+				privs = "ALL"
+			else:
+				privs = row["privileges"]					
+			if not p_obj is None:
+				if not "grants" in p_pthe_dict[p_sch][p_obj].keys():
+					p_pthe_dict[p_sch][p_obj]["grants"] = {}					
+				p_pthe_dict[p_sch][p_obj]["grants"][row["grantee"]] = privs
+			else:
+				if not "grants" in p_pthe_dict[p_sch].keys():
+					p_pthe_dict[p_sch]["grants"] = {}					
+				p_pthe_dict[p_sch]["grants"][row["grantee"]] = privs
+					
+	for sch in p_the_dict.keys():		
+		if forschemas:
+			_getit(p_the_dict, p_cursor, sch)			
+		else:					
+			for obj in p_the_dict[sch].keys():				
+				_getit(p_the_dict, p_cursor, sch, p_obj = obj)
+			
+
 	
 def schemas(p_cursor, p_filters_cfg, p_include_public, out_dict):
 	
@@ -238,8 +255,10 @@ def schemas(p_cursor, p_filters_cfg, p_include_public, out_dict):
 			continue	
 		owners.add(schema_owner)	
 		the_dict[schema_name] = {
-			"auth": schema_owner
+			"schdetails": { "auth": schema_owner }
 		}	
+		
+	get_grants(the_dict, p_cursor, forschemas=True)
 		
 	out_dict["content"]["owners"] = list(owners)
 	
