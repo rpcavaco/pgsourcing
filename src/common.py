@@ -13,7 +13,6 @@ LOG_CLI_CFG = {
 }	
 
 
-
 ########################################################################
 # Config de versao -- NAO EDITAR
 ########################################################################
@@ -87,8 +86,12 @@ COL_ITEMS_CHG_AVOIDING_SUBSTITUTION = ["default", "nullable"]
 #  num nivel na arvore acima daquele onde a diferenca foi
 #  detetada.
 #
-# Valor indica a profundidade da alteracao abaixo da chave indicada
+# Valor indica:
 #
-UPPERLEVELOPS = { "pkey": 1, "cols": 1, "check": 1, "index": 1, "unique": 1, "trigger": 1, "procedures": 2, "roles": 1, "views": 2, "matviews": 2 }
+#  a) a profundidade da alteracao abaixo da chave indicada (inteiro);
+#  b) tuplo contendo o valor para a) e uma flag True para indicar que a
+#		alteracao e' para aplcar ao 'parent'
+#
+UPPERLEVELOPS = { "pkey": 1, "cols": 1, "check": 1, "index": 1, "unique": 1, "trigger": 1, "procedures": 2, "roles": 1, "vdetails": (0, True), "mvdetails": (0, True) }
 
 

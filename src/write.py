@@ -407,7 +407,7 @@ def print_matviewhdr(p_docomment, p_sch, p_name, p_out_sql_src, o_flag_byref):
 	if p_docomment and not o_flag_byref[0]:
 		p_out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Materialized view %s.%s\n" % (p_sch, p_name) + "-- " + "".join(['#'] * 77))
 		o_flag_byref[0] = True
-	
+
 def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, docomment=True):
 	
 	diff_content = p_difdict["content"]	
@@ -722,10 +722,19 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 										out_sql_src.append("".join(flines))
 									elif di["diffoper"] == "delete":
 										out_sql_src.append(xtmpl % (trname, sch, tname))
-												
+				
+				# diff_item = currdiff_block[sch][tname]
+				# if "grants" in diff_item.keys():
+					# for user_name in diff_item["grants"].keys():
+						# di = diff_item["grants"][user_name]					
+						# if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
+							# print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
+							# if docomment:
+								# out_sql_src.append("-- Op #%d" % di["operorder"])
+							# privs = di["newvalue"]["privs"]
+							# out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, tname, user_name))
 
 	grpkey = "views"
-
 	if grpkey in diff_content.keys():	
 
 		header_printed = [False]
@@ -740,22 +749,49 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 				
 				header_printed[0] = False				
 				diff_item = currdiff_block[sch][vname]	
-				assert "diffoper" in diff_item.keys()					
 				
-				if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
-					print_viewhdr(docomment, sch, vname, out_sql_src, header_printed)	
-					if docomment:				
-						out_sql_src.append("-- Op #%d" % diff_item["operorder"])
-					if diff_item["diffoper"] in ("update", "delete"):
-						out_sql_src.append(tmplvd % (sch,vname))
-					if diff_item["diffoper"] in ("update", "insert"):
-						tmplv = "CREATE OR REPLACE VIEW %s.%s AS %s" 
-						out_sql_src.append(tmplv % (sch,vname, diff_item["newvalue"]["vdef"]))
-						if "owner" in diff_item["newvalue"].keys():
-							out_sql_src.append("ALTER TABLE %s.%s OWNER to %s" % (sch, vname, diff_item["newvalue"]["owner"]))
+				if "newvalue" in diff_item.keys():
+
+					assert "vdetails" in diff_item["newvalue"].keys()
+					
+					di = diff_item["newvalue"]["vdetails"]				
+					if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:						
+						print_matviewhdr(docomment, sch, vname, out_sql_src, header_printed)	
+						if docomment:				
+							out_sql_src.append("-- Op #%d" % diff_item["operorder"])
+						if diff_item["diffoper"] in ("update", "delete"):
+							out_sql_src.append(tmplvd % (sch,vname))
+						if diff_item["diffoper"] in ("update", "insert"):
+							tmplv = "CREATE VIEW %s.%s AS %s" 
+							out_sql_src.append(tmplv % (sch,vname, di["vdef"]))
+								
+							if "vowner" in di.keys():
+								out_sql_src.append("ALTER TABLE %s.%s OWNER to %s" % (sch, vname, di["vowner"]))
+							
+							if "grants" in diff_item["newvalue"].keys():
+								for user_name in diff_item["newvalue"]["grants"].keys():
+									privs = diff_item["newvalue"]["grants"][user_name]
+									out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, vname, user_name))
+							
+				if "grants" in diff_item.keys():
+					for user_name in diff_item["grants"].keys():
+						di = diff_item["grants"][user_name]					
+						if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
+							print_matviewhdr(docomment, sch, vname, out_sql_src, header_printed)
+							if docomment:
+								out_sql_src.append("-- Op #%d" % di["operorder"])
+							privs = di["newvalue"]	
+							if di["diffoper"] in ("update", "delete"):
+								if delmode == "NODEL":
+									xtmpl = "-- REVOKE %s ON %s.%s FROM %s"
+								else:
+									xtmpl = "REVOKE %s ON %s.%s FROM %s"
+								out_sql_src.append(xtmpl % (privs, sch, vname, user_name))
+							if di["diffoper"] in ("update", "insert"):
+								out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, vname, user_name))
+
 
 	grpkey = "matviews"
-
 	if grpkey in diff_content.keys():	
 
 		header_printed = [False]
@@ -770,20 +806,47 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 				
 				header_printed[0] = False				
 				diff_item = currdiff_block[sch][vname]	
-				assert "diffoper" in diff_item.keys()					
 				
-				if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
-					print_matviewhdr(docomment, sch, vname, out_sql_src, header_printed)	
-					if docomment:				
-						out_sql_src.append("-- Op #%d" % diff_item["operorder"])
-					if diff_item["diffoper"] in ("update", "delete"):
-						out_sql_src.append(tmplmvd % (sch,vname))
-					if diff_item["diffoper"] in ("update", "insert"):
-						tmplv = "CREATE MATERIALIZED VIEW %s.%s TABLESPACE %s AS %s" 
-						out_sql_src.append(tmplv % (sch,vname, diff_item["newvalue"]["tablespace"], diff_item["newvalue"]["vdef"]))
-						if "owner" in diff_item["newvalue"].keys():
-							out_sql_src.append("ALTER TABLE %s.%s OWNER to %s" % (sch, vname, diff_item["newvalue"]["owner"]))
-						
+				if "newvalue" in diff_item.keys():
+
+					assert "mvdetails" in diff_item["newvalue"].keys()
+					
+					di = diff_item["newvalue"]["mvdetails"]				
+					if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:						
+						print_matviewhdr(docomment, sch, vname, out_sql_src, header_printed)	
+						if docomment:				
+							out_sql_src.append("-- Op #%d" % diff_item["operorder"])
+						if diff_item["diffoper"] in ("update", "delete"):
+							out_sql_src.append(tmplmvd % (sch,vname))
+						if diff_item["diffoper"] in ("update", "insert"):
+							tmplv = "CREATE MATERIALIZED VIEW %s.%s TABLESPACE %s AS %s" 
+							out_sql_src.append(tmplv % (sch,vname, di["vtablespace"], di["vdef"]))
+								
+							if "vowner" in di.keys():
+								out_sql_src.append("ALTER TABLE %s.%s OWNER to %s" % (sch, vname, di["vowner"]))
+							
+							if "grants" in diff_item["newvalue"].keys():
+								for user_name in diff_item["newvalue"]["grants"].keys():
+									privs = diff_item["newvalue"]["grants"][user_name]
+									out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, vname, user_name))
+							
+				if "grants" in diff_item.keys():
+					for user_name in diff_item["grants"].keys():
+						di = diff_item["grants"][user_name]					
+						if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
+							print_matviewhdr(docomment, sch, vname, out_sql_src, header_printed)
+							if docomment:
+								out_sql_src.append("-- Op #%d" % di["operorder"])
+							privs = di["newvalue"]	
+							if di["diffoper"] in ("update", "delete"):
+								if delmode == "NODEL":
+									xtmpl = "-- REVOKE %s ON %s.%s FROM %s"
+								else:
+									xtmpl = "REVOKE %s ON %s.%s FROM %s"
+								out_sql_src.append(xtmpl % (privs, sch, vname, user_name))
+							if di["diffoper"] in ("update", "insert"):
+								out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, vname, user_name))
+
 	grpkey = "procedures"
 	
 	if grpkey in diff_content.keys():	

@@ -203,7 +203,19 @@ def srvanddb_metadata(p_conn, out_dict):
 			
 	return ret_majorversion
 			
-
+def get_grants(p_the_dict, p_cursor):
+	for sch in p_the_dict.keys():			
+		for obj in p_the_dict[sch].keys():
+			p_cursor.execute(SQL["GRANTS"], (sch, obj))
+			for row in p_cursor:
+				if not "grants" in p_the_dict[sch][obj].keys():
+					p_the_dict[sch][obj]["grants"] = {}					
+				if row["allprivs"]:
+					privs = "ALL"
+				else:
+					privs = row["privileges"]					
+				p_the_dict[sch][obj]["grants"][row["grantee"]] = privs
+	
 def schemas(p_cursor, p_filters_cfg, p_include_public, out_dict):
 	
 	if "schema" in p_filters_cfg and len(p_filters_cfg["schema"]) > 0:
@@ -374,6 +386,8 @@ def tables(p_cursor, p_filters_cfg, out_dict):
 			if not row["tablespace"] is None:
 				sch_dict[row["tablename"]]["tablespace"] = row["tablespace"]
 				
+
+		get_grants(the_dict, p_cursor)
 			
 	## TODO - contar registos, ler dados das parameterstables
 
@@ -425,9 +439,13 @@ def views(p_cursor, p_filters_cfg, out_dict):
 				sch_dict = the_dict[row["schemaname"]]	
 				
 			sch_dict[row["viewname"]] = {
-				"owner": row["viewowner"],
-				"vdef": row["definition"]
+				"vdetails": {
+					"vowner": row["viewowner"],
+					"vdef": row["definition"]
+				}
 			}
+			
+		get_grants(the_dict, p_cursor)
 
 def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict):
 
@@ -487,27 +505,14 @@ def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict):
 				tblspc = row["tablespace"]
 				
 			sch_dict[row["matviewname"]] = {
-				"owner": row["viewowner"],
-				"vdef": row["definition"],
-				"tablespace": tblspc
+				"mvdetails": {
+					"vowner": row["viewowner"],
+					"vdef": row["definition"],
+					"vtablespace": tblspc
+				}
 			}
 			
-		for sch in the_dict.keys():			
-			for obj in the_dict[sch].keys():
-				p_cursor.execute(SQL["GRANTS"], (sch, obj))
-				for row in p_cursor:
-					if not "grants" in the_dict[sch][obj].keys():
-						the_dict[sch][obj]["grants"] = {}
-						
-					if row["allprivs"]:
-						privs = "ALL"
-					else:
-						privs = row["privileges"]
-						
-					the_dict[sch][obj]["grants"][row["grantee"]] = {
-						"privs": privs						
-					}
-
+		get_grants(the_dict, p_cursor)
 
 			
 def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
