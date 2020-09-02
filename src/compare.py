@@ -147,16 +147,24 @@ def subtree_fromkeychain(p_dict, p_keychainlist):
 		ret = ret[k]
 		
 	return ret
-				
-def gen_update(p_fase, p_transformschema, p_opordmgr, p_upperlevel_ops, p_keychain, p_diff_dict, p_raw_newvalue):
+	
+# Generate upper level update				
+def gen_update(p_transformschema, p_opordmgr, p_upperlevel_ops, p_keychain, p_diff_dict, p_raw_parent_newvalue, p_raw_newvalue, stepback=False):
 	
 	lower_ops = subtree_fromkeychain(p_upperlevel_ops, p_keychain)
 	assert not lower_ops is None
 	
-	#print("174", p_raw_newvalue_parent.keys(), p_keychain[-1])
-		
 	diff_item_parent = get_diff_item('b3', p_diff_dict, p_keychain[:-1])
-	diff_item = diff_item_parent[p_keychain[-1]] = {  }
+	if stepback:
+		diff_item = diff_item_parent
+	else:
+		diff_item = diff_item_parent[p_keychain[-1]] = {  }
+
+	
+	# upper level update 'newvalue' includes grants to set
+	if "grants" in diff_item.keys():
+		del diff_item["grants"]
+	
 	
 	p_opordmgr.setord(diff_item)
 
@@ -180,8 +188,11 @@ def gen_update(p_fase, p_transformschema, p_opordmgr, p_upperlevel_ops, p_keycha
 					
 	diff_item["diffoper"] = op
 
-	newvalue = deepcopy(p_raw_newvalue)
-	traverse_replaceval(p_transformschema, newvalue, "gen_update %s" % p_fase)
+	if stepback:
+		newvalue = deepcopy(p_raw_parent_newvalue)
+	else:
+		newvalue = deepcopy(p_raw_newvalue)
+	traverse_replaceval(p_transformschema, newvalue, "doing gen_update")
 	diff_item["newvalue"] = newvalue
 				
 		
@@ -326,9 +337,10 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						if p_transformschema:
 							do_transformschema(p_transformschema, tmp_l, k)	
 						leftval = tmp_l[k]	
+						
 											
 						if leftval != rightval:
-							
+
 							pass_diff_construction = False
 
 							for ulk in UPPERLEVELOPS.keys():
@@ -344,7 +356,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 									curr_ulop[k] = {
 										"op": "update"
 									}
-
+									
 									pass_diff_construction = True
 									break
 									
@@ -366,15 +378,21 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 		# print("--------------")
 		
 		for ulk in UPPERLEVELOPS.keys():
-			offset = UPPERLEVELOPS[ulk]
-			# print('    ', ulk, offset)
+			dostepback = False
+			if isinstance(UPPERLEVELOPS[ulk], int):
+				offset = UPPERLEVELOPS[ulk]
+			else:
+				offset, dostepback = UPPERLEVELOPS[ulk]
+			testkey = grpkey
 			for kc in kcl:
 				if ulk in kc:
 					# print("..348..", ulk, kc)
 					ki = kc.index(ulk)
+					# if ulk == "mvdetails":
+						# print("     381:", len(kc), "==", (offset + ki + 1), kc[-1], "==", testkey)
 					if len(kc) == (offset + ki + 1):
-						if kc[-1] == grpkey:
-							gen_update('geral', p_transformschema, p_opordmgr, ret_upperlevel_ops, kc, diff_dict, tmp_l)
+						if kc[-1] == testkey:
+							gen_update(p_transformschema, p_opordmgr, ret_upperlevel_ops, kc, diff_dict, p_leftdic, tmp_l, stepback=dostepback)
 							break
 							
 	return ret_upperlevel_ops

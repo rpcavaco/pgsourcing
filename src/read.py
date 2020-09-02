@@ -797,7 +797,7 @@ def sequences(p_conn, p_majorversion, out_dict):
 
 					cr.execute(SQL["SEQUENCES"], (schema_name, seq_name))
 
-					the_dict = seq_root[schema_name][seq_name]
+					the_dict = seq_root[schema_name][seq_name]["seqdetails"] = { }
 					row =  cr.fetchone()
 					
 					if row is None:
@@ -823,6 +823,8 @@ def sequences(p_conn, p_majorversion, out_dict):
 						cr.execute(SQL["SEQ_OWNER"], (schema_name, seq_name))				
 						row = cr.fetchone()						
 						the_dict["owner"] = row[0]	
+
+					get_grants(seq_root, cr)
 						
 
 	except Exception as e:			 

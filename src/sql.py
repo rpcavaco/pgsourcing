@@ -246,15 +246,19 @@ SQL = {
 							WHEN 'D' THEN 'TRUNCATE'
 							WHEN 'x' THEN 'REFERENCES'
 							WHEN 't' THEN 'TRIGGER'
+							WHEN 'U' THEN 'USAGE'
+							WHEN 'C' THEN 'CREATE'
 						END AS privilege
 						FROM regexp_split_to_table(acl[2], '') ch
 					) s
 				) AS privileges,	
 		case acl[2] 
 			when 'arwdDxt' then true
+			when 'UC' then true  -- schemas
+			when 'rwU' then true -- seqs
 			else false
 		end allprivs
-		from ps""",
+		from ps""",		
 	"SCHGRANTS": """with ps as (select regexp_split_to_array(unnest(ns.nspacl)::text, '=|/') AS acl
 		from pg_namespace ns
 		where ns.nspname = %s)

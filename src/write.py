@@ -430,7 +430,6 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 	tmplt = "ALTER TABLE %s.%s"
 
 	grpkey = "roles"
-
 	if grpkey in diff_content.keys():	
 		
 		header_printed = False
@@ -506,8 +505,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 					out_sql_src.append(xtmpl % sch)
 					dropped_schemas.append(sch)
 	
-	grpkey = "sequences"
-	
+	grpkey = "sequences"	
 	if grpkey in diff_content.keys():	
 	
 		header_printed = False
@@ -528,25 +526,45 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 					if docomment and not header_printed:
 						out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Sequence %s.%s\n" % (sch, sname) + "-- " + "".join(['#'] * 77))
 						header_printed = True
-					
-					out_sql_src.append("-- Op #%d" % diff_item["operorder"])
+					if docomment:
+						out_sql_src.append("-- Op #%d" % diff_item["operorder"])
+						
+					assert "seqdetails" in diff_item["newvalue"].keys()
+
+					if diff_item["diffoper"] in ("update", "delete"):
+						out_sql_src.append(tmplsd % (sch, sname))
 				
-					if diff_item["diffoper"] == "insert":
+					if diff_item["diffoper"] in ("update", "insert"):
+						
 						flines = []
-						create_sequence(sch, sname, diff_item["newvalue"], flines)						
+						create_sequence(sch, sname, diff_item["newvalue"]["seqdetails"], flines)						
 						out_sql_src.append("".join(flines))
 
-					elif diff_item["diffoper"] == "update":
-						out_sql_src.append(tmplsd % (sch, sname))
-						flines = []
-						create_sequence(sch, sname, diff_item["newvalue"], flines)						
-						out_sql_src.append("".join(flines))
-
-					elif diff_item["diffoper"] == "delete":
-						out_sql_src.append(tmplsd % (sch, sname))
+						if "grants" in diff_item["newvalue"].keys():
+							for user_name in diff_item["newvalue"]["grants"].keys():
+								privs = diff_item["newvalue"]["grants"][user_name]
+								out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, sname, user_name))
+							
+				if "grants" in diff_item.keys():
+					for user_name in diff_item["grants"].keys():
+						di = diff_item["grants"][user_name]					
+						if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
+							if docomment and not header_printed:
+								out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Sequence %s.%s\n" % (sch, sname) + "-- " + "".join(['#'] * 77))
+								header_printed = True
+							if docomment:
+								out_sql_src.append("-- Op #%d" % diff_item["operorder"])
+							privs = di["newvalue"]	
+							if di["diffoper"] in ("update", "delete"):
+								if delmode == "NODEL":
+									xtmpl = "-- REVOKE %s ON %s.%s FROM %s"
+								else:
+									xtmpl = "REVOKE %s ON %s.%s FROM %s"
+								out_sql_src.append(xtmpl % (privs, sch, sname, user_name))
+							if di["diffoper"] in ("update", "insert"):
+								out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, sname, user_name))
 	
-	grpkey = "tables"
-	
+	grpkey = "tables"	
 	if grpkey in diff_content.keys():	
 
 		header_printed = [False]
