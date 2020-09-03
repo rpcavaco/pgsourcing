@@ -72,6 +72,19 @@ def get_diff_item(p_fase, p_diff_dict, p_grpkeys, b_leaf_is_list=False):
 		
 	return diff_dict		
 
+def sources_to_lists(p_src_a, p_src_b, p_list_a, p_list_b):
+	
+	del p_list_a[:]
+	del p_list_b[:]
+
+	rawlistA = p_src_a.splitlines(True)
+	rawlistB = p_src_b.splitlines(True)
+	
+	patt = r"^--(.*)$"
+	substitute = r"/* \1 */"
+	p_list_a.extend([re.sub(patt, substitute, ln.strip()).lower() for ln in rawlistA if len(ln.strip()) > 0])
+	p_list_b.extend([re.sub(patt, substitute, ln.strip()).lower() for ln in rawlistB if len(ln.strip()) > 0])
+	
 def sourcediff(p_srca, p_srcb, p_transformschema, out_dellist): #, out_addlist):
 	
 	del out_dellist[:]
@@ -91,18 +104,23 @@ def sourcediff(p_srca, p_srcb, p_transformschema, out_dellist): #, out_addlist):
 			for trans in p_transformschema["trans"]:
 				srca = srca.replace(trans["src"], trans["dest"])
 		
-	rawlistA= srca.splitlines(True)
-	rawlistB = srcb.splitlines(True)
+	# rawlistA= srca.splitlines(True)
+	# rawlistB = srcb.splitlines(True)
 	
-	patt = r"^--(.*)$"
-	substitute = r"/* \1 */"
-	#listA = [re.sub(' +', ' ', ln.strip()).lower() for ln in rawlistA if len(ln.strip()) > 0]
-	#listB = [re.sub(' +', ' ', ln.strip()).lower() for ln in rawlistB if len(ln.strip()) > 0]
-	#listA = [ln.strip().lower() for ln in rawlistA if len(ln.strip()) > 0]
-	#listB = [ln.strip().lower() for ln in rawlistB if len(ln.strip()) > 0]
-	# startswith
-	listA = [re.sub(patt, substitute, ln.strip()).lower() for ln in rawlistA if len(ln.strip()) > 0]
-	listB = [re.sub(patt, substitute, ln.strip()).lower() for ln in rawlistB if len(ln.strip()) > 0]
+	listA = []
+	listB = []
+	
+	sources_to_lists(srca, srcb, listA, listB)
+	
+	# patt = r"^--(.*)$"
+	# substitute = r"/* \1 */"
+	# #listA = [re.sub(' +', ' ', ln.strip()).lower() for ln in rawlistA if len(ln.strip()) > 0]
+	# #listB = [re.sub(' +', ' ', ln.strip()).lower() for ln in rawlistB if len(ln.strip()) > 0]
+	# #listA = [ln.strip().lower() for ln in rawlistA if len(ln.strip()) > 0]
+	# #listB = [ln.strip().lower() for ln in rawlistB if len(ln.strip()) > 0]
+	# # startswith
+	# listA = [re.sub(patt, substitute, ln.strip()).lower() for ln in rawlistA if len(ln.strip()) > 0]
+	# listB = [re.sub(patt, substitute, ln.strip()).lower() for ln in rawlistB if len(ln.strip()) > 0]
 	
 	diff = [l.strip() for l in list(dodiff(listA, listB)) if l.strip()]
 	

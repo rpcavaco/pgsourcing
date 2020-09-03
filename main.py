@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
-from os import listdir, mkdir, makedirs, remove as removefile
+from os import listdir, mkdir, makedirs, walk, remove as removefile
 from os.path import abspath, dirname, exists, join as path_join
 from datetime import datetime as dt
 from copy import deepcopy
+from difflib import unified_diff as dodiff
+
 
 from psycopg2.extras import execute_batch
 
@@ -23,10 +25,14 @@ from src.common import LOG_CLI_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, \
 		
 from src.read import srcreader
 from src.connect import Connections
-from src.compare import comparing, keychains
+from src.compare import comparing, keychains, sources_to_lists
 from src.zip import gen_setup_zip
-from src.fileandpath import get_conn_cfg_path, get_filters_cfg, exists_currentref, to_jsonfile, save_ref, get_refcodedir, save_warnings
+from src.fileandpath import get_conn_cfg_path, get_filters_cfg, \
+		exists_currentref, to_jsonfile, save_ref, get_refcodedir, \
+		save_warnings, clear_dir
 from src.write import updateref, updatedb
+
+
 
 try:
     file_types = (file, io.IOBase, StringIO.StringIO)
@@ -223,7 +229,7 @@ def create_new_proj(p_newproj):
 	if not exists(proj_dir):
 		mkdir(proj_dir)
 
-	the_dir = path_join(proj_dir, "referencia")
+	the_dir = path_join(proj_dir, "reference")
 	if not exists(the_dir):
 		mkdir(the_dir)
 		
@@ -419,7 +425,62 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 		
 	return ret_changed
 
+def code_ops_handler(p_proj, p_oper, p_outprocsdir, p_connkey=None):
 
+	logger = logging.getLogger('pgsourcing')	
+	
+	if p_oper == "chkcode":
+	
+		cfgpath = get_conn_cfg_path(p_proj)
+		srccodedir = None
+		if not p_connkey is None:
+			ck = p_connkey
+		else:
+			ck = "src"
+			
+		with open(cfgpath) as cfgfl:
+			cfgdict = json.load(cfgfl)
+			assert "srccodedir" in cfgdict[ck]
+			srccodedir = cfgdict[ck]["srccodedir"]
+			
+		if not srccodedir is None:
+			
+			try:
+				assert exists(srccodedir), "Missing source code dir: %s" % srccodedir
+			
+				for r, d, fs in walk(srccodedir):
+					for fl in fs:
+						
+						fll = fl.lower()
+						if not fll.endswith(".sql"):
+							continue
+							
+						frompath = path_join(r, fl)
+						topath = path_join(p_outprocsdir, fll)
+
+						if not exists(topath):
+							continue
+						
+						with codecs.open(frompath, "r", "utf-8") as flA:
+							srca = flA.read()
+						with codecs.open(topath, "r", "utf-8") as flB:
+							srcb = flB.read()
+
+						listA = []
+						listB = []
+						
+						sources_to_lists(srca, srcb, listA, listB)
+						
+						diff = [l.strip() for l in list(dodiff(listA, listB)) if l.strip()]
+						
+						print(fll, diff)
+
+					break
+
+			except AssertionError as err:
+				logger.exception("Source code dir test")
+
+	
 class OpOrderMgr(Singleton):
 	
 	def __init__(self):
@@ -553,28 +614,34 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			# do_output(check_dict, output=output, interactive=canuse_stdout)
 			
 	else:
-
-		# Se a operacao for updref ou chkdest o dicionario check_dict sera 
-		#  preenchido.
-
-		diffdict = None
-		if isinstance(inputf, basestring):
-			if exists(inputf):
-				with open(inputf, "r") as fj:
-					diffdict = json.load(fj)
-		elif isinstance(inputf, file_types):
-			diffdict = json.load(inputf)
+		
+		if p_oper in ("chkcode", "updcode"):
 			
-		if delmode is None:
-			dlmd = "NODEL"
+			code_ops_handler(p_proj, p_oper, refcodedir, p_connkey=p_connkey)
+			
 		else:
-			dlmd = 	delmode
-			
-		update_oper_handler(p_proj, p_oper, opordmgr, 
-			diffdict, updates_ids=updates_ids, p_connkey=p_connkey, 
-			limkeys=limkeys, include_public=include_public, 
-			include_colorder=include_colorder, output=output, 
-			canuse_stdout=canuse_stdout, delmode=dlmd)
+
+			# Se a operacao for updref ou chkdest o dicionario check_dict sera 
+			#  preenchido.
+
+			diffdict = None
+			if isinstance(inputf, basestring):
+				if exists(inputf):
+					with open(inputf, "r") as fj:
+						diffdict = json.load(fj)
+			elif isinstance(inputf, file_types):
+				diffdict = json.load(inputf)
+				
+			if delmode is None:
+				dlmd = "NODEL"
+			else:
+				dlmd = 	delmode
+				
+			update_oper_handler(p_proj, p_oper, opordmgr, 
+				diffdict, updates_ids=updates_ids, p_connkey=p_connkey, 
+				limkeys=limkeys, include_public=include_public, 
+				include_colorder=include_colorder, output=output, 
+				canuse_stdout=canuse_stdout, delmode=dlmd)
 					
 	
 # ######################################################################

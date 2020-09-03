@@ -1,8 +1,10 @@
 
 import json
 
-from os import makedirs
+from os import makedirs, walk, remove as removefile
 from os.path import exists, dirname, abspath, join as path_join
+from shutil import rmtree
+
 
 from src.common import PROJECTDIR
 
@@ -14,7 +16,7 @@ def _get_projdir(p_proj):
 	return path_join(dirname(dirname(abspath(__file__))), PROJECTDIR, p_proj)
 
 def _get_refdir(p_proj):	
-	return path_join(_get_projdir(p_proj), "referencia")
+	return path_join(_get_projdir(p_proj), "reference")
 
 def get_conn_cfg_path(p_proj):	
 	return path_join(_get_projdir(p_proj), "conncfg.json")
@@ -68,6 +70,14 @@ def save_ref(p_proj, p_obj, p_dt):
 
 def save_warnings(p_proj, p_obj):
 	to_jsonfile(p_obj, get_refwarnings(p_proj))
+
+def clear_dir(p_path):	
+	for root, dirs, files in walk(p_path):
+		for f in files:
+			removefile(path_join(root, f))
+		for d in dirs:
+			rmtree(path_join(root, d))
+		
 
 # ######################################################################
 

@@ -4,12 +4,12 @@ import logging
 import codecs
 
 from os.path import exists, join as path_join
-
 from psycopg2.errors import UndefinedFunction
-
+from shutil import rmtree
 
 from src.sql import SQL
 from src.common import PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_LISTGROUPS, OPS_CHECK, FLOAT_TYPES, INT_TYPES
+from src.fileandpath import clear_dir
 
 WARN_KEYS = {
 	"PROC_SU_OWNED": "Procedimentos cujo owner e' 'postgres'",
@@ -930,6 +930,18 @@ AS $BODY$\n"""
 	return template % (p_sch, p_row["procedure_name"], p_row["args"],
 		p_row["return_type"], p_row["language_type"], volatdict[p_row["provolatile"]])
 
+def gen_proc_fname(p_sch, p_row):
+	
+	if p_row["args"]:
+		template = "%s.%s_%s.sql" 
+		args = re.sub("[ ,]+", "_", p_row["args"])
+		ret = template % (p_sch, p_row["procedure_name"], args)
+	else:
+		template = "%s.%s.sql" 
+		ret = template % (p_sch, p_row["procedure_name"])
+
+	return ret
+
 def gen_proc_ftr(p_sch, p_row):
 
 	template = """$BODY$;\n
@@ -940,14 +952,15 @@ OWNER TO %s;"""
 		p_row["procedure_owner"])
 
 def gen_proc_file(p_genprocsdir, p_schema, p_proc_row, winendings=True):
+	fname = gen_proc_fname(p_schema, p_proc_row)
 	if winendings:
-		with codecs.open(path_join(p_genprocsdir, "%s.%s.sql" % (p_schema, p_proc_row["procedure_name"])), "wb", "utf-8") as fl:
+		with codecs.open(path_join(p_genprocsdir, fname), "wb", "utf-8") as fl:
 			#print("......", str(type(row[PROC_SRC_BODY_FNAME])))
 			fl.write(gen_proc_hdr(p_schema, p_proc_row).replace("\n","\r\n"))
 			fl.write(p_proc_row[PROC_SRC_BODY_FNAME].decode('utf-8').replace("\n","\r\n"))									
 			fl.write(gen_proc_ftr(p_schema, p_proc_row).replace("\n","\r\n"))
 	else:
-		with codecs.open(path_join(p_genprocsdir, "%s.%s.sql" % (p_schema, p_proc_row["procedure_name"])), "w", "utf-8") as fl:
+		with codecs.open(path_join(p_genprocsdir, fname), "w", "utf-8") as fl:
 			#print("......", str(type(row[PROC_SRC_BODY_FNAME])))
 			fl.write(gen_proc_hdr(p_schema, p_proc_row))
 			fl.write(p_proc_row[PROC_SRC_BODY_FNAME].decode('utf-8'))									
@@ -972,6 +985,9 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dic
 		dict_key = "PROCS_PRE11"
 	else:
 		dict_key = "PROCS_FROM11"
+
+	if not genprocsdir is None:
+		clear_dir(genprocsdir)
 
 	for sch in out_dict["content"]["schemas"]:
 		
