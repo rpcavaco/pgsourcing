@@ -26,6 +26,8 @@ OPS_OUTPUT = ["upddest"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
 
+STORAGE_VERSION = 1
+
 OPS_HELP = {
 	"pt": {
 		"chksrc": "comparar b.d. fonte com o repositorio de referencia",

@@ -19,7 +19,8 @@ import StringIO
 
 from src.common import LOG_CLI_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, \
 		OPS_OUTPUT, OPS_HELP, OPS_CHECK, SETUP_ZIP, BASE_CONNCFG, \
-		BASE_FILTERS_RE, PROC_SRC_BODY_FNAME
+		BASE_FILTERS_RE, PROC_SRC_BODY_FNAME, STORAGE_VERSION
+		
 from src.read import srcreader
 from src.connect import Connections
 from src.compare import comparing, keychains
@@ -384,7 +385,8 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 		
 			newref_dict["timestamp"] = base_ts			
 			newref_dict["project"] = p_proj		
-			newref_dict["pgsourcing_output_type"] = "reference"			
+			newref_dict["pgsourcing_output_type"] = "reference"	
+			newref_dict["pgsourcing_storage_ver"] = STORAGE_VERSION		 	
 
 			save_ref(p_proj, newref_dict, now_dt)
 
@@ -453,18 +455,18 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	
 	if check_dict:
 		
-		check_dict["pgsourcing_output_type"] = "rawcheck"
-		
 		now_dt = dt.now()
 		
 		base_ts = now_dt.strftime('%Y%m%dT%H%M%S')
 		check_dict["project"] = p_proj
 		check_dict["timestamp"] = base_ts
 		check_dict["pgsourcing_output_type"] = "rawcheck"
+		check_dict["pgsourcing_storage_ver"] = STORAGE_VERSION		 	
 
 		root_diff_dict["project"] = p_proj
 		root_diff_dict["timestamp"] = base_ts
 		root_diff_dict["pgsourcing_output_type"] = "diff"
+		root_diff_dict["pgsourcing_storage_ver"] = STORAGE_VERSION		 	
 		
 		do_compare = False
 		if comparison_mode == "From SRC":
@@ -472,7 +474,8 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			if not exists_currentref(p_proj):
 				
 				ref_dict = {
-					"pgsourcing_output_type": "reference"
+					"pgsourcing_output_type": "reference",
+					"pgsourcing_storage_ver": STORAGE_VERSION		 	
 				}
 				
 				# Extrair warnings antes de gravar
@@ -492,6 +495,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			wout_json = {
 				"project": p_proj,
 				"pgsourcing_output_type": "warnings_only",
+				"pgsourcing_storage_ver": STORAGE_VERSION,	 	
 				"timestamp": base_ts,
 				"content": check_dict["warnings"] 
 			}			
@@ -517,6 +521,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			logger.info("result: DIFF FOUND (proj '%s')" % p_proj)
 			out_json = deepcopy(root_diff_dict)
 			out_json["pgsourcing_output_type"] = "diff"
+			out_json["pgsourcing_storage_ver"] = STORAGE_VERSION		 	
 			out_json["comparison_dir"] = comparison_mode
 			out_json["connkey"] = connkey
 			do_output(out_json, output=output, interactive=canuse_stdout, diff=True)

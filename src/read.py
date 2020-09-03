@@ -741,7 +741,7 @@ def constraints(p_cursor, p_deftablespace, out_dict):
 
 				schema_dependency(row["schema_ref"], schema_name, "fkeys")
 
-def indexes(p_cursor, out_dict):
+def indexes(p_cursor, p_deftablespace, out_dict):
 	
 	# ATENCAO - indexes deve ser corrido depois de constraints, para poder filtrar
 	# os indices associados a primary keys e que sao implicitos,
@@ -788,7 +788,15 @@ def indexes(p_cursor, out_dict):
 					if idxt1 in idxdef:
 						idxdef = idxdef.replace(idxt1, idxt2)
 						
-					constrs_dict[row["indexname"]] = { "idxdesc": idxdef }
+					if row["tablespace"] is None:
+						tblspc = p_deftablespace
+					else:
+						tblspc = row["tablespace"]
+
+					constrs_dict[row["indexname"]] = { 
+						"idxdesc": idxdef,
+						"tablespace": tblspc
+					}
 
 def sequences(p_conn, p_majorversion, out_dict):
 	
@@ -1075,7 +1083,7 @@ def srcreader(p_conn, p_filters_cfg, out_dict, outprocs_dir=None, include_public
 			constraints(cr, out_dict["pg_metadata"]["tablespace"], out_dict)
 			
 			logger.info("reading indexes ..")
-			indexes(cr, out_dict)
+			indexes(cr, out_dict["pg_metadata"]["tablespace"], out_dict)
 
 			logger.info("reading views ..")			
 			views(cr, p_filters_cfg, out_dict)

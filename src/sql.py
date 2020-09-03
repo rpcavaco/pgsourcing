@@ -156,7 +156,7 @@ SQL = {
 			ON a.oid = atr.attrelid 
 			and a.attnum = atr.attnum
 		GROUP BY idxtblspc, conname""",		
-	"INDEXES": """SELECT indexname, indexdef
+	"INDEXES": """SELECT indexname, indexdef, tablespace
 			FROM
 				pg_indexes
 			WHERE

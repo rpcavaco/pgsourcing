@@ -8,7 +8,10 @@ from os.path import exists
 from copy import copy, deepcopy
 from difflib import unified_diff as dodiff
 
-from src.common import PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_DEST_GROUPS, CFG_LISTGROUPS, UPPERLEVELOPS, CFG_SHALLOW_GROUPS, SHALLOW_DEPTH
+from src.common import PROC_SRC_BODY_FNAME, CFG_GROUPS, \
+		CFG_DEST_GROUPS, CFG_LISTGROUPS, UPPERLEVELOPS, \
+		CFG_SHALLOW_GROUPS, SHALLOW_DEPTH, STORAGE_VERSION
+		
 from src.fileandpath import load_currentref
 
 def do_transformschema(p_transformschema, p_obj, p_k):
@@ -475,6 +478,7 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 	raw_ref_json = load_currentref(p_proj)
 		
 	assert not raw_ref_json is None
+	assert raw_ref_json["pgsourcing_storage_ver"] <= STORAGE_VERSION, "Incompatible storager ver %s > %s" % (raw_ref_json["pgsourcing_storage_ver"], STORAGE_VERSION)
 	
 	ref_json = raw_ref_json["content"]
 	

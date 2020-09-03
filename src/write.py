@@ -205,7 +205,7 @@ def table_operation(p_sch, p_tname, p_diff_item, p_delmode, p_out_sql_src):
 		if "index" in p_diff_item["newvalue"].keys():	
 			for cname in p_diff_item["newvalue"]["index"].keys():	
 				di = p_diff_item["newvalue"]["index"][cname]
-				p_out_sql_src.append(di["idxdesc"])						
+				p_out_sql_src.append("%s TABLESPACE %s" % (di["idxdesc"], di["tablespace"]))						
 
 		if "unique" in p_diff_item["newvalue"].keys():							
 			for cname in p_diff_item["newvalue"]["unique"].keys():	
@@ -524,15 +524,19 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 							out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Schemas\n" + "-- " + "".join(['#'] * 77))
 							header_printed = True
 						if docomment:
-							out_sql_src.append("-- Op #%d" % diff_item["operorder"])
-						privs = di["newvalue"]	
+							out_sql_src.append("-- Op #%d" % di["operorder"])
 						if di["diffoper"] in ("update", "delete"):
+							if di["diffoper"] == "delete":
+								privs = "ALL"
+							else:
+								privs = di["newvalue"]	
 							if delmode == "NODEL":
 								xtmpl = "-- REVOKE %s ON %s FROM %s"
 							else:
 								xtmpl = "REVOKE %s ON %s FROM %s"
 							out_sql_src.append(xtmpl % (privs, sch, user_name))
 						if di["diffoper"] in ("update", "insert"):
+							privs = di["newvalue"]
 							out_sql_src.append("GRANT %s ON SCHEMA %s TO %s" % (privs, sch, user_name))
 	
 	grpkey = "sequences"	
@@ -714,13 +718,11 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 									print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
 									if docomment:
 										out_sql_src.append("-- Op #%d" % di["operorder"])
-									if di["diffoper"] in ("insert", "update"):
-										if di["diffoper"] == "update":
-											out_sql_src.append(xtmpl % (sch, cname))
-										nv = di["newvalue"]
-										out_sql_src.append(nv["idxdesc"])						
-									elif di["diffoper"] == "delete":
+									if di["diffoper"] in ("delete", "update"):
 										out_sql_src.append(xtmpl % (sch, cname))
+									if di["diffoper"] in ("insert", "update"):
+										nv = di["newvalue"]
+										out_sql_src.append("%s TABLESPACE %s" % (nv["idxdesc"], nv["tablespace"]))						
 
 					if "unique" in diff_item.keys():							
 
@@ -904,8 +906,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 							if di["diffoper"] in ("update", "insert"):
 								out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, vname, user_name))
 
-	grpkey = "procedures"
-	
+	grpkey = "procedures"	
 	if grpkey in diff_content.keys():	
 
 		header_printed = False
