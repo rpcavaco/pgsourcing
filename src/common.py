@@ -5,7 +5,7 @@ import logging
 ########################################################################
 
 # Config de logging
-LOG_CLI_CFG = {
+LOG_CFG = {
   # "format" : "%(asctime)s %(levelname)-8s %(name)s %(message)s",
   "format" : "%(asctime)s %(levelname)-8s %(message)s",
   "filename": "log/cli.log",
@@ -58,8 +58,18 @@ BASE_CONNCFG = {
 		"user": "the_user", 
 		"password": "base64_converted_passwd" 
 		  },
+		"filters": BASE_FILTERS_RE,
+		"srccodedir": ""
+	},
+	"dest": {
+		"conn": {
+		"host": "XX.XX.XX.XX", 
+		"dbname": "the_dbname", 
+		"user": "the_user", 
+		"password": "base64_converted_passwd" 
+		  },
 		"filters": BASE_FILTERS_RE
-	}
+	}	
 }
 
 CFG_GROUPS = [

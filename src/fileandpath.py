@@ -86,9 +86,9 @@ def get_srccodedir(p_cfgpath, p_key):
 		with open(p_cfgpath) as cfgfl:
 			cfgdict = json.load(cfgfl)		
 	assert not cfgdict is None, "get_srccodedir, missing config in: %s" % p_cfgpath
-	assert "srccodedir" in cfgdict, "get_srccodedir, missing source code dir in config, key: %s" % p_key
+	assert "srccodedir" in cfgdict[p_key].keys(), "get_srccodedir, missing source code dir in config, key: %s" % p_key
 		
-	return path_join(cfgdict["srccodedir"], "procedures")
+	return path_join(cfgdict[p_key]["srccodedir"], "procedures")
 
 def get_srccodedir_trigger(p_cfgpath, p_key):	
 	cfgdict = None
@@ -96,9 +96,9 @@ def get_srccodedir_trigger(p_cfgpath, p_key):
 		with open(p_cfgpath) as cfgfl:
 			cfgdict = json.load(cfgfl)		
 	assert not cfgdict is None, "get_srccodedir_trigger, missing config in: %s" % p_cfgpath
-	assert "srccodedir" in cfgdict, "get_srccodedir_trigger, missing trigger source code dir in config, key: %s" % p_key
+	assert "srccodedir" in cfgdict[p_key].keys(), "get_srccodedir_trigger, missing trigger source code dir in config, key: %s" % p_key
 		
-	return path_join(cfgdict["srccodedir"], "triggers")
+	return path_join(cfgdict[p_key]["srccodedir"], "triggers")
 		
 
 # ######################################################################

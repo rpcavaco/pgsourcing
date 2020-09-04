@@ -2,10 +2,11 @@
 
 from __future__ import print_function
 from os import listdir, mkdir, makedirs, walk, remove as removefile
-from os.path import abspath, dirname, exists, join as path_join
+from os.path import abspath, dirname, exists, splitext, join as path_join
 from datetime import datetime as dt
 from copy import deepcopy
 from difflib import unified_diff as dodiff
+from subprocess import check_call
 
 
 from psycopg2.extras import execute_batch
@@ -19,11 +20,11 @@ import re
 import io
 import StringIO
 
-from src.common import LOG_CLI_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, \
+from src.common import LOG_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, \
 		OPS_OUTPUT, OPS_HELP, OPS_CHECK, SETUP_ZIP, BASE_CONNCFG, \
 		BASE_FILTERS_RE, PROC_SRC_BODY_FNAME, STORAGE_VERSION
 		
-from src.read import srcreader, gen_proc_fname
+from src.read import srcreader, gen_proc_fname, reverse_proc_fname
 from src.connect import Connections
 from src.compare import comparing, keychains, sources_to_lists
 from src.zip import gen_setup_zip
@@ -76,7 +77,7 @@ def parse_args():
 	parser.add_argument("-k", "--limkeys", help="Filtro de atributios a alterar: apenas estes atributos serao alterados", action="store")
 	parser.add_argument("-m", "--delmode", help="Modo apagamento: NODEL (default), DEL, CASCADE", action="store")
 	parser.add_argument("-a", "--addnweproc", help="Gerar novo ficheiro de procedure", action="store_true")
-	parser.add_argument("-t", "--addnwetrig", help="Gerar novo ficheiro de trigger", action="store_true")
+	parser.add_argument("-t", "--addnewtrig", help="Gerar novo ficheiro de trigger", action="store_true")
 	
 	args = parser.parse_args()
 	
@@ -128,12 +129,12 @@ def parse_args():
 		
 	return args, proj
 
-def log_cli_setup(tosdout=False):
+def log_setup(tosdout=False):
 	
 	logger = logging.getLogger('pgsourcing')
-	logger.setLevel(LOG_CLI_CFG["level"])
-	logfmt = logging.Formatter(LOG_CLI_CFG["format"])
-	fh = logging.FileHandler(LOG_CLI_CFG["filename"])
+	logger.setLevel(LOG_CFG["level"])
+	logfmt = logging.Formatter(LOG_CFG["format"])
+	fh = logging.FileHandler(LOG_CFG["filename"])
 	fh.setFormatter(logfmt)
 	logger.addHandler(fh)
 	if tosdout:
@@ -385,7 +386,7 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 
 		if p_connkey is None:
 			if not conns.checkConn("dest"):
-				raise RuntimeError("Chkdest: connection identificada com 'dest' nao existe, necessario indicar chave respetiva")
+				raise RuntimeError("default 'dest' connection not found, need to pass connection key to use")
 			else:
 				connkey = 'dest'
 		else:	
@@ -429,10 +430,11 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 		cn.commit()
 			
 		logger.info("direct dest change for proj. %s" % p_proj)
+
 		
 	return ret_changed
 
-def code_ops_handler(p_proj, p_oper, p_outprocsdir, p_connkey=None):
+def code_ops_handler(p_proj, p_oper, p_outprocsdir, p_opordmgr, p_connkey=None, output=None, interactive=False):
 
 	logger = logging.getLogger('pgsourcing')	
 	
@@ -444,11 +446,17 @@ def code_ops_handler(p_proj, p_oper, p_outprocsdir, p_connkey=None):
 			ck = p_connkey
 		else:
 			ck = "src"
+
+		now_dt = dt.now()
+		
+		base_ts = now_dt.strftime('%Y%m%dT%H%M%S')
 			
 		srccodedir = get_srccodedir(cfgpath, ck)				
 		if not srccodedir is None:
 			
 			try:
+				check_dict = { "content": {} }
+
 				assert exists(srccodedir), "Missing source code dir: %s" % srccodedir			
 				for r, d, fs in walk(srccodedir):
 					for fl in fs:
@@ -460,24 +468,65 @@ def code_ops_handler(p_proj, p_oper, p_outprocsdir, p_connkey=None):
 						frompath = path_join(r, fl)
 						topath = path_join(p_outprocsdir, fll)
 
-						if not exists(topath):
-							continue
-						
-						with codecs.open(frompath, "r", "utf-8") as flA:
-							srca = flA.read()
-						with codecs.open(topath, "r", "utf-8") as flB:
-							srcb = flB.read()
+						fname, ext = splitext(fll)
+						revdict = {}
+						reverse_proc_fname(fname, revdict)
 
-						listA = []
-						listB = []						
-						sources_to_lists(srca, srcb, listA, listB)						
-						diff = [l.strip() for l in list(dodiff(listA, listB)) if l.strip()]
+						assert "procschema" in revdict.keys()
+						assert "procname" in revdict.keys()
+
+						if not exists(topath):
+							
+							if not revdict["procschema"] in check_dict["content"].keys():
+								check_dict["content"][revdict["procschema"]] = {}
+							if not revdict["procname"] in check_dict["content"][revdict["procschema"]].keys():
+								di = check_dict["content"][revdict["procschema"]][revdict["procname"]] = {
+									"diffoper": "insert",
+									"fname": fll
+								}
+								p_opordmgr.setord(di)
+							
+						else:
+						
+							with codecs.open(frompath, "r", "utf-8") as flA:
+								srca = flA.read()
+							with codecs.open(topath, "r", "utf-8") as flB:
+								srcb = flB.read()
+
+							listA = []
+							listB = []						
+							sources_to_lists(srca, srcb, listA, listB)						
+							diff = [l.strip() for l in list(dodiff(listA, listB)) if l.strip()]
+
+							if len(diff) > 0:
+
+								if not revdict["procschema"] in check_dict["content"].keys():
+									check_dict["content"][revdict["procschema"]] = {}
+								if not revdict["procname"] in check_dict["content"][revdict["procschema"]].keys():
+									di = check_dict["content"][revdict["procschema"]][revdict["procname"]] = {
+										"diffoper": "update",
+										"difflines": copy(diff),
+										"fname": fll
+									}
+									p_opordmgr.setord(di)
 
 					break
+					
+				if check_dict["content"]:
+
+					check_dict["project"] = p_proj
+					check_dict["timestamp"] = base_ts
+					check_dict["pgsourcing_output_type"] = "codediff"
+					check_dict["pgsourcing_storage_ver"] = STORAGE_VERSION		
+					do_output(check_dict, output=output, interactive=interactive, diff=True)
 
 			except AssertionError as err:
 				logger.exception("Source code dir test")
 
+
+	# elif p_oper == "updcode":
+		
+		
 	
 class OpOrderMgr(Singleton):
 	
@@ -615,7 +664,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		
 		if p_oper in ("chkcode", "updcode"):
 			
-			code_ops_handler(p_proj, p_oper, refcodedir, p_connkey=p_connkey)
+			code_ops_handler(p_proj, p_oper, refcodedir, opordmgr, p_connkey=p_connkey, output=output, interactive=canuse_stdout)
 			
 		else:
 
@@ -715,7 +764,7 @@ def addnewprocedure_file(p_proj, conn=None, conf_obj=None):
 		
 	if newitems is None:
 		
-		logger.info("Criacao nao-concluida de novo procedimento")
+		logger.info("New procedure creation terminated")
 		
 	else:
 	
@@ -727,11 +776,12 @@ def addnewprocedure_file(p_proj, conn=None, conf_obj=None):
 		else:
 			ck = "src"
 			
-		srccodedir = get_srccodedir(cfgpath, ck)				
+		srccodedir = get_srccodedir(cfgpath, ck)	
+		fullenewpath = None			
 		if not srccodedir is None:
 			
 			try:
-				assert exists(srccodedir), "Missing source code dir: %s" % srccodedir	
+				assert exists(srccodedir), "addnewprocedure_file, missing source code dir: %s" % srccodedir	
 				
 				if conf_obj is None:
 					newfname, sch, nome, rettipo, tiposargs, ownership = newitems		
@@ -747,7 +797,7 @@ def addnewprocedure_file(p_proj, conn=None, conf_obj=None):
 				
 				if exists(fullenewpath):
 					
-					logger.info("Criacao nao-concluida de novo procedimento em %s: nome de ficheiro em uso -- %s" % (proj, fname))
+					logger.info("addnewprocedure_file, cannot create new procedure in '%s': filename in use -- %s" % (proj, fname))
 					
 				else:
 					
@@ -764,15 +814,17 @@ def addnewprocedure_file(p_proj, conn=None, conf_obj=None):
 			except AssertionError as err:
 				logger.exception("addnewprocedure_file, source code dir test")
 		
-		logger.info("Novo ficheiro de procedimento: %s" % newfname)
-		
-		try:
-			resp = raw_input(pr)
-		except NameError:
-			resp = input(pr)
-		if len(resp) < 1 or resp.lower() == 'x':
-			doexit = True
-			break
+		if not fullenewpath is None:
+			
+			logger.info("New procedure file created: %s" % newfname)
+			
+			# pr = "Want to open with default system editor? (y/n)"
+			# try:
+				# resp = raw_input(pr)
+			# except NameError:
+				# resp = input(pr)
+			# if resp.lower() == 's':
+				# check_call(['start', fullenewpath], shell=True)
 
 
 def cli_main():
@@ -780,7 +832,7 @@ def cli_main():
 	# Config
 	check_filesystem()
 	
-	log_cli_setup(tosdout=canuse_stdout)	
+	log_setup(tosdout=True)	
 	logger = logging.getLogger('pgsourcing')		
 		
 	# Bootstrap
@@ -796,7 +848,7 @@ def cli_main():
 			if args.addnweproc:
 				## conf_obj=None forces interaction with stdin and stdout
 				addnewprocedure_file(proj, conn=args.connkey, conf_obj=None)				
-			elif args.addnwetrig:
+			elif args.addnewtrig:
 				## conf_obj=None forces interaction with stdin and stdout
 				addnewtrigger_file(proj, conn=args.connkey, conf_obj=None)				
 			else:			

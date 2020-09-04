@@ -960,16 +960,30 @@ def gen_proc_fname_argsstr(p_sch, p_pname, p_rettype, p_args):
 def gen_proc_fname(p_sch, p_pname, p_rettype, p_argtypes_list):
 	
 	if len(p_argtypes_list) > 0:
-		template = "%s.%s#%s_%s.sql" 
+		template = "%s.%s#%s$%s.sql" 
 		catlist = [condensed_pgdtype(cat) for cat in p_argtypes_list]
 		ret = template % (p_sch, p_pname, 
 		condensed_pgdtype(p_rettype), "-".join(catlist))
 	else:
-		template = "%s.%s_%s.sql" 
+		template = "%s.%s$%s.sql" 
 		ret = template % (p_sch, p_pname, 
 		condensed_pgdtype(p_rettype))
 
 	return ret	
+	
+def reverse_proc_fname(p_fname, o_dict):
+	
+	schema, rest = p_fname.split(".")
+	
+	if "#" in rest:
+		# has arguments
+		procname, rest2 = rest.split("#")
+	else:
+		procname, rest2 = rest.split("$")
+		
+	o_dict["procschema"] = schema
+	o_dict["procname"] = procname
+	
 
 def gen_proc_ftr(p_sch, p_row):
 
