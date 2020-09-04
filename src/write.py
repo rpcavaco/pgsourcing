@@ -317,8 +317,16 @@ def col_operation(docomment, p_sch, p_tname, p_colname, p_diff_item, p_delmode, 
 			cont0 = re.sub("\s\s+", " ",   "%s %s %s %s" % tuple(colcreatitems[1:]))
 			p_out_sql_src.append("%s ADD COLUMN %s" % (tmplt % (p_sch, p_tname), cont0.strip()))
 					
-
 def create_function(p_schema, p_name, p_new_value, o_sql_linebuffer, replace=False):
+	
+	create_function_items(p_schema, p_name, p_new_value["args"],
+		p_new_value["return_type"], p_new_value["language_type"], 
+		p_new_value["provolatile"], p_new_value["body"], 
+		p_new_value["procedure_owner"], 
+		o_sql_linebuffer, replace=replace)
+
+def create_function_items(p_schema, p_name, p_args, p_rettype, p_langtype, p_owner, p_volatility, 
+	p_body, o_sql_linebuffer, replace=False):
 	
 	if replace:
 		cr = "CREATE OR REPLACE FUNCTION %s.%s"
@@ -326,26 +334,26 @@ def create_function(p_schema, p_name, p_new_value, o_sql_linebuffer, replace=Fal
 		cr = "CREATE FUNCTION %s.%s"
 		
 	o_sql_linebuffer.append(cr % (p_schema, p_name))	
-	o_sql_linebuffer.append("(%s)" % p_new_value["args"])
+	o_sql_linebuffer.append("(%s)" % p_args)
 	o_sql_linebuffer.append("\n")
-	o_sql_linebuffer.append("RETURNS %s\n" % p_new_value["return_type"])
-	o_sql_linebuffer.append("LANGUAGE %s\n" % p_new_value["language_type"])
+	o_sql_linebuffer.append("\tRETURNS %s\n" % p_rettype)
+	o_sql_linebuffer.append("\tLANGUAGE %s\n" % p_langtype)
 	
-	if p_new_value["provolatile"] == "s":
+	if p_volatility == "s":
 		vol = "STABLE"
-	elif p_new_value["provolatile"] == "v":
+	elif p_volatility == "v":
 		vol = "VOLATILE"
-	elif p_new_value["provolatile"] == "i":
+	elif p_volatility == "i":
 		vol = "IMMUTABLE"
 	else:
 		vol = "???????"
 
-	o_sql_linebuffer.append("%s\n" % vol)
+	o_sql_linebuffer.append("\t%s\n" % vol)
 	o_sql_linebuffer.append("AS $BODY$\n")
-	o_sql_linebuffer.append(p_new_value["body"].strip())
+	o_sql_linebuffer.append(p_body.strip())
 	o_sql_linebuffer.append("\n$BODY$;\n\n")
 	
-	o_sql_linebuffer.append("ALTER FUNCTION %s.%s OWNER to %s" % (p_schema, p_name, p_new_value["procedure_owner"]))
+	o_sql_linebuffer.append("ALTER FUNCTION %s.%s(%s) OWNER to %s" % (p_schema, p_name, p_args, p_owner))
 
 def create_role(p_rolename, p_new_value, o_sql_linebuffer):
 	

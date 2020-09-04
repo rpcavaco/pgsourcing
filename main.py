@@ -23,15 +23,14 @@ from src.common import LOG_CLI_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, \
 		OPS_OUTPUT, OPS_HELP, OPS_CHECK, SETUP_ZIP, BASE_CONNCFG, \
 		BASE_FILTERS_RE, PROC_SRC_BODY_FNAME, STORAGE_VERSION
 		
-from src.read import srcreader
+from src.read import srcreader, gen_proc_fname
 from src.connect import Connections
 from src.compare import comparing, keychains, sources_to_lists
 from src.zip import gen_setup_zip
 from src.fileandpath import get_conn_cfg_path, get_filters_cfg, \
 		exists_currentref, to_jsonfile, save_ref, get_refcodedir, \
 		save_warnings, clear_dir
-from src.write import updateref, updatedb
-
+from src.write import updateref, updatedb, create_function_items
 
 
 try:
@@ -76,18 +75,25 @@ def parse_args():
 	parser.add_argument("-d", "--opsorder", help="Lista de operacoes (sequencia de oporder) a efetuar", action="store")
 	parser.add_argument("-k", "--limkeys", help="Filtro de atributios a alterar: apenas estes atributos serao alterados", action="store")
 	parser.add_argument("-m", "--delmode", help="Modo apagamento: NODEL (default), DEL, CASCADE", action="store")
+	parser.add_argument("-a", "--addnweproc", help="Gerar novo ficheiro de procedure", action="store_true")
 	
 	args = parser.parse_args()
 	
 	logger = logging.getLogger('pgsourcing')	
 	logger.info("Inicio, args: %s" % args)
 	
-	if args.setup and not args.newproj is None:
+	mutexflags = set()
+	if args.setup:
+		mutexflags.add("setup")
+	if not args.newproj is None:
+		mutexflags.add("newproj")
+	
+	if len(mutexflags) > 1:
 		parser.print_help()
 		raise RuntimeError("opcoes -s e -n sao mutuamente exclusivas")
 	
 	proj = None
-	if not args.setup and args.newproj is None:
+	if len(mutexflags) == 0:
 		if args.proj is None:
 			parser.print_help()
 			raise RuntimeError("A indicacao de projeto (proj) obrigatoria exceto nas opcoes -s e -n")
@@ -105,7 +111,7 @@ def parse_args():
 			else:
 				raise RuntimeError("Projeto '%s' nao existe, projetos encontrados: %s" % (args.proj, str(projetos)))
 				
-		if not args.oper in OPS:
+		if not args.addnweproc and not args.oper in OPS:
 			raise RuntimeError("Operacao '%s' invalida, ops disponiveis: %s" % (args.oper, str(ops_help)))
 
 		if args.oper in OPS_INPUT and args.input is None:
@@ -446,8 +452,7 @@ def code_ops_handler(p_proj, p_oper, p_outprocsdir, p_connkey=None):
 		if not srccodedir is None:
 			
 			try:
-				assert exists(srccodedir), "Missing source code dir: %s" % srccodedir
-			
+				assert exists(srccodedir), "Missing source code dir: %s" % srccodedir			
 				for r, d, fs in walk(srccodedir):
 					for fl in fs:
 						
@@ -467,13 +472,9 @@ def code_ops_handler(p_proj, p_oper, p_outprocsdir, p_connkey=None):
 							srcb = flB.read()
 
 						listA = []
-						listB = []
-						
-						sources_to_lists(srca, srcb, listA, listB)
-						
+						listB = []						
+						sources_to_lists(srca, srcb, listA, listB)						
 						diff = [l.strip() for l in list(dodiff(listA, listB)) if l.strip()]
-						
-						print(fll, diff)
 
 					break
 
@@ -646,6 +647,113 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	
 # ######################################################################
 
+def gen_newprocfile_items():
+
+	ret = None
+	prlist = [
+		"Schema do novo procedimento (x ou vazio para sair sem criar):",
+		"Nome do novo procedimento:",
+		"Tipo de dados de retorno:",
+		"Login proprietario:"
+		]
+		
+	prfinal = "tipo de dados %so. argumento (x ou vazio para terminar):"
+
+	doexit = False
+	tiposargs = []
+	sch = None
+	nome = None
+	rettipo = None
+	ownership = None
+			
+	for pri, pr in enumerate(prlist):		
+		try:
+			resp = raw_input(pr)
+		except NameError:
+			resp = input(pr)
+		if len(resp) < 1 or resp.lower() == 'x':
+			doexit = True
+			break
+		if pri == 0:
+			sch = resp.strip().lower()
+		elif pri == 1:
+			nome = resp.strip().lower()
+		elif pri == 2:
+			rettipo = resp.strip().lower()
+		elif pri == 3:
+			ownership = resp.strip().lower()
+			
+	if not doexit:
+
+		count = 0
+		while count <= 20:
+			count += 1
+			try:
+				resp = raw_input(prfinal % count)
+			except NameError:
+				resp = input(prfinal % count)
+			if len(resp) < 1 or resp.lower() == 'x':
+				break
+			tiposargs.append(resp.strip().lower())
+	
+		fname = gen_proc_fname(sch, nome, rettipo, tiposargs)
+		ret = [fname, sch, nome, rettipo, tiposargs, ownership] 
+		
+	return ret
+	
+def addnewprocedure_file(p_proj, conn=None):
+
+	logger = logging.getLogger('pgsourcing')		
+	
+	newitems = gen_newprocfile_items()
+	if newitems is None:
+		
+		logger.info("Criacao nao-concluida de novo procedimento")
+		
+	else:
+	
+		cfgpath = get_conn_cfg_path(p_proj)
+		srccodedir = None
+		newfname = None
+		if not conn is None:
+			ck = conn
+		else:
+			ck = "src"
+			
+		with open(cfgpath) as cfgfl:
+			cfgdict = json.load(cfgfl)
+			assert "srccodedir" in cfgdict[ck]
+			srccodedir = cfgdict[ck]["srccodedir"]
+			
+		if not srccodedir is None:
+			
+			try:
+				assert exists(srccodedir), "Missing source code dir: %s" % srccodedir	
+				
+				newfname, sch, nome, rettipo, tiposargs, ownership = newitems				
+				fullenewpath = path_join(srccodedir, newfname)
+				
+				if exists(fullenewpath):
+					
+					logger.info("Criacao nao-concluida de novo procedimento em %s: nome de ficheiro em uso -- %s" % (proj, fname))
+					
+				else:
+					
+					sql_linebuffer = []
+					argslist = ["%s %s" % (chr(97+ti), ta) for ti, ta in enumerate(tiposargs)] 
+					args = ", ".join(argslist)
+					create_function_items(sch, nome, args, rettipo, "plpgsql", ownership, "v", 
+						"DECLARE\n\tv_null integer;\nBEGIN\n\n\tv_null := 0;\n\tRETURN null;\n\nEND;", sql_linebuffer)
+						
+					if len(sql_linebuffer) > 0:
+						with codecs.open(fullenewpath, "w", "utf-8") as newfl:
+							newfl.write("%s;" % "".join(sql_linebuffer))
+						
+			except AssertionError as err:
+				logger.exception("addnewprocedure_file, source code dir test")
+		
+		logger.info("Novo ficheiro de procedimento: %s" % newfname)
+
 def cli_main(canuse_stdout=False):
 
 	# Config
@@ -663,14 +771,18 @@ def cli_main(canuse_stdout=False):
 			create_new_proj(args.newproj)
 		else:
 			assert not proj is None
-			main(proj, args.oper, args.connkey, args.genprocsdir, 
-					output=args.output, inputf=args.input, 
-					canuse_stdout=canuse_stdout, 
-					include_public=args.includepublic, 
-					include_colorder = not args.removecolorder,
-					updates_ids = args.opsorder,
-					limkeys = args.limkeys,
-					delmode = args.delmode)
+			
+			if args.addnweproc:
+				addnewprocedure_file(proj, conn=args.connkey)				
+			else:			
+				main(proj, args.oper, args.connkey, args.genprocsdir, 
+						output=args.output, inputf=args.input, 
+						canuse_stdout=canuse_stdout, 
+						include_public=args.includepublic, 
+						include_colorder = not args.removecolorder,
+						updates_ids = args.opsorder,
+						limkeys = args.limkeys,
+						delmode = args.delmode)
 					
 	except:
 		logger.exception("")

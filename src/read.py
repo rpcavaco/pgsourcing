@@ -2,6 +2,7 @@
 import re
 import logging
 import codecs
+import hashlib
 
 from os.path import exists, join as path_join
 from psycopg2.errors import UndefinedFunction
@@ -930,17 +931,45 @@ AS $BODY$\n"""
 	return template % (p_sch, p_row["procedure_name"], p_row["args"],
 		p_row["return_type"], p_row["language_type"], volatdict[p_row["provolatile"]])
 
-def gen_proc_fname(p_sch, p_row):
-	
-	if p_row["args"]:
-		template = "%s.%s_%s.sql" 
-		args = re.sub("[ ,]+", "_", p_row["args"])
-		ret = template % (p_sch, p_row["procedure_name"], args)
+def condensed_pgdtype(p_typestr):
+	if len(p_typestr) > 4:
+		hashv = hashlib.sha1(p_typestr.encode("UTF-8")).hexdigest()
+		ret = p_typestr[:2] + hashv[:2]
 	else:
-		template = "%s.%s.sql" 
-		ret = template % (p_sch, p_row["procedure_name"])
+		ret = p_typestr
+	return ret
+
+def gen_proc_fname_row(p_sch, p_row):
+	
+	return gen_proc_fname_argsstr(p_sch, 
+	p_row["procedure_name"], p_row["return_type"], p_row["args"])
+
+	
+def gen_proc_fname_argsstr(p_sch, p_pname, p_rettype, p_args):
+	
+	if p_args:
+		args = re.split(",[ ]+", p_args)
+		argtypeslist = [spl.split(" ")[1] for spl in re.split(",[ ]+", 
+		p_args)]
+		ret = gen_proc_fname(p_sch, p_pname, p_rettype, argtypeslist)
+	else:
+		ret = gen_proc_fname(p_sch, p_pname, p_rettype, [])
 
 	return ret
+	
+def gen_proc_fname(p_sch, p_pname, p_rettype, p_argtypes_list):
+	
+	if len(p_argtypes_list) > 0:
+		template = "%s.%s#%s_%s.sql" 
+		catlist = [condensed_pgdtype(cat) for cat in p_argtypes_list]
+		ret = template % (p_sch, p_pname, 
+		condensed_pgdtype(p_rettype), "-".join(catlist))
+	else:
+		template = "%s.%s_%s.sql" 
+		ret = template % (p_sch, p_pname, 
+		condensed_pgdtype(p_rettype))
+
+	return ret	
 
 def gen_proc_ftr(p_sch, p_row):
 
@@ -952,7 +981,7 @@ OWNER TO %s;"""
 		p_row["procedure_owner"])
 
 def gen_proc_file(p_genprocsdir, p_schema, p_proc_row, winendings=True):
-	fname = gen_proc_fname(p_schema, p_proc_row)
+	fname = gen_proc_fname_row(p_schema, p_proc_row)
 	if winendings:
 		with codecs.open(path_join(p_genprocsdir, fname), "wb", "utf-8") as fl:
 			#print("......", str(type(row[PROC_SRC_BODY_FNAME])))
