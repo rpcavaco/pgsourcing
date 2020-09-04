@@ -18,7 +18,7 @@ LOG_CFG = {
 ########################################################################
 
 LANG = "pt"
-OPS = ["chksrc", "chkdest", "updref", "upddest", "upddir", "chkcode"]
+OPS = ["chksrc", "chkdest", "updref", "upddest", "upddir", "chkcode", "updcode"]
 OPS_CHECK = ["chksrc", "chkdest"]
 OPS_CONNECTED = ["chksrc", "chkdest", "upddir", "updcode"]
 OPS_INPUT = ["updref", "upddest", "upddir", "updcode"]
@@ -33,10 +33,10 @@ OPS_HELP = {
 		"chksrc": "comparar b.d. fonte com o repositorio de referencia",
 		"chkdest": "comparar o repositorio de referencia com uma b.d. destino",
 		"chkcode": "comparar codigo externo (procedures) com o repositorio de referencia",
-		"updcode": "atualizar codigo na b.d. fonte",
 		"updref": "atualizar o repositorio de referencia desde a b.d. fonte",
 		"upddest": "gerar script para b.d. destino",
-		"upddir": "atualizar diretamente b.d. destino"
+		"upddir": "atualizar diretamente b.d. destino",
+		"updcode": "atualizar codigo na b.d. fonte"
 	}
 }
 

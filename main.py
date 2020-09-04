@@ -434,97 +434,203 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 		
 	return ret_changed
 
-def code_ops_handler(p_proj, p_oper, p_outprocsdir, p_opordmgr, p_connkey=None, output=None, interactive=False):
+def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=None, interactive=False):
 
 	logger = logging.getLogger('pgsourcing')	
-	
-	if p_oper == "chkcode":
-	
-		cfgpath = get_conn_cfg_path(p_proj)
-		srccodedir = None
-		if not p_connkey is None:
-			ck = p_connkey
-		else:
-			ck = "src"
-
-		now_dt = dt.now()
 		
-		base_ts = now_dt.strftime('%Y%m%dT%H%M%S')
-			
-		srccodedir = get_srccodedir(cfgpath, ck)				
-		if not srccodedir is None:
-			
-			try:
-				check_dict = { "content": {} }
+	cfgpath = get_conn_cfg_path(p_proj)
+	srccodedir = None
+	if not p_connkey is None:
+		ck = p_connkey
+	else:
+		ck = "src"
 
-				assert exists(srccodedir), "Missing source code dir: %s" % srccodedir			
-				for r, d, fs in walk(srccodedir):
-					for fl in fs:
+	now_dt = dt.now()
+
+	base_ts = now_dt.strftime('%Y%m%dT%H%M%S')		
+	srccodedir = get_srccodedir(cfgpath, ck)				
+	if not srccodedir is None:
+		
+		try:
+			check_dict = { "content": {} }
+
+			assert exists(srccodedir), "Missing source code dir: %s" % srccodedir			
+			for r, d, fs in walk(srccodedir):
+				for fl in fs:
+					
+					fll = fl.lower()
+					if not fll.endswith(".sql"):
+						continue
 						
-						fll = fl.lower()
-						if not fll.endswith(".sql"):
-							continue
-							
-						frompath = path_join(r, fl)
-						topath = path_join(p_outprocsdir, fll)
+					frompath = path_join(r, fl)
+					topath = path_join(p_outprocsdir, fll)
 
-						fname, ext = splitext(fll)
-						revdict = {}
-						reverse_proc_fname(fname, revdict)
+					fname, ext = splitext(fll)
+					revdict = {}
+					reverse_proc_fname(fname, revdict)
 
-						assert "procschema" in revdict.keys()
-						assert "procname" in revdict.keys()
+					assert "procschema" in revdict.keys()
+					assert "procname" in revdict.keys()
 
-						if not exists(topath):
-							
+					if not exists(topath):
+						
+						if not revdict["procschema"] in check_dict["content"].keys():
+							check_dict["content"][revdict["procschema"]] = {}
+						if not revdict["procname"] in check_dict["content"][revdict["procschema"]].keys():
+							di = check_dict["content"][revdict["procschema"]][revdict["procname"]] = {
+								"diffoper": "insert",
+								"fname": fll
+							}
+							p_opordmgr.setord(di)
+						
+					else:
+					
+						with codecs.open(frompath, "r", "utf-8") as flA:
+							srca = flA.read()
+						with codecs.open(topath, "r", "utf-8") as flB:
+							srcb = flB.read()
+
+						listA = []
+						listB = []						
+						sources_to_lists(srca, srcb, listA, listB)						
+						diff = [l.strip() for l in list(dodiff(listA, listB)) if l.strip()]
+
+						if len(diff) > 0:
+
 							if not revdict["procschema"] in check_dict["content"].keys():
 								check_dict["content"][revdict["procschema"]] = {}
 							if not revdict["procname"] in check_dict["content"][revdict["procschema"]].keys():
 								di = check_dict["content"][revdict["procschema"]][revdict["procname"]] = {
-									"diffoper": "insert",
+									"diffoper": "update",
+									"difflines": copy(diff),
 									"fname": fll
 								}
 								p_opordmgr.setord(di)
-							
-						else:
-						
-							with codecs.open(frompath, "r", "utf-8") as flA:
-								srca = flA.read()
-							with codecs.open(topath, "r", "utf-8") as flB:
-								srcb = flB.read()
 
-							listA = []
-							listB = []						
-							sources_to_lists(srca, srcb, listA, listB)						
-							diff = [l.strip() for l in list(dodiff(listA, listB)) if l.strip()]
-
-							if len(diff) > 0:
-
-								if not revdict["procschema"] in check_dict["content"].keys():
-									check_dict["content"][revdict["procschema"]] = {}
-								if not revdict["procname"] in check_dict["content"][revdict["procschema"]].keys():
-									di = check_dict["content"][revdict["procschema"]][revdict["procname"]] = {
-										"diffoper": "update",
-										"difflines": copy(diff),
-										"fname": fll
-									}
-									p_opordmgr.setord(di)
-
-					break
+				break
+				
+			# reverse
+			# TODO: a aguardar a altercao para delete em updcode_handler
+			
+			# for r, d, fs in walk(p_outprocsdir):
+				# for fl in fs:
 					
-				if check_dict["content"]:
+					# fll = fl.lower()
+					# if not fll.endswith(".sql"):
+						# continue
 
-					check_dict["project"] = p_proj
-					check_dict["timestamp"] = base_ts
-					check_dict["pgsourcing_output_type"] = "codediff"
-					check_dict["pgsourcing_storage_ver"] = STORAGE_VERSION		
-					do_output(check_dict, output=output, interactive=interactive, diff=True)
+					# frompath = path_join(r, fl)
+					# topath = path_join(srccodedir, fll)
 
-			except AssertionError as err:
-				logger.exception("Source code dir test")
+					# fname, ext = splitext(fll)
+					# revdict = {}
+					# reverse_proc_fname(fname, revdict)
+
+					# assert "procschema" in revdict.keys()
+					# assert "procname" in revdict.keys()
+
+					# if not exists(topath):
+
+						# if not revdict["procschema"] in check_dict["content"].keys():
+							# check_dict["content"][revdict["procschema"]] = {}
+						# if not revdict["procname"] in check_dict["content"][revdict["procschema"]].keys():
+							# di = check_dict["content"][revdict["procschema"]][revdict["procname"]] = {
+								# "diffoper": "delete",
+								# "fname": fll
+							# }
+							# p_opordmgr.setord(di)
+			
+			if check_dict["content"]:
+
+				check_dict["project"] = p_proj
+				check_dict["timestamp"] = base_ts
+				check_dict["pgsourcing_output_type"] = "codediff"
+				check_dict["pgsourcing_storage_ver"] = STORAGE_VERSION		
+				do_output(check_dict, output=output, interactive=interactive, diff=True)
+
+		except AssertionError as err:
+			logger.exception("Source code dir test")
 
 
-	# elif p_oper == "updcode":
+def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None, delmode=None):
+	
+	logger = logging.getLogger('pgsourcing')	
+		
+	cfgpath = get_conn_cfg_path(p_proj)
+	srccodedir = None
+	if not p_connkey is None:
+		ck = p_connkey
+	else:
+		ck = "src"
+
+	cfgpath = get_conn_cfg_path(p_proj)
+	conns = Connections(cfgpath, subkey="conn")		
+
+	upd_ids_list = []
+	if not updates_ids is None:
+		if isinstance(updates_ids, basestring):
+			upd_ids_list = process_intervals_string(updates_ids)
+		elif isinstance(updates_ids, list):
+			upd_ids_list = updates_ids
+
+	if p_connkey is None:
+	
+		if not conns.checkConn("dest"):
+			raise RuntimeError("default 'dest' connection not found, need to pass connection key to use")
+		else:
+			connkey = 'dest'
+
+	else:	
+		connkey = p_connkey	
+
+	connobj = conns.getConn(connkey)
+
+	# now_dt = dt.now()
+	# base_ts = now_dt.strftime('%Y%m%dT%H%M%S')		
+	srccodedir = get_srccodedir(cfgpath, ck)				
+	if not srccodedir is None:
+		
+		assert "content" in p_diffdict.keys()
+		
+		try:
+			with connobj as con:
+				
+				cn = con.getConn()
+				changed = False
+				
+				for sch in p_diffdict["content"].keys():
+					for pname in p_diffdict["content"][sch].keys():
+						diff_item = p_diffdict["content"][sch][pname]
+						if len(upd_ids_list) < 1 or diff_item["operorder"] in upd_ids_list:	
+							if diff_item["diffoper"] in ("insert", "update"):
+								full_path = path_join(srccodedir, diff_item["fname"])
+								assert exists(full_path)
+								with codecs.open(full_path, "r", "utf-8") as fl:
+									src = fl.read()
+									with cn.cursor() as cr:
+										cr.execute(src)
+										changed = True
+										logger.info("inserting script for proj. %s, %s.%s" % (p_proj,sch,pname))	
+							# elif diff_item["diffoper"] == "delete":
+								# TODO: necessario encontrar argumentos dentro da source da funcao
+								# if delmode == "DEL":
+									# sqlstr = "DROP FUNCTION %s.%s" % (sch, pname)
+								# elif delmode == "CASCADE":
+									# sqlstr = "DROP FUNCTION %s.%s CASCADE" % (sch, pname)
+								# else:
+									# sqlstr = None
+								# if not sqlstr is None:
+									# with cn.cursor() as cr:
+										# cr.execute(sqlstr)
+										# changed = True
+									# logger.info("deleting script for proj. %s, %s" % (p_proj,sch,pname))	
+										
+				if changed:
+					logger.info("commiting changes to scripts")
+					cn.commit()
+		
+		except AssertionError as err:
+			logger.exception("updcode_handler")
 		
 		
 	
@@ -661,17 +767,10 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			# do_output(check_dict, output=output, interactive=canuse_stdout)
 			
 	else:
-		
-		if p_oper in ("chkcode", "updcode"):
-			
-			code_ops_handler(p_proj, p_oper, refcodedir, opordmgr, p_connkey=p_connkey, output=output, interactive=canuse_stdout)
-			
-		else:
 
-			# Se a operacao for updref ou chkdest o dicionario check_dict sera 
-			#  preenchido.
+		diffdict = None
+		if p_oper in ("updcode", "updref", "upddest", "upddir"):
 
-			diffdict = None
 			if isinstance(inputf, basestring):
 				if exists(inputf):
 					with open(inputf, "r") as fj:
@@ -684,6 +783,26 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			else:
 				dlmd = 	delmode
 				
+		
+		if p_oper in ("chkcode", "updcode"):
+			
+			if p_oper == "chkcode":
+
+				chkcode_handler(p_proj, refcodedir, opordmgr, 
+					p_connkey=p_connkey, output=output, 
+					interactive=canuse_stdout)
+
+			elif p_oper == "updcode":
+			
+				updcode_handler(p_proj, diffdict, 
+					updates_ids=updates_ids, p_connkey=p_connkey, 
+					delmode=dlmd)
+			
+		else:
+
+			# Se a operacao for updref ou chkdest o dicionario check_dict sera 
+			#  preenchido.
+
 			update_oper_handler(p_proj, p_oper, opordmgr, 
 				diffdict, updates_ids=updates_ids, p_connkey=p_connkey, 
 				limkeys=limkeys, include_public=include_public, 
