@@ -1016,7 +1016,7 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dic
 		dict_key = "PROCS_FROM11"
 
 	if not genprocsdir is None:
-		clear_dir(genprocsdir)
+		clear_dir(genprocsdir, ".sql")
 
 	for sch in out_dict["content"]["schemas"]:
 		

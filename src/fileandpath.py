@@ -71,12 +71,34 @@ def save_ref(p_proj, p_obj, p_dt):
 def save_warnings(p_proj, p_obj):
 	to_jsonfile(p_obj, get_refwarnings(p_proj))
 
-def clear_dir(p_path):	
+def clear_dir(p_path, ext=None):	
 	for root, dirs, files in walk(p_path):
 		for f in files:
-			removefile(path_join(root, f))
-		for d in dirs:
-			rmtree(path_join(root, d))
+			if ext is None or f.lower().endswith(ext.lower()):
+				removefile(path_join(root, f))
+		if ext is None:
+			for d in dirs:
+				rmtree(path_join(root, d))
+
+def get_srccodedir(p_cfgpath, p_key):	
+	cfgdict = None
+	if exists(p_cfgpath):
+		with open(p_cfgpath) as cfgfl:
+			cfgdict = json.load(cfgfl)		
+	assert not cfgdict is None, "get_srccodedir, missing config in: %s" % p_cfgpath
+	assert "srccodedir" in cfgdict, "get_srccodedir, missing source code dir in config, key: %s" % p_key
+		
+	return path_join(cfgdict["srccodedir"], "procedures")
+
+def get_srccodedir_trigger(p_cfgpath, p_key):	
+	cfgdict = None
+	if exists(p_cfgpath):
+		with open(p_cfgpath) as cfgfl:
+			cfgdict = json.load(cfgfl)		
+	assert not cfgdict is None, "get_srccodedir_trigger, missing config in: %s" % p_cfgpath
+	assert "srccodedir" in cfgdict, "get_srccodedir_trigger, missing trigger source code dir in config, key: %s" % p_key
+		
+	return path_join(cfgdict["srccodedir"], "triggers")
 		
 
 # ######################################################################

@@ -29,7 +29,7 @@ from src.compare import comparing, keychains, sources_to_lists
 from src.zip import gen_setup_zip
 from src.fileandpath import get_conn_cfg_path, get_filters_cfg, \
 		exists_currentref, to_jsonfile, save_ref, get_refcodedir, \
-		save_warnings, clear_dir
+		save_warnings, clear_dir, get_srccodedir
 from src.write import updateref, updatedb, create_function_items
 
 
@@ -76,6 +76,7 @@ def parse_args():
 	parser.add_argument("-k", "--limkeys", help="Filtro de atributios a alterar: apenas estes atributos serao alterados", action="store")
 	parser.add_argument("-m", "--delmode", help="Modo apagamento: NODEL (default), DEL, CASCADE", action="store")
 	parser.add_argument("-a", "--addnweproc", help="Gerar novo ficheiro de procedure", action="store_true")
+	parser.add_argument("-t", "--addnwetrig", help="Gerar novo ficheiro de trigger", action="store_true")
 	
 	args = parser.parse_args()
 	
@@ -444,11 +445,7 @@ def code_ops_handler(p_proj, p_oper, p_outprocsdir, p_connkey=None):
 		else:
 			ck = "src"
 			
-		with open(cfgpath) as cfgfl:
-			cfgdict = json.load(cfgfl)
-			assert "srccodedir" in cfgdict[ck]
-			srccodedir = cfgdict[ck]["srccodedir"]
-			
+		srccodedir = get_srccodedir(cfgpath, ck)				
 		if not srccodedir is None:
 			
 			try:
@@ -658,7 +655,7 @@ def gen_newprocfile_items():
 		]
 		
 	prfinal = "tipo de dados %so. argumento (x ou vazio para terminar):"
-
+	
 	doexit = False
 	tiposargs = []
 	sch = None
@@ -700,12 +697,22 @@ def gen_newprocfile_items():
 		ret = [fname, sch, nome, rettipo, tiposargs, ownership] 
 		
 	return ret
+
+def addnewtrigger_file(p_proj, conn=None, conf_obj=None):
 	
-def addnewprocedure_file(p_proj, conn=None):
+	## TODO
+	raise NotImplementedError
+
+	
+def addnewprocedure_file(p_proj, conn=None, conf_obj=None):
 
 	logger = logging.getLogger('pgsourcing')		
 	
-	newitems = gen_newprocfile_items()
+	newitems = None
+	if conf_obj is None:
+		## Accesses stdin and stdout to query user
+		newitems = gen_newprocfile_items()
+		
 	if newitems is None:
 		
 		logger.info("Criacao nao-concluida de novo procedimento")
@@ -720,17 +727,22 @@ def addnewprocedure_file(p_proj, conn=None):
 		else:
 			ck = "src"
 			
-		with open(cfgpath) as cfgfl:
-			cfgdict = json.load(cfgfl)
-			assert "srccodedir" in cfgdict[ck]
-			srccodedir = cfgdict[ck]["srccodedir"]
-			
+		srccodedir = get_srccodedir(cfgpath, ck)				
 		if not srccodedir is None:
 			
 			try:
 				assert exists(srccodedir), "Missing source code dir: %s" % srccodedir	
 				
-				newfname, sch, nome, rettipo, tiposargs, ownership = newitems				
+				if conf_obj is None:
+					newfname, sch, nome, rettipo, tiposargs, ownership = newitems		
+				else:
+					newfname = conf_obj["newfname"]
+					sch = conf_obj["sch"]
+					nome = conf_obj["nome"]
+					rettipo = conf_obj["rettipo"]
+					tiposargs = conf_obj["tiposargs"]
+					ownership = conf_obj["ownership"]
+					
 				fullenewpath = path_join(srccodedir, newfname)
 				
 				if exists(fullenewpath):
@@ -753,8 +765,17 @@ def addnewprocedure_file(p_proj, conn=None):
 				logger.exception("addnewprocedure_file, source code dir test")
 		
 		logger.info("Novo ficheiro de procedimento: %s" % newfname)
+		
+		try:
+			resp = raw_input(pr)
+		except NameError:
+			resp = input(pr)
+		if len(resp) < 1 or resp.lower() == 'x':
+			doexit = True
+			break
 
-def cli_main(canuse_stdout=False):
+
+def cli_main():
 
 	# Config
 	check_filesystem()
@@ -773,11 +794,15 @@ def cli_main(canuse_stdout=False):
 			assert not proj is None
 			
 			if args.addnweproc:
-				addnewprocedure_file(proj, conn=args.connkey)				
+				## conf_obj=None forces interaction with stdin and stdout
+				addnewprocedure_file(proj, conn=args.connkey, conf_obj=None)				
+			elif args.addnwetrig:
+				## conf_obj=None forces interaction with stdin and stdout
+				addnewtrigger_file(proj, conn=args.connkey, conf_obj=None)				
 			else:			
 				main(proj, args.oper, args.connkey, args.genprocsdir, 
 						output=args.output, inputf=args.input, 
-						canuse_stdout=canuse_stdout, 
+						canuse_stdout=True, 
 						include_public=args.includepublic, 
 						include_colorder = not args.removecolorder,
 						updates_ids = args.opsorder,
@@ -789,7 +814,7 @@ def cli_main(canuse_stdout=False):
 	
 
 if __name__ == "__main__":
-	cli_main(canuse_stdout=True)
+	cli_main()
 
 
 
