@@ -89,15 +89,19 @@ def sourcediff(p_srca, p_srcb, p_transformschema, out_dellist): #, out_addlist):
 	
 	del out_dellist[:]
 
-	if "unicode" in str(type(p_srca)):
-		srca = p_srca
-	else:
-		srca = p_srca.decode('utf-8')
+	try:
+		if "unicode" in str(type(p_srca)):
+			srca = p_srca
+		else:
+			srca = p_srca.decode('utf-8')
+		if "unicode" in str(type(p_srcb)):
+			srcb = p_srcb
+		else:
+			srcb = p_srcb.decode('utf-8')
 
-	if "unicode" in str(type(p_srcb)):
+	except AttributeError:
+		srca = p_srca
 		srcb = p_srcb
-	else:
-		srcb = p_srcb.decode('utf-8')
 		
 	if p_transformschema:
 		if "procedures" in p_transformschema["types"]:

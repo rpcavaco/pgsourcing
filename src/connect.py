@@ -22,8 +22,11 @@ class Conn(object):
 		if "password" not in p_dict.keys():
 			raise ConnectionError("Conn: no password")
 
-		passw = b64decode(p_dict["password"]).decode("utf-8") 
-		
+		try:
+			passw = b64decode(p_dict["password"]).decode("utf-8") 
+		except AttributeError:
+			passw = str(b64decode(p_dict["password"]))
+			
 		newdict = {}
 		for k in p_dict.keys():
 			if k == "password":

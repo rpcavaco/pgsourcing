@@ -611,7 +611,12 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 							else:
 								parsed_val =  row[opt_colname]
 								
-							if isinstance(parsed_val, basestring):
+							try:
+								flagv = isinstance(parsed_val, basestring)
+							except NameError:
+								flagv = isinstance(parsed_val, str)
+								
+							if flagv:
 								
 								match = pattern.match(parsed_val)
 								if not match is None:
@@ -996,17 +1001,23 @@ OWNER TO %s;"""
 def gen_proc_file(p_genprocsdir, p_schema, p_proc_row, winendings=True):
 	fname = gen_proc_fname_row(p_proc_row)
 	complfname = "%s.%s.sql" % (p_schema, fname) 
+	
+	try:
+		procsrc = p_proc_row[PROC_SRC_BODY_FNAME].decode('utf-8')
+	except AttributeError:
+		procsrc = p_proc_row[PROC_SRC_BODY_FNAME]
+	
 	if winendings:
 		with codecs.open(path_join(p_genprocsdir, complfname), "wb", "utf-8") as fl:
 			#print("......", str(type(row[PROC_SRC_BODY_FNAME])))
 			fl.write(gen_proc_hdr(p_schema, p_proc_row).replace("\n","\r\n"))
-			fl.write(p_proc_row[PROC_SRC_BODY_FNAME].decode('utf-8').replace("\n","\r\n"))									
+			fl.write(procsrc.replace("\n","\r\n"))									
 			fl.write(gen_proc_ftr(p_schema, p_proc_row).replace("\n","\r\n"))
 	else:
 		with codecs.open(path_join(p_genprocsdir, complfname), "w", "utf-8") as fl:
 			#print("......", str(type(row[PROC_SRC_BODY_FNAME])))
 			fl.write(gen_proc_hdr(p_schema, p_proc_row))
-			fl.write(p_proc_row[PROC_SRC_BODY_FNAME].decode('utf-8'))									
+			fl.write(procsrc)									
 			fl.write(gen_proc_ftr(p_schema, p_proc_row))						
 						
 

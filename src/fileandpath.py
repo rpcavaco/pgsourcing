@@ -60,7 +60,7 @@ def to_jsonfile(p_obj, p_output):
 
 def from_jsonfile(p_input, o_obj):
 	if not exists(p_input):
-		raise RuntimeError, "Ficheiro de entrada inexistente: '%s'" % p_input
+		raise RuntimeError("Ficheiro de entrada inexistente: '%s'" % p_input)
 	with open(p_input, "r") as fj:
 		o_obj.update(json.load(fj))
 				

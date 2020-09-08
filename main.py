@@ -18,7 +18,7 @@ import json
 import codecs
 import re
 import io
-import StringIO
+
 
 from src.common import LOG_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, \
 		OPS_OUTPUT, OPS_HELP, OPS_CHECK, SETUP_ZIP, BASE_CONNCFG, \
@@ -33,11 +33,15 @@ from src.fileandpath import get_conn_cfg_path, get_filters_cfg, \
 		save_warnings, clear_dir, get_srccodedir
 from src.write import updateref, updatedb, create_function_items
 
+try:
+	from StringIO import StringIO
+except ImportError:
+	from io import StringIO
 
 try:
-    file_types = (file, io.IOBase, StringIO.StringIO)
-except NameError:
     file_types = (io.IOBase,)
+except NameError:
+    file_types = (file, StringIO)
     
 class Singleton(object):
 	_instances = {}
@@ -174,7 +178,13 @@ def do_linesoutput(p_obj, output=None, interactive=False):
 		
 		finallines = []
 		for item in p_obj:
-			if isinstance(item, basestring):
+
+			try:
+				flagv = isinstance(item, basestring)
+			except NameError:
+				flagv = isinstance(item, str)
+
+			if flagv:
 				if len(item) > 0:
 					if item.strip().endswith('##'):
 						finallines.append(item + "\n")
@@ -192,7 +202,13 @@ def do_linesoutput(p_obj, output=None, interactive=False):
 				print(out_str) 
 		else:
 			dosave = False
-			if isinstance(output, basestring):
+
+			try:
+				flagv = isinstance(output, basestring)
+			except NameError:
+				flagv = isinstance(output, str)
+
+			if flagv:
 				
 				if exists(output) and interactive:
 					prompt = "Ficheiro de saida existe, sobreescrever ? (s/n)"
@@ -366,7 +382,13 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 	
 	upd_ids_list = []
 	if not updates_ids is None:
-		if isinstance(updates_ids, basestring):
+
+		try:
+			flagv = isinstance(updates_ids, basestring)
+		except NameError:
+			flagv = isinstance(updates_ids, str)
+
+		if flagv:
 			upd_ids_list = process_intervals_string(updates_ids)
 		elif isinstance(updates_ids, list):
 			upd_ids_list = updates_ids
@@ -571,7 +593,7 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 		delmode=None, canuse_stdout=False, simulupdcode=False):
 			
 	if simulupdcode and not canuse_stdout:
-		raise RuntimeError, "'simulupdcode' option requires access to shel interactivity (stdout)"
+		raise RuntimeError("'simulupdcode' option requires access to shell interactivity (stdout)")
 	
 	logger = logging.getLogger('pgsourcing')	
 		
@@ -587,7 +609,13 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 
 	upd_ids_list = []
 	if not updates_ids is None:
-		if isinstance(updates_ids, basestring):
+
+		try:
+			flagv = isinstance(updates_ids, basestring)
+		except NameError:
+			flagv = isinstance(updates_ids, str)
+
+		if flagv:
 			upd_ids_list = process_intervals_string(updates_ids)
 		elif isinstance(updates_ids, list):
 			upd_ids_list = updates_ids
@@ -743,7 +771,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		elif comparison_mode == "From REF":
 			
 			if not exists_currentref(p_proj):
-				raise RuntimeError, "Referencia do projeto '%s' em falta, necessario correr chksrc primeiro" % p_proj
+				raise RuntimeError("Referencia do projeto '%s' em falta, necessario correr chksrc primeiro" % p_proj)
 			else:
 				do_compare = True
 		
@@ -796,7 +824,12 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		diffdict = None
 		if p_oper in ("updcode", "updref", "upddest", "upddir"):
 
-			if isinstance(inputf, basestring):
+			try:
+				flagv = isinstance(inputf, basestring)
+			except NameError:
+				flagv = isinstance(inputf, str)
+
+			if flagv:
 				if exists(inputf):
 					with open(inputf, "r") as fj:
 						diffdict = json.load(fj)

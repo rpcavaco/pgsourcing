@@ -43,14 +43,14 @@ def changegrp(p_chg_group, p_currdiff_block, p_updates_ids_list, p_keys_byref, p
 	changed = False
 	
 	if len(p_keys_byref) > 15:
-		raise RuntimeError, "changegrp: excessiva recursao, seq de chaves: %s" % str(p_keys_byref)
+		raise RuntimeError("changegrp: excessiva recursao, seq de chaves: %s" % str(p_keys_byref))
 
 	if isinstance(p_currdiff_block, dict):
 		
 		for k in p_currdiff_block.keys():	
 			
 			if k == p_keys_byref[-1]:
-				raise RuntimeError, "changegrp: erro recursao, seq de chaves identicas: %s + %s" % (str(p_keys_byref), k)
+				raise RuntimeError("changegrp: erro recursao, seq de chaves identicas: %s + %s" % (str(p_keys_byref), k))
 			diff_item = p_currdiff_block[k]
 			if isinstance(diff_item, list):
 				assert isinstance(p_chg_group, list), "Incoerencia: list diff para alterar dicionario: '%s'" % str(diff_item)
@@ -964,7 +964,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 							
 						else:
 							
-							raise RuntimeError, "function %s.%s, wrong diffoper: %s" % (sch, procname, proc_blk["diffoper"])
+							raise RuntimeError("function %s.%s, wrong diffoper: %s" % (sch, procname, proc_blk["diffoper"]))
 					
 						
 	return out_sql_src
