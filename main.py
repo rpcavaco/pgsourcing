@@ -1,5 +1,51 @@
 # -*- coding: utf-8 -*-
 
+#=======================================================================
+# Licença MIT (MIT)
+#
+# Copyright © 2020 Rui Pedro Cavaco Barrosa
+#
+# Por este meio, é dada permissão, livre de encargos, a qualquer pessoa
+# de obter uma cópia deste software e da documentação associada
+# (o "Software"), de negociar o Software sem restrições, incluindo os
+# di#reitos de usar, copiar, modificar, fundir, publicar, distribuir,
+# sublicenciar e/ou vender cópias do Software, sem restrições, e de per-
+# mitir a quem o Software seja fornecido que o faça também, sob a se-
+# guinte condição: a notificação de copyright e a notificação de permis-
+# sões concedidas, dadas acima, deverão ser incluídas em todas as có-
+# pias ou partes substanciais do Software.
+#
+# O SOFTWARE É FORNECIDO "AS IS", TAL COMO SE ENCONTRA, SEM GARANTIAS DE
+# QUALQUER TIPO, SEJAM EXPLÍCITAS OU IMPLÍCITAS, INCLUINDO, MAS NÃO SE
+# LIMITANDO A, GARANTIAS DE COMERCIALIZAÇÃO, DE ADEQUAÇÃO PARA UM
+# PROPÓSITO ESPECÍFICO E DE NÃO TRANSGRESSÃO DA LEI. EM CASO ALGUM SERÃO
+# ADMISSÍVEIS REIVINDICAÇÕES POR PERDAS E DANOS IMPUTÁVEIS AOS AUTORES
+# OU DETENTORES DO COPYRIGHT, DECORRENTES DA UTILIZAÇÃO, LEGAL OU ILÍCI-
+# TA, DO SOFTWARE OU DE QUALQUER FORMA LIGADOS AO SOFTWARE OU A DERIVA-
+# ÇÕES DO MESMO.
+#=======================================================================
+
+# -------------------------------------------------- #
+# pgsourcing/main.py - Versão 1.0 - Python 2 e 3     #
+# -------------------------------------------------- #
+# Rui Pedro Cavaco Barrosa, Porto, Setembro de 2020  #
+# -------------------------------------------------- #
+
+# ----------------------------------------------------------------------
+# ==== pgsourcing: 'migrations tool' para PostgreSQL ====
+# ----------------------------------------------------------------------
+#
+# Objectivo geral: gerir versões de estrutura de base de dados e 
+#	código fonte de procedimentos.
+#
+# Objectivo deste módulo: cálculo de extents e coordenadas de tiles
+#
+# Ficheiros desta solução:
+#	- main.py
+#	- src/*.py (varios)
+#
+# ----------------------------------------------------------------------
+
 from __future__ import print_function
 from os import listdir, mkdir, makedirs, walk, remove as removefile
 from os.path import abspath, dirname, exists, splitext, join as path_join
