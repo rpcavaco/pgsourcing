@@ -78,6 +78,7 @@ def parse_args():
 	parser.add_argument("-m", "--delmode", help="Modo apagamento: NODEL (default), DEL, CASCADE", action="store")
 	parser.add_argument("-a", "--addnweproc", help="Gerar novo ficheiro de procedure", action="store_true")
 	parser.add_argument("-t", "--addnewtrig", help="Gerar novo ficheiro de trigger", action="store_true")
+	parser.add_argument("-u", "--simulupdcode", help="Simular atualizacao codigo", action="store_true")
 	
 	args = parser.parse_args()
 	
@@ -509,36 +510,50 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 
 				break
 				
-			# reverse
-			# TODO: a aguardar a altercao para delete em updcode_handler
-			
-			# for r, d, fs in walk(p_outprocsdir):
-				# for fl in fs:
+			# reverse			
+			for r, d, fs in walk(p_outprocsdir):
+				for fl in fs:
 					
-					# fll = fl.lower()
-					# if not fll.endswith(".sql"):
-						# continue
+					fll = fl.lower()
+					if not fll.endswith(".sql"):
+						continue
 
-					# frompath = path_join(r, fl)
-					# topath = path_join(srccodedir, fll)
+					frompath = path_join(r, fl)
+					topath = path_join(srccodedir, fll)
 
-					# fname, ext = splitext(fll)
-					# revdict = {}
-					# reverse_proc_fname(fname, revdict)
+					fname, ext = splitext(fll)
+					revdict = {}
+					reverse_proc_fname(fname, revdict)
 
-					# assert "procschema" in revdict.keys()
-					# assert "procname" in revdict.keys()
+					assert "procschema" in revdict.keys()
+					assert "procname" in revdict.keys()
+					
+					if revdict["procschema"] == "":
+						sch = "public"
+					else:
+						sch = revdict["procschema"]
 
-					# if not exists(topath):
+					if not exists(topath):
+						
+						with codecs.open(frompath, "r", "utf-8") as open_fl:
+							src = open_fl.read()
+							m = re.match("[\s]?(CREATE|CREATE[\s]+OR[\s]+REPLACE)[\s]+FUNCTION[\s]+[^\(]+\s?\(\)", src, re.MULTILINE)
+							args = ""
+							if m is None:
+								m2 = re.search("[\s]?(CREATE|CREATE[\s]+OR[\s]+REPLACE)[\s]+FUNCTION[\s]+[^\(]+\s?\(([^\)]+)\)", src, re.MULTILINE)
+								if not m2 is None:
+									args = m2.group(2).strip()									
 
-						# if not revdict["procschema"] in check_dict["content"].keys():
-							# check_dict["content"][revdict["procschema"]] = {}
-						# if not revdict["procname"] in check_dict["content"][revdict["procschema"]].keys():
-							# di = check_dict["content"][revdict["procschema"]][revdict["procname"]] = {
-								# "diffoper": "delete",
-								# "fname": fll
-							# }
-							# p_opordmgr.setord(di)
+						if not sch in check_dict["content"].keys():
+							check_dict["content"][sch] = {}
+						if not revdict["procname"] in check_dict["content"][sch].keys():
+							di = check_dict["content"][sch][revdict["procname"]] = {
+								"diffoper": "delete",
+								"filename": fll,
+								"procname": ".".join((sch, revdict["procname"])),
+								"args": args
+							}
+							p_opordmgr.setord(di)
 			
 			if check_dict["content"]:
 
@@ -552,7 +567,11 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 			logger.exception("Source code dir test")
 
 
-def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None, delmode=None):
+def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None, 
+		delmode=None, canuse_stdout=False, simulupdcode=False):
+			
+	if simulupdcode and not canuse_stdout:
+		raise RuntimeError, "'simulupdcode' option requires access to shel interactivity (stdout)"
 	
 	logger = logging.getLogger('pgsourcing')	
 		
@@ -607,23 +626,29 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None, delmod
 								assert exists(full_path)
 								with codecs.open(full_path, "r", "utf-8") as fl:
 									src = fl.read()
-									with cn.cursor() as cr:
-										cr.execute(src)
-										changed = True
+									if simulupdcode and canuse_stdout:
+										print("insert or update src of ", src[:60])
+									else:
+										with cn.cursor() as cr:
+											cr.execute(src)
+											changed = True
 										logger.info("inserting script for proj. %s, %s.%s" % (p_proj,sch,pname))	
-							# elif diff_item["diffoper"] == "delete":
-								# TODO: necessario encontrar argumentos dentro da source da funcao
-								# if delmode == "DEL":
-									# sqlstr = "DROP FUNCTION %s.%s" % (sch, pname)
-								# elif delmode == "CASCADE":
-									# sqlstr = "DROP FUNCTION %s.%s CASCADE" % (sch, pname)
-								# else:
-									# sqlstr = None
-								# if not sqlstr is None:
-									# with cn.cursor() as cr:
-										# cr.execute(sqlstr)
-										# changed = True
-									# logger.info("deleting script for proj. %s, %s" % (p_proj,sch,pname))	
+							elif diff_item["diffoper"] == "delete":
+								if delmode == "DEL":
+									fmt = "DROP FUNCTION %s"
+								elif delmode == "CASCADE":
+									fmt = "DROP FUNCTION %s CASCADE"
+								else:
+									fmt = None
+								if not fmt is None:
+									sqlstr = fmt % ("%s(%s)" % (diff_item["procname"], diff_item["args"]))
+									if simulupdcode and canuse_stdout:
+										print("delete sqlstr", sqlstr)
+									else:
+										with cn.cursor() as cr:
+											cr.execute(sqlstr)
+											changed = True
+										logger.info("deleting script for proj. %s, %s" % (p_proj,sch,pname))	
 										
 				if changed:
 					logger.info("commiting changes to scripts")
@@ -647,7 +672,7 @@ class OpOrderMgr(Singleton):
 	
 def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=None, 
 		canuse_stdout=False, include_public=False, include_colorder=False, 
-		updates_ids=None, limkeys=None, delmode=None):
+		updates_ids=None, limkeys=None, delmode=None, simulupdcode=False):
 	
 	opordmgr = OpOrderMgr()
 	
@@ -796,7 +821,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			
 				updcode_handler(p_proj, diffdict, 
 					updates_ids=updates_ids, p_connkey=p_connkey, 
-					delmode=dlmd)
+					delmode=dlmd, canuse_stdout=canuse_stdout, simulupdcode=simulupdcode)
 			
 		else:
 
@@ -978,7 +1003,8 @@ def cli_main():
 						include_colorder = not args.removecolorder,
 						updates_ids = args.opsorder,
 						limkeys = args.limkeys,
-						delmode = args.delmode)
+						delmode = args.delmode,
+						simulupdcode = args.simulupdcode)
 					
 	except:
 		logger.exception("")

@@ -301,6 +301,10 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 				diff_item = get_diff_item('b1', diff_dict, klist)
 				p_opordmgr.setord(diff_item)
 				diff_item["diffoper"] = "delete"
+				
+				# if grpkeys[0] == "procedures":
+					# diff_item["procedure_name"] = tmp_r[k]["procedure_name"]
+					# diff_item["args"] = tmp_r[k]["args"]
 			
 			else:
 				
@@ -359,7 +363,6 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 							do_transformschema(p_transformschema, tmp_l, k)	
 						leftval = tmp_l[k]	
 						
-											
 						if leftval != rightval:
 
 							pass_diff_construction = False
