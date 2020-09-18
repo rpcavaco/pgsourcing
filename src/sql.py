@@ -2,6 +2,12 @@
 from src.common import PROC_SRC_BODY_FNAME
 
 SQL = {
+	"GENERIC_CHECK": """select relkind
+		from pg_class t1
+		JOIN pg_namespace n1
+		ON t1.relnamespace = n1.oid
+		where nspname = %s
+		and t1.relname = %s""",
 	"SCHEMAS": """select schema_name, schema_owner
 		from information_schema.schemata""", 
 	"PROCOWNERS": """select distinct proowner::regrole as ownr

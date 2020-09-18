@@ -64,6 +64,7 @@ import json
 import codecs
 import re
 import io
+import pprint
 
 
 from src.common import LOG_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, \
@@ -78,6 +79,7 @@ from src.fileandpath import get_conn_cfg_path, get_filters_cfg, \
 		exists_currentref, to_jsonfile, save_ref, get_refcodedir, \
 		save_warnings, clear_dir, get_srccodedir, get_reftablesdir
 from src.write import updateref, updatedb, create_function_items
+from src.sql import SQL
 
 try:
 	from StringIO import StringIO
@@ -743,6 +745,81 @@ class OpOrderMgr(Singleton):
 		p_dict["operorder"] = self.ord + 1
 		self.ord = self.ord + 1
 
+def check_objtype(p_relkind, p_typestr):
+	ret = False
+	if p_relkind.lower() == 's' and p_typestr.lower() == 'sequences':
+		ret = True
+		
+	return ret
+		
+	
+def erase_diff_item(p_diff_dict, p_grpkeys):
+	
+	diff_dict = p_diff_dict
+	#pre_last_key = p_grpkeys[-2]
+	last_key = p_grpkeys[-1]
+	prekey = None
+	predict = None
+	for k in p_grpkeys:
+		if k != last_key:
+			predict = diff_dict
+			diff_dict = diff_dict[k]
+			prekey = k
+		else:
+			del diff_dict[k]
+
+	count = 0
+	while count < 10:
+		count += 1
+		for k in p_grpkeys:
+				
+		
+def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
+	
+	def should_remove(p_isinsert, p_cr, p_op, p_pdiff_dict):
+		
+		grpkeys = p_op[1]
+		sch, name = grpkeys[1:3]
+		obj_exists = False
+		ret = False
+		
+		if grpkeys[0] == "procedures":
+			
+			assert len(p_op) == 3
+			print("sch: %s, name:%s num.args:%d", (sch, name, len(p_op[2])))
+			
+		else:
+			
+			p_cr.execute(SQL["GENERIC_CHECK"], (sch, name))
+			row = p_cr.fetchone()
+			if not row is None:
+				obj_exists = check_objtype(row[0], grpkeys[0])
+				
+		if p_isinsert and obj_exists or \
+			not p_isinsert and not obj_exists:
+				ret = True
+				
+		if ret:
+			erase_diff_item(p_pdiff_dict, grpkeys)
+				
+
+	cfgpath = get_conn_cfg_path(p_proj)
+	conns = Connections(cfgpath, subkey="conn")
+	
+	cnobj = conns.getConn(p_connkey)	
+	cn = cnobj.getConn()
+	with cn.cursor() as cr:
+
+		ops = p_cd_ops["insert"]
+		for op in ops:
+			should_remove(True, cr, op, p_diff_dict)
+
+		ops = p_cd_ops["delete"]
+		for op in ops:
+			should_remove(False, cr, op, p_diff_dict)
+					
+		
+	
 	
 def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=None, 
 		canuse_stdout=False, include_public=False, include_colorder=False, 
@@ -751,6 +828,8 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	opordmgr = OpOrderMgr()
 	
 	logger = logging.getLogger('pgsourcing')	
+	
+	pp = pprint.PrettyPrinter()
 	
 	refcodedir = get_refcodedir(p_proj)
 	reftablesdir = get_reftablesdir(p_proj)
@@ -824,11 +903,17 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			else:
 				do_compare = True
 		
+		cd_ops = { "insert": [], "delete": [] }
 		if do_compare:
 
 			comparing(p_proj, check_dict["content"], 
-				comparison_mode, replaces, opordmgr, root_diff_dict["content"])
-						
+				comparison_mode, replaces, opordmgr, 
+				root_diff_dict["content"], cd_ops)
+				
+			#pp.pprint(cd_ops)
+			checkCDOps(p_proj, cd_ops, connkey, root_diff_dict["content"])
+			
+		#print("910", root_diff_dict["content"].keys())			
 		## TODO - deve haver uma verificacao final de coerencia
 		## Sequencias - tipo da seq. == tipo do campo serial em que e usada
 		

@@ -247,7 +247,7 @@ def gen_update(p_transformschema, p_opordmgr, p_upperlevel_ops, p_keychain, p_di
 				
 		
 																			
-def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_diff_dict, level=0): 
+def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops, level=0): 
 
 	logger = logging.getLogger('pgsourcing')
 
@@ -296,12 +296,22 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						newvalue = deepcopy(tmp_l[lzero_key][lk])
 						traverse_replaceval(p_transformschema, newvalue, "insert A0")
 						diff_item[lzero_key][lk]["newvalue"] = newvalue
+						new_grpkeys = grpkeys + [lzero_key] + [lk]
+						o_cd_ops["insert"].append(('a', new_grpkeys))
 			else:
 				p_opordmgr.setord(diff_item)
 				diff_item["diffoper"] = "insert"   
 				newvalue = deepcopy(tmp_l)
 				traverse_replaceval(p_transformschema, newvalue, "insert A1")
 				diff_item["newvalue"] = newvalue
+				
+				if grpkeys[0] == "procedures" and "procedure_name" in newvalue.keys():
+					new_grpkeys = grpkeys[:-1] + [newvalue["procedure_name"]]
+					args = grpkeys[:-1] + [newvalue["args"]]
+					o_cd_ops["insert"].append(('b', new_grpkeys, newvalue["args"]))
+				else:
+					new_grpkeys = grpkeys
+					o_cd_ops["insert"].append(('c', new_grpkeys))
 			
 		except:
 			logger.exception("comparegrp insert A, group: '%s', level %d" % (grpkey, level))
@@ -358,7 +368,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 					for newkey in tmp_l[k].keys():
 					
 						newklist  = klist+[newkey]		
-						upperlevel_ops = comparegrp(tmp_l[k], tmp_r, newklist, p_transformschema, p_opordmgr, diff_dict, level=level+1)
+						upperlevel_ops = comparegrp(tmp_l[k], tmp_r, newklist, p_transformschema, p_opordmgr, diff_dict, o_cd_ops, level=level+1)
 						if upperlevel_ops:
 							#print("... 241", upperlevel_ops)
 							dictupdate(ret_upperlevel_ops, upperlevel_ops)
@@ -374,6 +384,9 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						diff_item["diffoper"] = "insert"				
 						traverse_replaceval(p_transformschema, newvalue, "insert B")
 						diff_item["newvalue"] = newvalue
+
+						new_grpkeys = grpkeys + [k]
+						o_cd_ops["insert"].append(('c', new_grpkeys))
 										
 			elif k in rkeys and not k in tmp_l.keys():
 
@@ -395,14 +408,14 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 					print("both left and right:", grpkey, k, level)
 				
 				if isinstance(tmp_l[k], dict) and isinstance(tmp_r[k], dict):
-					upperlevel_ops = comparegrp(tmp_l, tmp_r, klist, p_transformschema, p_opordmgr, diff_dict, level=level+1)
+					upperlevel_ops = comparegrp(tmp_l, tmp_r, klist, p_transformschema, p_opordmgr, diff_dict, o_cd_ops, level=level+1)
 					if upperlevel_ops:
 						# if "tables" in upperlevel_ops.keys():
 							# print(".. 292 ..", upperlevel_ops)
 						dictupdate(ret_upperlevel_ops, upperlevel_ops)
 
 				elif isinstance(tmp_l[k], list) and isinstance(tmp_r[k], list):
-					upperlevel_ops = comparegrp_list(tmp_l, tmp_r, klist, p_opordmgr, diff_dict)
+					upperlevel_ops = comparegrp_list(tmp_l, tmp_r, klist, p_opordmgr, diff_dict, o_cd_ops, level=level+1)
 					if upperlevel_ops:
 						# print(".. 298 ..", upperlevel_ops)
 						dictupdate(ret_upperlevel_ops, upperlevel_ops)
@@ -580,7 +593,7 @@ def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict):
 	return ret_upperlevel_ops
 										
 
-def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opordmgr, o_diff_dict):
+def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops):
 	
 	raw_ref_json = load_currentref(p_proj)
 	
@@ -630,7 +643,7 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 		if grp in CFG_LISTGROUPS:
 			ret = comparegrp_list(l_dict, r_dict, [grp], p_opordmgr, o_diff_dict)
 		else:	
-			ret = comparegrp(l_dict, r_dict, [grp], p_transformschema, p_opordmgr, o_diff_dict)
+			ret = comparegrp(l_dict, r_dict, [grp], p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops)
 		
 		if ret:
 			dictupdate(upperlevel_ops, ret)
