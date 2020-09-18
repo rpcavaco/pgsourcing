@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 
 #=======================================================================
 # Licença MIT (MIT)
@@ -64,6 +65,12 @@ def get_refwarnings(p_proj):
 
 def get_refcodedir(p_proj):
 	pth = path_join(_get_refdir(p_proj), "code")
+	if not exists(pth):
+		makedirs(pth)
+	return pth
+	
+def get_reftablesdir(p_proj):
+	pth = path_join(_get_refdir(p_proj), "tables")
 	if not exists(pth):
 		makedirs(pth)
 	return pth

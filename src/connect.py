@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 
 #=======================================================================
 # Licença MIT (MIT)
@@ -32,9 +33,6 @@ from os.path import exists
 class ConnectionError(Exception):
     """Exception raised for bad database connections"""
 
-# postgresql: Dict with 
-	# dbname="test", user="postgres", password="secret"
-	# dbname="test", user="postgres", password="secret", port="5431"
 
 class Conn(object):
 
@@ -79,7 +77,7 @@ class Conn(object):
 						
 	def getDb(self):
 		if self.db is None:
-			raise ConnectionError("Conn: getDb is NULL")
+			raise ConnectionError("Conn: self.db in getDb is NULL")
 		return self.db
 						
 	def _test(self):
@@ -150,11 +148,15 @@ class Connections(object):
 			else:
 				root = cfgdict[rootjsonkey]
 			for k in root.keys():
-				if subkey is None:
-					self.conns[k] = Conn(root[k])
-				else:
-					self.conns[k] = Conn(root[k][subkey])
-				
+				try:
+					if subkey is None:
+						self.conns[k] = Conn(root[k])
+					else:
+						self.conns[k] = Conn(root[k][subkey])
+				except Exception as e:
+					continue
+
+
 	def __del__(self):
 		for k in self.conns.keys():
 			self.conns[k].terminate()
@@ -183,13 +185,13 @@ def testConn():
 				raise
 
 		try:
-			con = Conn({"host": "aa", "dbname": "aa", "usr": "xxx", "password": "eXk=" })
+			con = Conn({"host": "aa", "database": "aa", "usr": "xxx", "password": "eXk=" })
 		except Exception as e:
 			if not str(e).startswith("invalid dsn: invalid connection option \"usr\""):
 				raise
 
 		# try:
-			# con = Conn("POSTGRESQL", {"host": "aa", "dbname": "aa", "user": "xxx", "password": "yy" })
+			# con = Conn("POSTGRESQL", {"host": "aa", "database": "aa", "user": "xxx", "password": "yy" })
 		# except Exception as e:
 			# if not str(e).startswith("invalid dsn: invalid connection option \"pwd\""):
 				# raise

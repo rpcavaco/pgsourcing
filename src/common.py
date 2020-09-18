@@ -44,17 +44,19 @@ SETUP_ZIP = "pgsourcing_setup.zip"
 
 BASE_FILTERS_RE = {
 	"schema": [],
-	"tables": [],
-	"views": [],
-	"matviews": [],
-	"procedures": []
+	"transformschema": {},
+	"tables": {},
+	"views": {},
+	"matviews": {},
+	"procedures": {},
+	"parameterstables": {}	
 }
 
 BASE_CONNCFG = {
 	"src": {
 		"conn": {
 		"host": "XX.XX.XX.XX", 
-		"dbname": "the_dbname", 
+		"database": "the_dbname", 
 		"user": "the_user", 
 		"password": "base64_converted_passwd" 
 		  },
@@ -64,7 +66,7 @@ BASE_CONNCFG = {
 	"dest": {
 		"conn": {
 		"host": "XX.XX.XX.XX", 
-		"dbname": "the_dbname", 
+		"database": "the_dbname", 
 		"user": "the_user", 
 		"password": "base64_converted_passwd" 
 		  },

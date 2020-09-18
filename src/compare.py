@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 
 #=======================================================================
 # Licença MIT (MIT)
@@ -252,37 +253,64 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 
 	grpkey = grpkeys[-1]
 	
+	ret_upperlevel_ops = {}
+	
 	try:
 		tmp_l = p_leftdic[grpkey]
 	except:
-		logger.exception("comparegrp, error retrieving key from leftdict: '%s', level %d" % (grpkey, level))
-		raise
+		if level > 0:
+			logger.exception("comparegrp, error retrieving key from leftdict: '%s', level %d" % (grpkey, level))
+			raise
+		else:
+			logger.info("comparegrp, no key on leftdict: '%s'" % (grpkey,))
+			return ret_upperlevel_ops
 		
 	diff_dict = o_diff_dict	
-	ret_upperlevel_ops = {}
 		
 	if "error" in tmp_l.keys():
 		return ret_upperlevel_ops
 		
-	# print("comparegrp", grpkeys) #, diff_dict)
+	# print("comparegrp:", grpkeys, p_rightdic.keys(), level) #, diff_dict)
+	# print("    p_rightdict:", p_rightdic.keys()) #, diff_dict)
+	
+	printdbg = False
+	if grpkey in []: # ("sequences",):
+		printdbg = True
 	
 	if not grpkey in p_rightdic.keys():
-
+		
+		if printdbg:
+			print("not in right keys:", grpkey)
+		
 		try:
-			
 			diff_item = get_diff_item('a', diff_dict, grpkeys)
-
-			p_opordmgr.setord(diff_item)
-			diff_item["diffoper"] = "insert"   
-			newvalue = deepcopy(tmp_l)
-			traverse_replaceval(p_transformschema, newvalue, "insert A")
-			diff_item["newvalue"] = newvalue
+			
+			if level == 0:
+				# lzero_key is a schema, if not exists is created elsewhere
+				for lzero_key in tmp_l.keys(): 
+					diff_item[lzero_key] = {}
+					for lk in tmp_l[lzero_key].keys():
+						diff_item[lzero_key][lk] = {}
+						p_opordmgr.setord(diff_item[lzero_key][lk])
+						diff_item[lzero_key][lk]["diffoper"] = "insert"   
+						newvalue = deepcopy(tmp_l[lzero_key][lk])
+						traverse_replaceval(p_transformschema, newvalue, "insert A0")
+						diff_item[lzero_key][lk]["newvalue"] = newvalue
+			else:
+				p_opordmgr.setord(diff_item)
+				diff_item["diffoper"] = "insert"   
+				newvalue = deepcopy(tmp_l)
+				traverse_replaceval(p_transformschema, newvalue, "insert A1")
+				diff_item["newvalue"] = newvalue
 			
 		except:
 			logger.exception("comparegrp insert A, group: '%s', level %d" % (grpkey, level))
 			raise
 		
 	else:
+
+		if printdbg:
+			print("IN right keys:", grpkey)
 	
 		tmp_r = p_rightdic[grpkey]
 		keyset = set(tmp_l.keys())	
@@ -293,9 +321,32 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 		for k in skeys:
 			
 			klist  = grpkeys+[k]
+			rkeys = tmp_r.keys()
+			# reprkey = {}
 
-			if k in tmp_l.keys() and not k in tmp_r.keys():
+			# if k in tmp_l.keys() and not k in tmp_r.keys():
+
+				# if level == 0:
+					# if grpkey in p_transformschema["types"]:
+						# for trans in p_transformschema["trans"]:
+							# for tk in tmp_r.keys():
+								# if tk == trans["src"]:
+									# reprkey[tk] = trans["dest"]
+									# rkeys.append(trans["dest"])
+								# else:
+									# reprkey[tk] = tk
+									# rkeys.append(tk)
+									
+			# if len(rkeys) < 1:
+				# rkeys = tmp_r.keys()
+				# for rk in rkeys:
+					# reprkey[rk] = rk
 				
+
+			if k in tmp_l.keys() and not k in rkeys:
+				
+				if printdbg:
+					print("left only:", grpkey, k, level, tmp_l.keys(), rkeys)
 				# left only
 				
 				# If starting a new group from scratch
@@ -324,7 +375,11 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						traverse_replaceval(p_transformschema, newvalue, "insert B")
 						diff_item["newvalue"] = newvalue
 										
-			elif k in tmp_r.keys() and not k in tmp_l.keys():
+			elif k in rkeys and not k in tmp_l.keys():
+
+				if printdbg:
+					print("right only:", grpkey, k, level)
+
 				# right only
 				diff_item = get_diff_item('b1', diff_dict, klist)
 				p_opordmgr.setord(diff_item)
@@ -335,6 +390,9 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 					# diff_item["args"] = tmp_r[k]["args"]
 			
 			else:
+
+				if printdbg:
+					print("both left and right:", grpkey, k, level)
 				
 				if isinstance(tmp_l[k], dict) and isinstance(tmp_r[k], dict):
 					upperlevel_ops = comparegrp(tmp_l, tmp_r, klist, p_transformschema, p_opordmgr, diff_dict, level=level+1)
@@ -525,7 +583,7 @@ def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict):
 def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opordmgr, o_diff_dict):
 	
 	raw_ref_json = load_currentref(p_proj)
-		
+	
 	assert not raw_ref_json is None
 	assert raw_ref_json["pgsourcing_storage_ver"] <= STORAGE_VERSION, "Incompatible storager ver %s > %s" % (raw_ref_json["pgsourcing_storage_ver"], STORAGE_VERSION)
 	
@@ -544,13 +602,11 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 		
 	else:	
 			
-		r_dict = p_check_dict
-		
+		r_dict = p_check_dict		
 		l_dict = ref_json
 		
 		if p_transformschema:
-			
-			
+						
 			for sch in l_dict["schemas"].keys():
 				for trans in p_transformschema["trans"]:
 					if sch == trans["src"]:

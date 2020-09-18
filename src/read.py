@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 
 #=======================================================================
 # Licença MIT (MIT)
@@ -127,7 +128,7 @@ def gen_procs_where_from_re_list(p_schemafilter_fieldname, p_procfilter_fieldnam
 			
 	return wherecl
 
-def schema_dependency(p_found_schema, p_schema_name, p_typekey):
+def schema_dependency(out_dict, p_found_schema, p_schema_name, p_typekey):
 	
 	if p_found_schema != p_schema_name:
 
@@ -146,7 +147,7 @@ def schema_dependency(p_found_schema, p_schema_name, p_typekey):
 		if not p_found_schema in schdepobj.keys():
 			schdepobj[p_found_schema] = { p_typekey: [p_schema_name] }
 		else:
-			if not seqname in schdepobj[p_found_schema][p_typekey]:
+			if not p_schema_name in schdepobj[p_found_schema][p_typekey]:
 				schdepobj[p_found_schema][p_typekey].append(p_schema_name)
 
 def srvanddb_metadata(p_conn, out_dict):
@@ -265,14 +266,19 @@ def schemas(p_cursor, p_filters_cfg, p_include_public, out_dict):
 		sql = "%s %s" % (SQL["SCHEMAS"], gen_where_from_list("schema_name", p_filters_cfg["schema"]))
 	else:
 		sql = SQL["SCHEMAS"]
+		
 	p_cursor.execute(sql)
 	
 	if not "content" in out_dict.keys():
 		out_dict["content"] = {}	
 
-	the_dict = out_dict["content"]["schemas"] = {}
 	owners = set()
 	for row in p_cursor:
+		
+		if not "schemas" in out_dict["content"].keys():
+			out_dict["content"]["schemas"] = {}
+		the_dict = out_dict["content"]["schemas"]
+			
 		schema_name = row["schema_name"]
 		schema_owner = row["schema_owner"]
 		if schema_name.startswith("pg_") or schema_name == "information_schema":
@@ -287,7 +293,7 @@ def schemas(p_cursor, p_filters_cfg, p_include_public, out_dict):
 	get_grants(the_dict, p_cursor, forschemas=True)
 		
 	out_dict["content"]["owners"] = list(owners)
-	
+
 def ownership(p_cursor, p_filters_cfg, out_dict):
 
 	if not "content" in out_dict.keys():
@@ -348,24 +354,34 @@ def ownership(p_cursor, p_filters_cfg, out_dict):
 			
 	out_dict["content"]["owners"] = list(owners)
 			
-def roles(p_cursor, out_dict):
+def roles(p_cursor, p_filters_cfg, out_dict):
 
 	if not "content" in out_dict.keys():
 		out_dict["content"] = {}	
 			
 	p_cursor.execute(SQL["ROLES"])
 	
-	rl_dict = out_dict["content"]["roles"] = {}
-	#print(p_cursor.description)
+	ownerfilter = set()
+	if "owners" in out_dict["content"].keys() and len(out_dict["content"]["owners"]) > 0:
+		ownerfilter.update(out_dict["content"]["owners"])
+
+	if "roles" in p_filters_cfg.keys() and len(p_filters_cfg["roles"]) > 0:
+		ownerfilter.update(p_filters_cfg["roles"])
+	
 	for row in p_cursor:
+
+		if not "roles" in out_dict["content"].keys():
+			out_dict["content"]["roles"] = {}
+		
+		rl_dict = out_dict["content"]["roles"]
 		
 		rolename = row["rolname"]
 		if rolename.startswith("pg_") or \
 			rolename == "postgres":
 				continue
 				
-		if "owners" in out_dict["content"].keys() and not rolename in out_dict["content"]["owners"]:
-			continue
+		if rolename not in ownerfilter:
+				continue 
 				
 		if row["rolvaliduntil"] is None:
 			validuntil = "None"
@@ -386,7 +402,7 @@ def tables(p_cursor, p_filters_cfg, out_dict):
 	for sch in out_dict["content"]["schemas"]:
 
 		if "tables" in p_filters_cfg.keys():
-			if sch not in p_filters_cfg["tables"].keys():
+			if len(p_filters_cfg["tables"].keys()) > 0  and sch not in p_filters_cfg["tables"].keys():
 				continue 
 			
 		wherecl = gen_tables_where_from_re_list("schemaname", "tablename", sch, p_filters_cfg, dojoin=True, intersect=True)
@@ -396,17 +412,18 @@ def tables(p_cursor, p_filters_cfg, out_dict):
 			wherecl = "and schemaname = '%s' %s" % (sch, wherecl)
 
 		sql = "%s %s" % (SQL["TABLES"], wherecl)
-
-		if not "tables" in out_dict["content"].keys():
-			out_dict["content"]["tables"] = {}
-		
-		the_dict = out_dict["content"]["tables"]
 		#print(p_cursor.description)
 		
 		p_cursor.execute(sql)
 		#print(p_cursor.mogrify(sql))
+		the_dict = None
 
 		for row in p_cursor:
+
+			if not "tables" in out_dict["content"].keys():
+				out_dict["content"]["tables"] = {}
+			
+			the_dict = out_dict["content"]["tables"]
 
 			# if row["schemaname"] == "information_schema":
 				# continue
@@ -431,8 +448,8 @@ def tables(p_cursor, p_filters_cfg, out_dict):
 			if not row["tablespace"] is None:
 				sch_dict[row["tablename"]]["tablespace"] = row["tablespace"]
 				
-
-		get_grants(the_dict, p_cursor)
+		if not the_dict is None:
+			get_grants(the_dict, p_cursor)
 			
 	## TODO - contar registos, ler dados das parameterstables
 
@@ -445,7 +462,7 @@ def views(p_cursor, p_filters_cfg, out_dict):
 	for sch in out_dict["content"]["schemas"]:
 
 		if "views" in p_filters_cfg.keys():
-			if sch not in p_filters_cfg["views"].keys():
+			if len(p_filters_cfg["views"].keys()) > 0 and sch not in p_filters_cfg["views"].keys():
 				continue 
 			
 		wherecl = gen_views_where_from_re_list("schemaname", "viewname", sch, p_filters_cfg)
@@ -456,16 +473,16 @@ def views(p_cursor, p_filters_cfg, out_dict):
 			
 		sql = "%s %s" % (SQL["VIEWS"], wherecl)
 
-		if not "views" in out_dict["content"].keys():
-			out_dict["content"]["views"] = {}
-		
-		the_dict = out_dict["content"]["views"]
-		#print(p_cursor.description)
-		
 		p_cursor.execute(sql)
 		#print(p_cursor.mogrify(sql))
+		the_dict =  None
 
 		for row in p_cursor:
+
+			if not "views" in out_dict["content"].keys():
+				out_dict["content"]["views"] = {}
+			
+			the_dict = out_dict["content"]["views"]
 
 			# if row["schemaname"] == "information_schema":
 				# continue
@@ -490,7 +507,8 @@ def views(p_cursor, p_filters_cfg, out_dict):
 				}
 			}
 			
-		get_grants(the_dict, p_cursor)
+		if not the_dict is None:
+			get_grants(the_dict, p_cursor)
 
 def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict):
 
@@ -501,7 +519,7 @@ def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict):
 	for sch in out_dict["content"]["schemas"]:
 
 		if "matviews" in p_filters_cfg.keys():
-			if sch not in p_filters_cfg["matviews"].keys():
+			if len(p_filters_cfg["matviews"].keys()) > 0 and sch not in p_filters_cfg["matviews"].keys():
 				continue 
 			
 		wherecl = gen_matviews_where_from_re_list("schemaname", "matviewname", sch, p_filters_cfg)
@@ -510,18 +528,17 @@ def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict):
 		else:
 			wherecl = "%s and schemaname = '%s'" % (wherecl, sch)
 
-		sql = "%s %s" % (SQL["MATVIEWS"], wherecl)
-		
-		if not "matviews" in out_dict["content"].keys():
-			out_dict["content"]["matviews"] = {}
-		
-		the_dict = out_dict["content"]["matviews"]
-		#print(p_cursor.description)
-		
+		sql = "%s %s" % (SQL["MATVIEWS"], wherecl)		
 		p_cursor.execute(sql)
 		#print(p_cursor.mogrify(sql))
+		the_dict = None
 
 		for row in p_cursor:
+	
+			if not "matviews" in out_dict["content"].keys():
+				out_dict["content"]["matviews"] = {}
+			
+			the_dict = out_dict["content"]["matviews"]
 			
 			# if row["schemaname"] == "information_schema":
 				# continue
@@ -556,14 +573,19 @@ def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict):
 					"vtablespace": tblspc
 				}
 			}
-			
-		get_grants(the_dict, p_cursor)
+		
+		if not the_dict is None:	
+			get_grants(the_dict, p_cursor)
 
 			
 def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 	
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
-	assert "tables" in out_dict["content"].keys(), "'content.tables' em falta no dic. de saida"
+	
+	if not "tables" in out_dict["content"].keys():
+		return
+		
+	# assert "tables" in out_dict["content"].keys(), "'content.tables' em falta no dic. de saida"
 
 	pattern = re.compile(r"nextval\('  (?P<schema>[^\.]+) \. (?P<seqname>[0-9A-Za-z_]+)  ", re.VERBOSE)			
 	pattern2 = re.compile(r"nextval\('  (?P<seqname>[0-9A-Za-z_]+)  ", re.VERBOSE)			
@@ -648,15 +670,15 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 									
 									found_schema = match.group("schema")
 									seqname = match.group("seqname")
+									
 									# coletar nomes de sequencia em uso									
 									if not found_schema in out_dict["content"]["sequences"].keys():
-										seqs = out_dict["content"]["sequences"][found_schema] = {}
-									else:
-										seqs = out_dict["content"]["sequences"][found_schema]										
+										out_dict["content"]["sequences"][found_schema] = {}
+									seqs = out_dict["content"]["sequences"][found_schema]										
 									if not seqname in seqs.keys():
 										seqs[seqname] = {}										
 									if found_schema != schema_name:
-										schema_dependency(found_schema, schema_name, "sequences")											
+										schema_dependency(out_dict, found_schema, schema_name, "sequences")											
 									col_dict[opt_key] = parsed_val	
 									
 								else:
@@ -666,9 +688,8 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 										seqname = match.group("seqname")
 										# coletar nomes de sequencia em uso , usar o prorprio schema da tabela										
 										if not schema_name in out_dict["content"]["sequences"].keys():
-											seqs = out_dict["content"]["sequences"][schema_name] = {}
-										else:
-											seqs = out_dict["content"]["sequences"][schema_name]											
+											out_dict["content"]["sequences"][schema_name] = {}
+										seqs = out_dict["content"]["sequences"][schema_name]											
 										if not seqname in seqs.keys():
 											seqs[seqname] = {}											
 										col_dict[opt_key] = parsed_val.replace(seqname, "%s.%s" % (schema_name, seqname))												
@@ -684,7 +705,9 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 def constraints(p_cursor, p_deftablespace, out_dict):
 	
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
-	assert "tables" in out_dict["content"].keys(), "'content.tables' em falta no dic. de saida"
+	if not "tables" in out_dict["content"].keys():
+		return
+	#assert "tables" in out_dict["content"].keys(), "'content.tables' em falta no dic. de saida"
 
 	pattern = re.compile(r"foreign \s+ key \s+ \([^\)\s]+\) \s+ references \s+ (?P<schema>[^\.]+) \. (?P<tname>[^\(]+)", re.VERBOSE | re.IGNORECASE)			
 		
@@ -770,7 +793,7 @@ def constraints(p_cursor, p_deftablespace, out_dict):
 				# sao invocadas tabelas de outros schemas nas foreign keys
 				#
 
-				schema_dependency(row["schema_ref"], schema_name, "fkeys")
+				schema_dependency(out_dict, row["schema_ref"], schema_name, "fkeys")
 
 def indexes(p_cursor, p_deftablespace, out_dict):
 	
@@ -779,7 +802,9 @@ def indexes(p_cursor, p_deftablespace, out_dict):
 	# nao precisando de ser listados.
 	
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
-	assert "tables" in out_dict["content"].keys(), "'content.tables' em falta no dic. de saida"
+	if not "tables" in out_dict["content"].keys():
+		return
+	#assert "tables" in out_dict["content"].keys(), "'content.tables' em falta no dic. de saida"
 
 	# pattern = re.compile(r"foreign \s+ key \s+ \([^\)\s]+\) \s+ references \s+ (?P<schema>[^\.]+) \. (?P<tname>[^\(]+)", re.VERBOSE | re.IGNORECASE)			
 		
@@ -892,7 +917,10 @@ def sequences(p_conn, p_majorversion, out_dict):
 def triggers(p_cursor, out_trigger_functions, out_dict):
 	
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
-	assert "tables" in out_dict["content"].keys(), "'content.tables' em falta no dic. de saida"
+	if not "tables" in out_dict["content"].keys():
+		return
+		
+	#assert "tables" in out_dict["content"].keys(), "'content.tables' em falta no dic. de saida"
 	
 	tables_root = out_dict["content"]["tables"]
 	items = [
@@ -935,7 +963,7 @@ def triggers(p_cursor, out_trigger_functions, out_dict):
 		
 		out_trigger_functions.add((row["function_schema"], row["function_name"]))
 		
-		schema_dependency(t_schema, row["function_schema"], "triggerfuncs")
+		schema_dependency(out_dict, t_schema, row["function_schema"], "triggerfuncs")
 
 		for item in items:
 			if not row[item] is None:
@@ -1013,7 +1041,6 @@ def reverse_proc_fname(p_fname, o_dict):
 	o_dict["procschema"] = schema
 	o_dict["procname"] = procname
 	
-
 def gen_proc_ftr(p_sch, p_row):
 
 	template = """$BODY$;\n
@@ -1045,7 +1072,6 @@ def gen_proc_file(p_genprocsdir, p_schema, p_proc_row, winendings=True):
 			fl.write(procsrc)									
 			fl.write(gen_proc_ftr(p_schema, p_proc_row))						
 						
-
 def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dict, genprocsdir=None):
 	
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
@@ -1073,8 +1099,10 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dic
 		if "procedures" in p_filters_cfg.keys():			
 			if len(p_filters_cfg["procedures"].keys()) > 0 and sch not in p_filters_cfg["procedures"].keys():
 				continue 
-			
-		tr_funcnames = trig_dict[sch]	
+				
+		tr_funcnames = []
+		if sch in trig_dict.keys():
+			tr_funcnames = trig_dict[sch]	
 			
 		wherecl = gen_procs_where_from_re_list("procedure_schema", "procedure_name", sch, p_filters_cfg, dojoin=True, intersect=True)
 		if wherecl is None:
@@ -1110,31 +1138,51 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dic
 				gen_proc_file(genprocsdir, sch, row)
 					
 		# trigger funcs
-		
-		wherecl = "and procedure_schema = %s and procedure_name = ANY(%s)"
-		p_cursor.execute("%s %s" % (SQL[dict_key], wherecl), (sch, tr_funcnames))	
-		# print(p_cursor.mogrify("%s %s" % (SQL[dict_key], wherecl), (sch, tr_funcnames)))
+		if len(tr_funcnames) > 0:
 			
-		for row in p_cursor:
-			
-			# if row["schema"] == "public" and not p_include_public:
-				# continue
-			
-			if not row["procedure_schema"] in the_dict.keys():
-				schdict = the_dict[row["procedure_schema"]] = {}
-			else:
-				schdict = the_dict[row["procedure_schema"]]
+			wherecl = "and procedure_schema = %s and procedure_name = ANY(%s)"
+			p_cursor.execute("%s %s" % (SQL[dict_key], wherecl), (sch, tr_funcnames))	
+			# print(p_cursor.mogrify("%s %s" % (SQL[dict_key], wherecl), (sch, tr_funcnames)))
 				
-			procfname = gen_proc_fname_row(row)
-			pdict = schdict[procfname] = {}
-			for item in items:
-				if not row[item] is None:
-					pdict[item] = row[item]
+			for row in p_cursor:
+				
+				# if row["schema"] == "public" and not p_include_public:
+					# continue
+				
+				if not row["procedure_schema"] in the_dict.keys():
+					schdict = the_dict[row["procedure_schema"]] = {}
+				else:
+					schdict = the_dict[row["procedure_schema"]]
+					
+				procfname = gen_proc_fname_row(row)
+				pdict = schdict[procfname] = {}
+				for item in items:
+					if not row[item] is None:
+						pdict[item] = row[item]
 
-			if not genprocsdir is None:
-				gen_proc_file(genprocsdir, sch, row)
+				if not genprocsdir is None:
+					gen_proc_file(genprocsdir, sch, row)
+
+def paramtables(p_cursor, p_filters_cfg, p_gendumpsdir):
 		
-def srcreader(p_conn, p_filters_cfg, out_dict, outprocs_dir=None, include_public=False, include_colorder=False):
+	if not "parameterstables" in p_filters_cfg.keys() or p_gendumpsdir is None:	
+		return
+		
+	assert exists(p_gendumpsdir)
+				
+	for sch in p_filters_cfg["parameterstables"].keys():
+		
+		for tname in  p_filters_cfg["parameterstables"][sch]:
+			
+			ftname = "%s.%s" % (sch, tname)
+			fname = "%s.copy" % (ftname)
+			fullp = path_join(p_gendumpsdir, fname)
+			
+			with codecs.open(fullp, "wb", "utf-8") as fp:
+				
+				p_cursor.copy_to(fp, ftname)
+						
+def srcreader(p_conn, p_filters_cfg, out_dict, outtables_dir, outprocs_dir=None, include_public=False, include_colorder=False):
 	
 	logger = logging.getLogger('pgsourcing')
 	with p_conn as cnobj:
@@ -1155,13 +1203,13 @@ def srcreader(p_conn, p_filters_cfg, out_dict, outprocs_dir=None, include_public
 			
 			schemas(cr, p_filters_cfg, include_public, out_dict)			
 			ownership(cr, p_filters_cfg, out_dict)		
-			roles(cr, out_dict)
+			roles(cr, p_filters_cfg, out_dict)
 			
 			logger.info("reading tables ..")			
 			tables(cr, p_filters_cfg, out_dict)
 
-			if not "sequences" in out_dict["content"].keys():
-				out_dict["content"]["sequences"] = {}
+			# if not "sequences" in out_dict["content"].keys():
+				# out_dict["content"]["sequences"] = {}
 				
 			unreadable_tables = {}
 			
@@ -1175,7 +1223,7 @@ def srcreader(p_conn, p_filters_cfg, out_dict, outprocs_dir=None, include_public
 			
 		logger.info("reading sequences ..")
 		sequences(cnobj, majorversion, out_dict)
-
+		
 		with cn.cursor(cursor_factory=cnobj.dict_cursor_factory) as cr:
 			
 			logger.info("reading constraints ..")
@@ -1193,8 +1241,13 @@ def srcreader(p_conn, p_filters_cfg, out_dict, outprocs_dir=None, include_public
 					
 			logger.info("reading procedures ..")
 			procs(cr, p_filters_cfg, trigger_functions, majorversion, out_dict, genprocsdir=outprocs_dir)
-			
-			logger.info("reading finished.")
+
+		with cn.cursor() as cr:
+
+			logger.info("reading parameter table data ..")
+			paramtables(cr, p_filters_cfg, outtables_dir)
+						
+		logger.info("reading finished.")
 			
 
 # Teste ad-hoc

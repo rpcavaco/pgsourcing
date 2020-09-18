@@ -76,7 +76,7 @@ from src.compare import comparing, keychains, sources_to_lists
 from src.zip import gen_setup_zip
 from src.fileandpath import get_conn_cfg_path, get_filters_cfg, \
 		exists_currentref, to_jsonfile, save_ref, get_refcodedir, \
-		save_warnings, clear_dir, get_srccodedir
+		save_warnings, clear_dir, get_srccodedir, get_reftablesdir
 from src.write import updateref, updatedb, create_function_items
 
 try:
@@ -318,7 +318,7 @@ def create_new_proj(p_newproj):
 # MAIN LOGIC
 # ##################################################_###################		
 
-def check_oper_handler(p_proj, p_oper, p_outprocsdir, o_checkdict, o_replaces, p_connkey=None, include_public=False, include_colorder=False):
+def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir, o_checkdict, o_replaces, p_connkey=None, include_public=False, include_colorder=False):
 	
 	logger = logging.getLogger('pgsourcing')	
 	
@@ -373,7 +373,7 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, o_checkdict, o_replaces, p
 			if "transformschema" in filters_cfg.keys():
 				o_replaces.update(filters_cfg["transformschema"])
 
-			srcreader(conns.getConn(connkey), filters_cfg, o_checkdict, outprocs_dir=outprocs_dir, include_public=include_public, include_colorder=include_colorder)
+			srcreader(conns.getConn(connkey), filters_cfg, o_checkdict, p_outtables_dir, outprocs_dir=outprocs_dir, include_public=include_public, include_colorder=include_colorder)
 		
 	return ret, connkey
 
@@ -484,7 +484,7 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 		
 	elif p_oper == "upddir":
 		
-		output = StringIO.StringIO()
+		output = StringIO()
 		out_sql_src = updatedb(p_proj, diffdict, upd_ids_list, limkeys_list, delmode=delmode, docomment=False)			
 		#do_linesoutput(out_sql_src, output=output, interactive=False)		
 		#script = output.getvalue()
@@ -753,13 +753,15 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	logger = logging.getLogger('pgsourcing')	
 	
 	refcodedir = get_refcodedir(p_proj)
+	reftablesdir = get_reftablesdir(p_proj)
 	
 	check_dict = { }
 	root_diff_dict = { "content": {} }
 	#ordered_diffkeys = {}
 	replaces = {}
 	
-	comparison_mode, connkey = check_oper_handler(p_proj, p_oper, refcodedir, check_dict, \
+	comparison_mode, connkey = check_oper_handler(p_proj, p_oper, 
+		refcodedir, reftablesdir, check_dict, \
 		replaces, p_connkey=p_connkey, include_public=include_public, 
 		include_colorder=include_colorder)
 	
@@ -805,14 +807,15 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				
 			# Separar warnings para ficheiro proprio
 			
-			wout_json = {
-				"project": p_proj,
-				"pgsourcing_output_type": "warnings_only",
-				"pgsourcing_storage_ver": STORAGE_VERSION,	 	
-				"timestamp": base_ts,
-				"content": check_dict["warnings"] 
-			}			
-			save_warnings(p_proj, wout_json)	
+			if "warnings" in check_dict.keys():
+				wout_json = {
+					"project": p_proj,
+					"pgsourcing_output_type": "warnings_only",
+					"pgsourcing_storage_ver": STORAGE_VERSION,	 	
+					"timestamp": base_ts,
+					"content": check_dict["warnings"] 
+				}			
+				save_warnings(p_proj, wout_json)	
 			
 		elif comparison_mode == "From REF":
 			
