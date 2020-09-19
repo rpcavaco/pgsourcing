@@ -2,6 +2,15 @@
 from src.common import PROC_SRC_BODY_FNAME
 
 SQL = {
+	"PROC_CHECK": """select 
+			pg_get_function_identity_arguments(p.oid) args,
+			t2.typname return_type
+		from pg_proc p
+		JOIN pg_namespace n1
+		ON p.pronamespace = n1.oid
+		LEFT JOIN pg_type t2 ON p.prorettype=t2.oid
+		where nspname = %s
+		and p.proname = %s""",
 	"GENERIC_CHECK": """select relkind
 		from pg_class t1
 		JOIN pg_namespace n1

@@ -308,7 +308,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 				if grpkeys[0] == "procedures" and "procedure_name" in newvalue.keys():
 					new_grpkeys = grpkeys[:-1] + [newvalue["procedure_name"]]
 					args = grpkeys[:-1] + [newvalue["args"]]
-					o_cd_ops["insert"].append(('b', new_grpkeys, newvalue["args"]))
+					o_cd_ops["insert"].append(('b', new_grpkeys, newvalue["args"], newvalue["return_type"]))
 				else:
 					new_grpkeys = grpkeys
 					o_cd_ops["insert"].append(('c', new_grpkeys))
@@ -397,6 +397,8 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 				diff_item = get_diff_item('b1', diff_dict, klist)
 				p_opordmgr.setord(diff_item)
 				diff_item["diffoper"] = "delete"
+				
+				o_cd_ops["delete"].append(('da', klist))
 				
 				# if grpkeys[0] == "procedures":
 					# diff_item["procedure_name"] = tmp_r[k]["procedure_name"]

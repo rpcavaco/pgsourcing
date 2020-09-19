@@ -747,31 +747,52 @@ class OpOrderMgr(Singleton):
 
 def check_objtype(p_relkind, p_typestr):
 	ret = False
+
 	if p_relkind.lower() == 's' and p_typestr.lower() == 'sequences':
+		ret = True
+	elif p_relkind.lower() == 'r' and p_typestr.lower() == 'tables':
+		ret = True
+	elif p_relkind.lower() == 'm' and p_typestr.lower() == 'matviews':
+		ret = True
+	elif p_relkind.lower() == 'v' and p_typestr.lower() == 'views':
+		ret = True
+	elif p_relkind.lower() == 'f' and p_typestr.lower() == 'fortables':
 		ret = True
 		
 	return ret
 		
-	
+# Cleaning up unnecessary diff items and branches that become empty 
+#  during cleaning
 def erase_diff_item(p_diff_dict, p_grpkeys):
 	
 	diff_dict = p_diff_dict
-	#pre_last_key = p_grpkeys[-2]
 	last_key = p_grpkeys[-1]
-	prekey = None
-	predict = None
 	for k in p_grpkeys:
 		if k != last_key:
-			predict = diff_dict
 			diff_dict = diff_dict[k]
-			prekey = k
 		else:
 			del diff_dict[k]
 
+	# Clean empty branches
 	count = 0
-	while count < 10:
+	# max diff tree depth never bigger than 15
+	while count < 15:
+		
+		outerbreak = True
 		count += 1
+		diff_dict = p_diff_dict
+		
 		for k in p_grpkeys:
+			if k in diff_dict.keys():
+				if len(diff_dict[k].keys()) == 0:
+					del diff_dict[k]
+					outerbreak = False
+					break
+				else:
+					diff_dict = diff_dict[k]
+				
+		if outerbreak:
+			break
 				
 		
 def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
@@ -785,8 +806,12 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 		
 		if grpkeys[0] == "procedures":
 			
-			assert len(p_op) == 3
-			print("sch: %s, name:%s num.args:%d", (sch, name, len(p_op[2])))
+			assert len(p_op) == 4
+			
+			p_cr.execute(SQL["PROC_CHECK"], (sch, name))
+			row = p_cr.fetchone()
+			if not row is None:
+				obj_exists = (row[0] == p_op[2] and row[1] == p_op[3])
 			
 		else:
 			
@@ -829,7 +854,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	
 	logger = logging.getLogger('pgsourcing')	
 	
-	pp = pprint.PrettyPrinter()
+	# pp = pprint.PrettyPrinter()
 	
 	refcodedir = get_refcodedir(p_proj)
 	reftablesdir = get_reftablesdir(p_proj)
@@ -913,9 +938,8 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			#pp.pprint(cd_ops)
 			checkCDOps(p_proj, cd_ops, connkey, root_diff_dict["content"])
 			
-		#print("910", root_diff_dict["content"].keys())			
 		## TODO - deve haver uma verificacao final de coerencia
-		## Sequencias - tipo da seq. == tipo do campo serial em que e usada
+		## Sequencias - tipo da seq. == tipo do campo serial em que e usada, etc.
 		
 		if "content" in root_diff_dict.keys() and root_diff_dict["content"]:
 			
