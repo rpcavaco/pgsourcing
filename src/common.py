@@ -1,7 +1,7 @@
 import logging
 
 ########################################################################
-# Config de instalacao (a alterar numa instalacao, se necessario)
+# Instalation-relatec configs
 ########################################################################
 
 # Config de logging
@@ -14,15 +14,16 @@ LOG_CFG = {
 
 
 ########################################################################
-# Config de versao -- NAO EDITAR
+# Version-related configs -- DO NOT EDIT
 ########################################################################
 
 LANG = "pt"
-OPS = ["chksrc", "chkdest", "updref", "upddest", "upddir", "chkcode", "updcode"]
+OPS = ["chksrc", "chkdest", "updref", "upddest", "upddir", "chkcode", "updcode", "filldata"]
 OPS_CHECK = ["chksrc", "chkdest"]
-OPS_CONNECTED = ["chksrc", "chkdest", "upddir", "updcode"]
+OPS_CONNECTED = ["chksrc", "chkdest", "upddir", "updcode", "filldata"]
 OPS_INPUT = ["updref", "upddest", "upddir", "updcode"]
 OPS_OUTPUT = ["upddest"]
+OPS_CODE = ["chkcode", "updcode"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
 
@@ -36,7 +37,8 @@ OPS_HELP = {
 		"updref": "atualizar o repositorio de referencia desde a b.d. fonte",
 		"upddest": "gerar script para b.d. destino",
 		"upddir": "atualizar diretamente b.d. destino",
-		"updcode": "atualizar codigo na b.d. fonte"
+		"updcode": "atualizar codigo na b.d. fonte",
+		"filldata": "carregar dados de tebelas de parametros numa b.d. de destino"
 	}
 }
 

@@ -343,7 +343,7 @@ def col_operation(docomment, p_sch, p_tname, p_colname, p_diff_item, p_delmode, 
 			cont0 = re.sub("\s\s+", " ",   "%s %s %s %s" % tuple(colcreatitems[1:]))
 			p_out_sql_src.append("%s ADD COLUMN %s" % (tmplt % (p_sch, p_tname), cont0.strip()))
 					
-def create_function(p_schema, p_name, p_new_value, o_sql_linebuffer, replace=False):
+def create_function(p_schema, p_name, p_new_value, o_sql_linebuffer, replace=True):
 	
 	create_function_items(p_schema, p_name, p_new_value["args"],
 		p_new_value["return_type"], p_new_value["language_type"], 
@@ -352,7 +352,7 @@ def create_function(p_schema, p_name, p_new_value, o_sql_linebuffer, replace=Fal
 		o_sql_linebuffer, replace=replace)
 
 def create_function_items(p_schema, p_name, p_args, p_rettype, p_langtype, p_owner, p_volatility, 
-	p_body, o_sql_linebuffer, replace=False):
+	p_body, o_sql_linebuffer, replace=True):
 	
 	if replace:
 		cr = "CREATE OR REPLACE FUNCTION %s.%s"
@@ -965,7 +965,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 						if proc_blk["diffoper"] == "insert":
 							
 							flines = []
-							create_function(sch, procname, proc_blk["newvalue"], flines, replace=False)						
+							create_function(sch, procname, proc_blk["newvalue"], flines, replace=True)						
 							out_sql_src.append("".join(flines))
 							
 						elif proc_blk["diffoper"] == "delete":

@@ -248,10 +248,17 @@ def gen_update(p_transformschema, p_opordmgr, p_upperlevel_ops, p_keychain, p_di
 		
 																			
 def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops, level=0): 
+	
 
 	logger = logging.getLogger('pgsourcing')
 
 	grpkey = grpkeys[-1]
+	
+	# FLAG = grpkey.startswith("check_")
+	
+	# print(">grpkeys", grpkeys)
+	# if isinstance(p_leftdic[grpkey], dict):
+		# print("  >>", p_leftdic[grpkey].keys())
 	
 	ret_upperlevel_ops = {}
 	
@@ -386,7 +393,11 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						diff_item["newvalue"] = newvalue
 
 						new_grpkeys = grpkeys + [k]
-						o_cd_ops["insert"].append(('c', new_grpkeys))
+						if isinstance(newvalue, dict) and grpkeys[0] == "procedures":
+							assert "args" in newvalue.keys() and "return_type" in newvalue.keys(), newvalue.keys()
+							o_cd_ops["insert"].append(('d1', new_grpkeys, newvalue["args"], newvalue["return_type"]))
+						else:
+							o_cd_ops["insert"].append(('d2', new_grpkeys))
 										
 			elif k in rkeys and not k in tmp_l.keys():
 
@@ -397,8 +408,8 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 				diff_item = get_diff_item('b1', diff_dict, klist)
 				p_opordmgr.setord(diff_item)
 				diff_item["diffoper"] = "delete"
-				
-				o_cd_ops["delete"].append(('da', klist))
+
+				o_cd_ops["delete"].append(('e', klist))
 				
 				# if grpkeys[0] == "procedures":
 					# diff_item["procedure_name"] = tmp_r[k]["procedure_name"]
@@ -417,7 +428,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						dictupdate(ret_upperlevel_ops, upperlevel_ops)
 
 				elif isinstance(tmp_l[k], list) and isinstance(tmp_r[k], list):
-					upperlevel_ops = comparegrp_list(tmp_l, tmp_r, klist, p_opordmgr, diff_dict, o_cd_ops, level=level+1)
+					upperlevel_ops = comparegrp_list(tmp_l, tmp_r, klist, p_opordmgr, diff_dict) #, o_cd_ops, level=level+1)
 					if upperlevel_ops:
 						# print(".. 298 ..", upperlevel_ops)
 						dictupdate(ret_upperlevel_ops, upperlevel_ops)
@@ -524,7 +535,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						
 
 
-def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict): 
+def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict): #, o_cd_ops, level=0): 
 
 	grpkey = grpkeys[-1]
 	tmp_l = p_leftdic[grpkey]

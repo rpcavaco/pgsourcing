@@ -671,7 +671,10 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 									found_schema = match.group("schema")
 									seqname = match.group("seqname")
 									
-									# coletar nomes de sequencia em uso									
+									# coletar nomes de sequencia em uso		
+									if not "sequences" in out_dict["content"].keys():
+										out_dict["content"]["sequences"] = {}
+																
 									if not found_schema in out_dict["content"]["sequences"].keys():
 										out_dict["content"]["sequences"][found_schema] = {}
 									seqs = out_dict["content"]["sequences"][found_schema]										
@@ -687,8 +690,12 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 									if not match is None:
 										seqname = match.group("seqname")
 										# coletar nomes de sequencia em uso , usar o prorprio schema da tabela										
+										if not "sequences" in out_dict["content"].keys():
+											out_dict["content"]["sequences"] = {}
+
 										if not schema_name in out_dict["content"]["sequences"].keys():
 											out_dict["content"]["sequences"][schema_name] = {}
+											
 										seqs = out_dict["content"]["sequences"][schema_name]											
 										if not seqname in seqs.keys():
 											seqs[seqname] = {}											
@@ -1182,7 +1189,8 @@ def paramtables(p_cursor, p_filters_cfg, p_gendumpsdir):
 				
 				p_cursor.copy_to(fp, ftname)
 						
-def srcreader(p_conn, p_filters_cfg, out_dict, outtables_dir, outprocs_dir=None, include_public=False, include_colorder=False):
+def srcreader(p_conn, p_filters_cfg, out_dict, outtables_dir, 
+		outprocs_dir=None, include_public=False, include_colorder=False):
 	
 	logger = logging.getLogger('pgsourcing')
 	with p_conn as cnobj:

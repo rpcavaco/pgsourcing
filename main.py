@@ -50,9 +50,13 @@ from __future__ import print_function
 from os import listdir, mkdir, makedirs, walk, remove as removefile
 from os.path import abspath, dirname, exists, splitext, join as path_join
 from datetime import datetime as dt
-from copy import deepcopy
+from copy import deepcopy, copy
 from difflib import unified_diff as dodiff
 from subprocess import check_call
+
+#################
+import pdb
+#################
 
 
 from psycopg2.extras import execute_batch
@@ -68,8 +72,9 @@ import pprint
 
 
 from src.common import LOG_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, \
-		OPS_OUTPUT, OPS_HELP, OPS_CHECK, SETUP_ZIP, BASE_CONNCFG, \
-		BASE_FILTERS_RE, PROC_SRC_BODY_FNAME, STORAGE_VERSION
+		OPS_OUTPUT, OPS_HELP, OPS_CHECK, OPS_CODE, SETUP_ZIP, \
+		BASE_CONNCFG, BASE_FILTERS_RE, PROC_SRC_BODY_FNAME, \
+		STORAGE_VERSION
 		
 from src.read import srcreader, gen_proc_fname, reverse_proc_fname
 from src.connect import Connections
@@ -320,7 +325,9 @@ def create_new_proj(p_newproj):
 # MAIN LOGIC
 # ##################################################_###################		
 
-def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir, o_checkdict, o_replaces, p_connkey=None, include_public=False, include_colorder=False):
+def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir, 
+		o_checkdict, o_replaces, p_connkey=None, 
+		include_public=False, include_colorder=False):
 	
 	logger = logging.getLogger('pgsourcing')	
 	
@@ -426,7 +433,7 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 
 	conns = None
 	connkey = None
-	ret_changed = "None"
+	ret_changed = "None" # Valor de retorno nao esta a ser usado
 	
 	upd_ids_list = []
 	if not updates_ids is None:
@@ -448,8 +455,6 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 	now_dt = dt.now()
 	base_ts = now_dt.strftime('%Y%m%dT%H%M%S')
 
-	assert not diffdict is None
-
 	if p_oper in OPS_CONNECTED:
 		
 		cfgpath = get_conn_cfg_path(p_proj)
@@ -464,6 +469,8 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 			connkey = p_connkey		
 	
 	if p_oper == "updref":
+
+		assert not diffdict is None
 				
 		newref_dict = updateref(p_proj, diffdict, upd_ids_list, limkeys_list)
 		if not newref_dict is None:
@@ -478,6 +485,8 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 			logger.info("reference changed, proj:%s" % (p_proj,))
 		
 	elif p_oper == "upddest":
+
+		assert not diffdict is None
 		
 		out_sql_src = updatedb(p_proj, diffdict, upd_ids_list, limkeys_list, delmode=delmode)			
 		do_linesoutput(out_sql_src, output=output, interactive=canuse_stdout)
@@ -485,6 +494,8 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 		logger.info("dest change script for proj. %s, %s" % (p_proj,output))
 		
 	elif p_oper == "upddir":
+
+		assert not diffdict is None
 		
 		output = StringIO()
 		out_sql_src = updatedb(p_proj, diffdict, upd_ids_list, limkeys_list, delmode=delmode, docomment=False)			
@@ -501,8 +512,47 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 		cn.commit()
 			
 		logger.info("direct dest change for proj. %s" % p_proj)
-
 		
+	elif p_oper == "filldata":
+		
+		filters_cfg = get_filters_cfg(p_proj, connkey)
+		reftablesdir = get_reftablesdir(p_proj)
+
+		cnobj = conns.getConn(connkey)
+		cn = cnobj.getConn()
+		needscommit = False
+		with cn.cursor() as cr:
+
+			for sch in filters_cfg["parameterstables"].keys():	
+				
+				trschema = sch
+				if "transformschema" in filters_cfg.keys():					
+					if "tables" in filters_cfg["transformschema"]["types"]:
+						for trans in filters_cfg["transformschema"]["trans"]:
+							if trans["src"] == sch:
+								trschema = trans["dest"]
+								break
+								
+				for tname in filters_cfg["parameterstables"][sch]:
+					
+					ftname = "%s.%s" % (sch, tname)
+					trans_ftname = "%s.%s" % (trschema, tname)
+					fname = "%s.copy" % (ftname)
+					fullp = path_join(reftablesdir, fname)
+					
+					try:
+					
+						with codecs.open(fullp, "r", "utf-8") as fp:					
+							cr.copy_from(fp, trans_ftname)
+						needscommit = True
+						
+					except:
+						cn.rollback()
+						logger.exception("filldata")
+					
+		if needscommit:			
+			cn.commit()
+			
 	return ret_changed
 
 def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=None, interactive=False):
@@ -555,19 +605,25 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 							p_opordmgr.setord(di)
 						
 					else:
-					
-						with codecs.open(frompath, "r", "utf-8") as flA:
-							srca = flA.read()
-						with codecs.open(topath, "r", "utf-8") as flB:
-							srcb = flB.read()
+						try:
+							with codecs.open(frompath, "r", "utf-8") as flA:
+								srca = flA.read()
+						except:
+							raise RuntimeError("Erro de leitura de %s" % frompath)
+						
+						try:
+							with codecs.open(topath, "r", "utf-8") as flB:
+								srcb = flB.read()
+						except:
+							raise RuntimeError("Erro de leitura de %s" % topath)
+							
 
 						listA = []
 						listB = []						
-						sources_to_lists(srca, srcb, listA, listB)						
-						diff = [l.strip() for l in list(dodiff(listA, listB)) if l.strip()]
+						sources_to_lists(srca, srcb, listA, listB)	
+						diff = [l.strip() for l in list(dodiff(listB, listA)) if l.strip()]
 
 						if len(diff) > 0:
-
 							if not revdict["procschema"] in check_dict["content"].keys():
 								check_dict["content"][revdict["procschema"]] = {}
 							if not revdict["procname"] in check_dict["content"][revdict["procschema"]].keys():
@@ -679,6 +735,8 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 		connkey = p_connkey	
 
 	connobj = conns.getConn(connkey)
+	
+	# pdb.set_trace()
 
 	# now_dt = dt.now()
 	# base_ts = now_dt.strftime('%Y%m%dT%H%M%S')		
@@ -724,7 +782,7 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 										with cn.cursor() as cr:
 											cr.execute(sqlstr)
 											changed = True
-										logger.info("deleting script for proj. %s, %s" % (p_proj,sch,pname))	
+										logger.info("deleting script for proj. %s, %s.%s" % (p_proj,sch,pname))	
 										
 				if changed:
 					logger.info("commiting changes to scripts")
@@ -806,12 +864,17 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 		
 		if grpkeys[0] == "procedures":
 			
-			assert len(p_op) == 4
+			if not p_isinsert:
+				obj_exists = False
+				
+			else:
 			
-			p_cr.execute(SQL["PROC_CHECK"], (sch, name))
-			row = p_cr.fetchone()
-			if not row is None:
-				obj_exists = (row[0] == p_op[2] and row[1] == p_op[3])
+				assert len(p_op) == 4, p_op
+				
+				p_cr.execute(SQL["PROC_CHECK"], (sch, name))
+				row = p_cr.fetchone()
+				if not row is None:
+					obj_exists = (row[0] == p_op[2] and row[1] == p_op[3])
 			
 		else:
 			
@@ -980,7 +1043,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	else:
 
 		diffdict = None
-		if p_oper in ("updcode", "updref", "upddest", "upddir"):
+		if p_oper in OPS_INPUT:
 
 			try:
 				flagv = isinstance(inputf, basestring)
@@ -994,13 +1057,12 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			elif isinstance(inputf, file_types):
 				diffdict = json.load(inputf)
 				
-			if delmode is None:
-				dlmd = "NODEL"
-			else:
-				dlmd = 	delmode
-				
+		if delmode is None:
+			dlmd = "NODEL"
+		else:
+			dlmd = 	delmode
 		
-		if p_oper in ("chkcode", "updcode"):
+		if p_oper in OPS_CODE:
 			
 			if p_oper == "chkcode":
 
@@ -1018,7 +1080,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 
 			# Se a operacao for updref ou chkdest o dicionario check_dict sera 
 			#  preenchido.
-
+			
 			update_oper_handler(p_proj, p_oper, opordmgr, 
 				diffdict, updates_ids=updates_ids, p_connkey=p_connkey, 
 				limkeys=limkeys, include_public=include_public, 
@@ -1077,7 +1139,7 @@ def gen_newprocfile_items():
 				break
 			tiposargs.append(resp.strip().lower())
 	
-		fname = gen_proc_fname(sch, nome, rettipo, tiposargs)
+		fname = gen_proc_fname(nome, rettipo, tiposargs)
 		ret = [fname, sch, nome, rettipo, tiposargs, ownership] 
 		
 	return ret
@@ -1128,14 +1190,12 @@ def addnewprocedure_file(p_proj, conn=None, conf_obj=None):
 					tiposargs = conf_obj["tiposargs"]
 					ownership = conf_obj["ownership"]
 					
-				fullenewpath = path_join(srccodedir, newfname)
-				
-				if exists(fullenewpath):
+				complfname = "%s.%s.sql" % (sch, newfname) 
 					
+				fullenewpath = path_join(srccodedir, complfname)				
+				if exists(fullenewpath):					
 					logger.info("addnewprocedure_file, cannot create new procedure in '%s': filename in use -- %s" % (proj, fname))
-					
 				else:
-					
 					sql_linebuffer = []
 					argslist = ["%s %s" % (chr(97+ti), ta) for ti, ta in enumerate(tiposargs)] 
 					args = ", ".join(argslist)
