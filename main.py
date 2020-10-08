@@ -764,8 +764,12 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 										print("insert or update src of ", src[:60])
 									else:
 										with cn.cursor() as cr:
-											cr.execute(src)
-											changed = True
+											try:
+												cr.execute(src)
+												changed = True
+											except:
+												print("ficheiro %s" % diff_item["fname"])
+												raise
 										logger.info("inserting script for proj. %s, %s.%s" % (p_proj,sch,pname))	
 							elif diff_item["diffoper"] == "delete":
 								if delmode == "DEL":
