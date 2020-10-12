@@ -82,7 +82,8 @@ from src.compare import comparing, keychains, sources_to_lists
 from src.zip import gen_setup_zip
 from src.fileandpath import get_conn_cfg_path, get_filters_cfg, \
 		exists_currentref, to_jsonfile, save_ref, get_refcodedir, \
-		save_warnings, clear_dir, get_srccodedir, get_reftablesdir
+		get_destcodedir, save_warnings, clear_dir, get_srccodedir, \
+		get_reftablesdir
 from src.write import updateref, updatedb, create_function_items
 from src.sql import SQL
 
@@ -326,7 +327,7 @@ def create_new_proj(p_newproj):
 # ##################################################_###################		
 
 def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir, 
-		o_checkdict, o_replaces, p_connkey=None, 
+		p_outprocsdestdir, o_checkdict, o_replaces, p_connkey=None, 
 		include_public=False, include_colorder=False):
 	
 	logger = logging.getLogger('pgsourcing')	
@@ -371,7 +372,7 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 		elif p_oper == "chkdest":
 			
 			logger.info("checking, proj:%s  oper:%s" % (p_proj,p_oper))
-			outprocs_dir = None
+			outprocs_dir = p_outprocsdestdir
 			ret = "From REF"
 		
 		if not connkey is None:
@@ -924,6 +925,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	# pp = pprint.PrettyPrinter()
 	
 	refcodedir = get_refcodedir(p_proj)
+	destcodedir = get_destcodedir(p_proj)
 	reftablesdir = get_reftablesdir(p_proj)
 	
 	check_dict = { }
@@ -932,7 +934,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	replaces = {}
 	
 	comparison_mode, connkey = check_oper_handler(p_proj, p_oper, 
-		refcodedir, reftablesdir, check_dict, \
+		refcodedir, reftablesdir, destcodedir, check_dict, \
 		replaces, p_connkey=p_connkey, include_public=include_public, 
 		include_colorder=include_colorder)
 	

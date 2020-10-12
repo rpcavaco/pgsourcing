@@ -1057,7 +1057,7 @@ OWNER TO %s;"""
 	return template % (p_sch, p_row["procedure_name"], p_row["args"],
 		p_row["procedure_owner"])
 
-def gen_proc_file(p_genprocsdir, p_schema, p_proc_row, winendings=True):
+def gen_proc_file(p_genprocsdir, p_schema, p_proc_row, winendings=False):
 	fname = gen_proc_fname_row(p_proc_row)
 	complfname = "%s.%s.sql" % (p_schema, fname) 
 	
