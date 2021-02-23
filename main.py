@@ -134,7 +134,7 @@ def parse_args():
 	parser.add_argument("-d", "--opsorder", help="Lista de operacoes (sequencia de oporder) a efetuar", action="store")
 	parser.add_argument("-k", "--limkeys", help="Filtro de atributios a alterar: apenas estes atributos serao alterados", action="store")
 	parser.add_argument("-m", "--delmode", help="Modo apagamento: NODEL (default), DEL, CASCADE", action="store")
-	parser.add_argument("-a", "--addnweproc", help="Gerar novo ficheiro de procedure", action="store_true")
+	parser.add_argument("-a", "--addnewproc", help="Gerar novo ficheiro de procedure", action="store_true")
 	parser.add_argument("-t", "--addnewtrig", help="Gerar novo ficheiro de trigger", action="store_true")
 	parser.add_argument("-u", "--simulupdcode", help="Simular atualizacao codigo", action="store_true")
 	
@@ -172,7 +172,7 @@ def parse_args():
 			else:
 				raise RuntimeError("Projeto '%s' nao existe, projetos encontrados: %s" % (args.proj, str(projetos)))
 				
-		if not args.addnweproc and not args.oper in OPS:
+		if not args.addnewproc and not args.oper in OPS:
 			raise RuntimeError("Operacao '%s' invalida, ops disponiveis: %s" % (args.oper, str(ops_help)))
 
 		if args.oper in OPS_INPUT and args.input is None:
@@ -1246,7 +1246,7 @@ def cli_main():
 		else:
 			assert not proj is None
 			
-			if args.addnweproc:
+			if args.addnewproc:
 				## conf_obj=None forces interaction with stdin and stdout
 				addnewprocedure_file(proj, conn=args.connkey, conf_obj=None)				
 			elif args.addnewtrig:

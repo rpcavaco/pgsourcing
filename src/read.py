@@ -1185,7 +1185,7 @@ def paramtables(p_cursor, p_filters_cfg, p_gendumpsdir):
 			fname = "%s.copy" % (ftname)
 			fullp = path_join(p_gendumpsdir, fname)
 			
-			with codecs.open(fullp, "wb", "utf-8") as fp:
+			with open(fullp, "wb") as fp:
 				
 				p_cursor.copy_to(fp, ftname)
 						

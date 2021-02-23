@@ -363,7 +363,7 @@ def create_function_items(p_schema, p_name, p_args, p_rettype, p_langtype, p_own
 	o_sql_linebuffer.append("(%s)" % p_args)
 	o_sql_linebuffer.append("\n")
 	o_sql_linebuffer.append("\tRETURNS %s\n" % p_rettype)
-	o_sql_linebuffer.append("\tLANGUAGE %s\n" % p_langtype)
+	o_sql_linebuffer.append("\tLANGUAGE '%s'\n" % p_langtype)
 	
 	if p_volatility == "s":
 		vol = "STABLE"
@@ -379,7 +379,8 @@ def create_function_items(p_schema, p_name, p_args, p_rettype, p_langtype, p_own
 	o_sql_linebuffer.append(p_body.strip())
 	o_sql_linebuffer.append("\n$BODY$;\n\n")
 	
-	o_sql_linebuffer.append("ALTER FUNCTION %s.%s(%s) OWNER to %s" % (p_schema, p_name, p_args, p_owner))
+	o_sql_linebuffer.append("ALTER FUNCTION %s.%s(%s)" % (p_schema, p_name, p_args))
+	o_sql_linebuffer.append("OWNER to %s" % (p_owner,))
 
 def create_role(p_rolename, p_new_value, o_sql_linebuffer):
 	

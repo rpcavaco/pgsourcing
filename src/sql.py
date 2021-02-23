@@ -1,5 +1,6 @@
 
 from src.common import PROC_SRC_BODY_FNAME
+#from common import PROC_SRC_BODY_FNAME
 
 SQL = {
 	"PROC_CHECK": """select 
@@ -292,3 +293,20 @@ SQL = {
 		end allprivs
 		from ps"""
 }
+
+# if __name__ == "__main__":
+	# import re
+	# patt = re.compile(r"(from|join)[\s]+(?P<table>[^ \(\t\n\r\f\v]+)", flags= re.I)
+	
+	# for k in SQL.keys():
+		# src = SQL[k]
+		# mo = re.search(patt, src)
+		# if mo:
+			# print(k, "--", mo.group("table"), "--")
+		# else:
+			# print("NAO DETECTADO:", k)
+			# print("-------------------------------------------")
+			# print(src)
+			# print("-------------------------------------------")
+		
+		
