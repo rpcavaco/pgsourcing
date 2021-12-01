@@ -38,7 +38,6 @@
 # Objectivo geral: gerir versões de estrutura de base de dados e 
 #	código fonte de procedimentos.
 #
-# Objectivo deste módulo: cálculo de extents e coordenadas de tiles
 #
 # Ficheiros desta solução:
 #	- main.py
@@ -47,7 +46,7 @@
 # ----------------------------------------------------------------------
 
 from __future__ import print_function
-from os import listdir, mkdir, makedirs, walk, remove as removefile
+from os import XATTR_SIZE_MAX, initgroups, listdir, mkdir, makedirs, walk, remove as removefile
 from os.path import abspath, dirname, exists, splitext, join as path_join
 from datetime import datetime as dt
 from copy import deepcopy, copy
@@ -68,17 +67,17 @@ import json
 import codecs
 import re
 import io
-import pprint
+import pprint as pp
 
 
 from src.common import LOG_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, \
-		OPS_OUTPUT, OPS_HELP, OPS_CHECK, OPS_CODE, SETUP_ZIP, \
+		OPS_OUTPUT, OPS_HELP, OPS_CHECK, OPS_CODE, OPS_PRECEDENCE, SETUP_ZIP, \
 		BASE_CONNCFG, BASE_FILTERS_RE, PROC_SRC_BODY_FNAME, \
 		STORAGE_VERSION
 		
 from src.read import srcreader, gen_proc_fname, reverse_proc_fname
 from src.connect import Connections
-from src.compare import comparing, keychains, sources_to_lists
+from src.compare import comparing, sources_to_lists
 from src.zip import gen_setup_zip
 from src.fileandpath import get_conn_cfg_path, get_filters_cfg, \
 		exists_currentref, to_jsonfile, save_ref, get_refcodedir, \
@@ -96,6 +95,8 @@ try:
     file_types = (io.IOBase,)
 except NameError:
     file_types = (file, StringIO)
+
+
     
 class Singleton(object):
 	_instances = {}
@@ -103,6 +104,7 @@ class Singleton(object):
 		if class_ not in class_._instances:
 			class_._instances[class_] = super(Singleton, class_).__new__(class_, *args, **kwargs)
 		return class_._instances[class_]
+
 
 
 # ######################################################################
@@ -116,11 +118,11 @@ def parse_args():
 	projdir = path_join(dirname(abspath(__file__)), 'projetos')	
 	projetos = listdir(projdir)
 	
-	ops_help = ["%s: %s" % (op, OPS_HELP[LANG][op]) for op in OPS]
+	ops_help = OPS_HELP[LANG]
 	ops_input = ",".join(OPS_INPUT)
 	
 	parser.add_argument("proj", nargs="?", action="store", help="Indique um projeto de entre estes: %s" % str(projetos))
-	parser.add_argument("oper", nargs="?", action="store", help="Indique uma operacao de entre estas: %s" % str(ops_help))
+	parser.add_argument("oper", nargs="?", action="store", help="Indique uma operacao de entre estas: %s" % json.dumps(ops_help, indent=4))
 	parser.add_argument("-o", "--output", help="Ficheiro de saida",
                     action="store")
 
@@ -173,11 +175,11 @@ def parse_args():
 				raise RuntimeError("Projeto '%s' nao existe, projetos encontrados: %s" % (args.proj, str(projetos)))
 				
 		if not args.addnewproc and not args.oper in OPS:
-			raise RuntimeError("Operacao '%s' invalida, ops disponiveis: %s" % (args.oper, str(ops_help)))
+			raise RuntimeError("Operacao '%s' invalida, ops disponiveis: %s" % (args.oper, json.dumps(ops_help, indent=4)))
 
-		if args.oper in OPS_INPUT and args.input is None:
-			parser.print_help()
-			raise RuntimeError("Operacao '%s' exige indicacao ficheiro de entrada com opcao -i" % args.oper)
+		# if args.oper in OPS_INPUT and args.input is None:
+		# 	parser.print_help()
+		# 	raise RuntimeError("Operacao '%s' exige indicacao ficheiro de entrada com opcao -i" % args.oper)
 
 		if args.oper in OPS_OUTPUT and args.output is None:
 			parser.print_help()
@@ -210,7 +212,7 @@ def do_output(p_obj, output=None, interactive=False, diff=False):
 				print(json_out) 
 		else:
 			dosave = False
-			if exists(output) and interactive:
+			if not isinstance(output, StringIO) and exists(output) and interactive:
 				prompt = "Ficheiro de saida existe, sobreescrever ? (s/n)"
 				try:
 					resp = raw_input(prompt)
@@ -863,11 +865,30 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 	def should_remove(p_isinsert, p_cr, p_op, p_pdiff_dict):
 		
 		grpkeys = p_op[1]
-		sch, name = grpkeys[1:3]
+		if len(grpkeys) < 3:
+			erase_diff_item(p_pdiff_dict, grpkeys)
+			return
+
+		if grpkeys[0] == "schemas":
+			assert len(grpkeys) == 2
+			sch = grpkeys[1]
+			name = None
+		else:
+			try:
+				sch, name = grpkeys[1:3]
+			except ValueError as e:
+				raise RuntimeError(f"checkCDOps, should_remove, invalid grpkeys: {grpkeys}") from e
+
 		obj_exists = False
 		ret = False
-		
-		if grpkeys[0] == "procedures":
+
+		if grpkeys[0] == "schemas":
+
+			p_cr.execute(SQL["SCHEMA_CHK"], (sch,))
+			row = p_cr.fetchone()
+			obj_exists = (row[0] == 1)
+
+		elif grpkeys[0] == "procedures":
 			
 			if not p_isinsert:
 				obj_exists = False
@@ -882,11 +903,26 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 					obj_exists = (row[0] == p_op[2] and row[1] == p_op[3])
 			
 		else:
+
+			# repr de um índice
+			# ['tables', 'devestagio', 'import_payshop', 'index', 'ix_estagio_import_payshop_index']
+
+			if grpkeys[0] == "tables" and grpkeys[3] == "index":
+
+				sch = grpkeys[1]
+				tabname = grpkeys[2]
+				idxname = grpkeys[4]
+				p_cr.execute(SQL["INDEX_CHECK"], (sch, tabname, idxname))
+				row = p_cr.fetchone()
+				if row[0] > 0:
+					obj_exists = True
+
+			else:
 			
-			p_cr.execute(SQL["GENERIC_CHECK"], (sch, name))
-			row = p_cr.fetchone()
-			if not row is None:
-				obj_exists = check_objtype(row[0], grpkeys[0])
+				p_cr.execute(SQL["GENERIC_CHECK"], (sch, name))
+				row = p_cr.fetchone()
+				if not row is None:
+					obj_exists = check_objtype(row[0], grpkeys[0])
 				
 		if p_isinsert and obj_exists or \
 			not p_isinsert and not obj_exists:
@@ -1004,12 +1040,16 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				comparison_mode, replaces, opordmgr, 
 				root_diff_dict["content"], cd_ops)
 				
-			#pp.pprint(cd_ops)
+			# Lista "crua" das operações
+			# print("-------------------------------")
+			# pp.pprint(cd_ops)
+			# print("-------------------------------")
+			
 			checkCDOps(p_proj, cd_ops, connkey, root_diff_dict["content"])
 			
 		## TODO - deve haver uma verificacao final de coerencia
 		## Sequencias - tipo da seq. == tipo do campo serial em que e usada, etc.
-		
+
 		if "content" in root_diff_dict.keys() and root_diff_dict["content"]:
 			
 			logger.info("result: DIFF FOUND (proj '%s')" % p_proj)
@@ -1031,9 +1071,9 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 					if not exists(newgenprocsdir):
 						makedirs(newgenprocsdir)
 				
-					for sch in diff_dict["procedures"].keys():
-						for proc in diff_dict["procedures"][sch]:
-							procel = diff_dict["procedures"][sch][proc]
+					for sch in root_diff_dict["procedures"].keys():
+						for proc in root_diff_dict["procedures"][sch]:
+							procel = root_diff_dict["procedures"][sch][proc]
 							if PROC_SRC_BODY_FNAME in procel.keys():
 								if "diffoper" in procel[PROC_SRC_BODY_FNAME].keys() and \
 										procel[PROC_SRC_BODY_FNAME]["diffoper"] == "update":
@@ -1061,7 +1101,11 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 					with open(inputf, "r") as fj:
 						diffdict = json.load(fj)
 			elif isinstance(inputf, file_types):
-				diffdict = json.load(inputf)
+				if isinstance(inputf, StringIO):
+					diffdict = json.loads(inputf.getvalue())
+				else:
+					diffdict = json.load(inputf)
+				inputf.close()
 				
 		if delmode is None:
 			dlmd = "NODEL"
@@ -1252,16 +1296,52 @@ def cli_main():
 			elif args.addnewtrig:
 				## conf_obj=None forces interaction with stdin and stdout
 				addnewtrigger_file(proj, conn=args.connkey, conf_obj=None)				
-			else:			
-				main(proj, args.oper, args.connkey, args.genprocsdir, 
-						output=args.output, inputf=args.input, 
-						canuse_stdout=True, 
-						include_public=args.includepublic, 
-						include_colorder = not args.removecolorder,
-						updates_ids = args.opsorder,
-						limkeys = args.limkeys,
-						delmode = args.delmode,
-						simulupdcode = args.simulupdcode)
+			else:
+
+				if args.oper in OPS_INPUT and args.input is None:	
+
+					if not args.oper in OPS_PRECEDENCE.keys():
+						raise RuntimeError("Operacao '%s' exige indicacao ficheiro de entrada com opcao -i" % args.oper)
+
+					preoper = OPS_PRECEDENCE[args.oper]
+
+					with io.StringIO() as outf:
+
+						# prev operation
+						main(proj, preoper, args.connkey, args.genprocsdir, 
+								output=outf, inputf=None, 
+								canuse_stdout=True, 
+								include_public=args.includepublic, 
+								include_colorder = not args.removecolorder,
+								updates_ids = args.opsorder,
+								limkeys = args.limkeys,
+								delmode = args.delmode,
+								simulupdcode = args.simulupdcode)
+
+						assert outf.tell() > 0, "Nothing to do on '{}', prev operation '{}' result is empty".format(args.oper, preoper)
+
+						# requested operation
+						main(proj, args.oper, args.connkey, args.genprocsdir, 
+								output=args.output, inputf=outf, 
+								canuse_stdout=True, 
+								include_public=args.includepublic, 
+								include_colorder = not args.removecolorder,
+								updates_ids = args.opsorder,
+								limkeys = args.limkeys,
+								delmode = args.delmode,
+								simulupdcode = args.simulupdcode)
+
+				else:   # NOT args.oper in OPS_INPUT OR NOT args.input is None
+
+					main(proj, args.oper, args.connkey, args.genprocsdir, 
+							output=args.output, inputf=args.input, 
+							canuse_stdout=True, 
+							include_public=args.includepublic, 
+							include_colorder = not args.removecolorder,
+							updates_ids = args.opsorder,
+							limkeys = args.limkeys,
+							delmode = args.delmode,
+							simulupdcode = args.simulupdcode)
 					
 	except:
 		logger.exception("")

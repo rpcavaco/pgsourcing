@@ -18,6 +18,13 @@ SQL = {
 		ON t1.relnamespace = n1.oid
 		where nspname = %s
 		and t1.relname = %s""",
+	"INDEX_CHECK": """SELECT count(*)
+		FROM pg_indexes
+		WHERE schemaname = %s  
+		AND tablename = %s and tablename = %s""",
+	"SCHEMA_CHK": """select count(*)
+		from information_schema.schemata
+		where schema_name = %s""", 
 	"SCHEMAS": """select schema_name, schema_owner
 		from information_schema.schemata""", 
 	"PROCOWNERS": """select distinct proowner::regrole as ownr

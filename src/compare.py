@@ -28,6 +28,7 @@
 import json
 import re
 import logging
+import warnings
 
 from os.path import exists
 from copy import copy, deepcopy
@@ -84,7 +85,7 @@ def traverse_replaceval(p_transformschema, p_obj, p_mode):
 		if isinstance(p_obj[k], dict):
 			traverse_replaceval(p_transformschema, p_obj[k], p_mode)		
 	
-def get_diff_item(p_fase, p_diff_dict, p_grpkeys, b_leaf_is_list=False):
+def get_diff_item(p_fase, p_diff_dict, p_grpkeys, opt_leaf_keys=None, b_leaf_is_list=False):
 	
 	diff_dict = p_diff_dict
 	for ki, k in enumerate(p_grpkeys):
@@ -93,6 +94,11 @@ def get_diff_item(p_fase, p_diff_dict, p_grpkeys, b_leaf_is_list=False):
 				diff_dict[k] = []
 			else:
 				diff_dict[k] = {}
+		diff_dict = diff_dict[k]
+
+	if not opt_leaf_keys is None and len(opt_leaf_keys) == 1 and not b_leaf_is_list:
+		k = opt_leaf_keys[0]
+		diff_dict[k] = {}
 		diff_dict = diff_dict[k]
 		
 	return diff_dict		
@@ -337,7 +343,9 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 		
 		for k in skeys:
 			
-			klist  = grpkeys+[k]
+			klist = grpkeys+[k]
+			#if k == "index" and len(klist) == 4:
+				#print("klist:", klist, "k:", k, tmp_l.keys(), tmp_r.keys(), tmp_r["index"])
 			rkeys = tmp_r.keys()
 			# reprkey = {}
 
@@ -402,10 +410,10 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 			elif k in rkeys and not k in tmp_l.keys():
 
 				if printdbg:
-					print("right only:", grpkey, k, level)
+					print("right only:", grpkey, k, level, "tmp_r['"+k+"'].keys():", tmp_r[k].keys())
 
 				# right only
-				diff_item = get_diff_item('b1', diff_dict, klist)
+				diff_item = get_diff_item('b1', diff_dict, klist, opt_leaf_keys=list(tmp_r[k].keys()))
 				p_opordmgr.setord(diff_item)
 				diff_item["diffoper"] = "delete"
 
@@ -609,15 +617,20 @@ def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict): #,
 def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops):
 	
 	raw_ref_json = load_currentref(p_proj)
+
+	# print("--------")
+	# print(json.dumps(raw_ref_json, indent=4))
+	# print("--------")
 	
 	assert not raw_ref_json is None
-	assert raw_ref_json["pgsourcing_storage_ver"] <= STORAGE_VERSION, "Incompatible storager ver %s > %s" % (raw_ref_json["pgsourcing_storage_ver"], STORAGE_VERSION)
+	if raw_ref_json["pgsourcing_storage_ver"] <= STORAGE_VERSION:
+		warnings.warn("Deprecated storager ver %s > %s. Must run 'updref' ASAP" % (raw_ref_json["pgsourcing_storage_ver"], STORAGE_VERSION), DeprecationWarning) 
 	
 	ref_json = raw_ref_json["content"]
 	
 	upperlevel_ops = {}
 	
-	# print("comparison_mode:", p_comparison_mode)
+	print("comparison_mode:", p_comparison_mode)
 
 	if p_comparison_mode == "From SRC": 
 				
@@ -633,7 +646,8 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 		
 		if p_transformschema:
 						
-			for sch in l_dict["schemas"].keys():
+			first_schema_names = list(l_dict["schemas"].keys())
+			for sch in first_schema_names:
 				for trans in p_transformschema["trans"]:
 					if sch == trans["src"]:
 						l_dict["schemas"][trans["dest"]] = l_dict["schemas"].pop(sch)
@@ -642,8 +656,10 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 			for tk in p_transformschema["types"]:
 				if tk == "schemas":
 					continue
-				if tk in l_dict.keys():
-					for sch in l_dict[tk].keys():
+				first_types = list(l_dict.keys())
+				if tk in first_types:
+					first_schema_names = list(l_dict[tk].keys())
+					for sch in first_schema_names:
 						for trans in p_transformschema["trans"]:
 							if sch == trans["src"]:
 								l_dict[tk][trans["dest"]] = l_dict[tk].pop(sch)

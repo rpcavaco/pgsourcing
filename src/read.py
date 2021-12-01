@@ -181,8 +181,8 @@ def srvanddb_metadata(p_conn, out_dict):
 					cr.execute("select version()")
 					row = cr.fetchone()	
 					out_dict["pg_metadata"]["pg_version"] = row[0]
-					
-					m = re.match("PostgreSQL[\s]+(\d\.\d)", row[0])
+
+					m = re.match("PostgreSQL[\s]+(\d+\.\d+)", row[0])
 					if m:
 						vval = float(m.group(1))
 						if vval >= 10:

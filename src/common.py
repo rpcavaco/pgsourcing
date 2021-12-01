@@ -27,7 +27,7 @@ OPS_CODE = ["chkcode", "updcode"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
 
-STORAGE_VERSION = 1
+STORAGE_VERSION = 2
 
 OPS_HELP = {
 	"pt": {
@@ -40,6 +40,10 @@ OPS_HELP = {
 		"updcode": "atualizar codigo na b.d. fonte",
 		"filldata": "carregar dados de tebelas de parametros numa b.d. de destino"
 	}
+}
+
+OPS_PRECEDENCE = {
+	"updref": "chksrc"
 }
 
 SETUP_ZIP = "pgsourcing_setup.zip"

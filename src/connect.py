@@ -60,6 +60,8 @@ class Conn(object):
 				self.db = p_dict[k]
 			else:
 				newdict[k] = p_dict[k]
+		if self.db is None:
+			raise ConnectionError("Conn: missing 'database' parameter")
 				
 		# print(newdict)				
 		try:
@@ -154,7 +156,7 @@ class Connections(object):
 					else:
 						self.conns[k] = Conn(root[k][subkey])
 				except Exception as e:
-					continue
+					raise ConnectionError(f"Connections: Conn creation error for key '{k}'") from e
 
 
 	def __del__(self):
