@@ -46,7 +46,7 @@
 # ----------------------------------------------------------------------
 
 from __future__ import print_function
-from os import XATTR_SIZE_MAX, initgroups, listdir, mkdir, makedirs, walk, remove as removefile
+from os import listdir, mkdir, makedirs, walk, remove as removefile
 from os.path import abspath, dirname, exists, splitext, join as path_join
 from datetime import datetime as dt
 from copy import deepcopy, copy
@@ -72,8 +72,7 @@ import pprint as pp
 
 from src.common import LOG_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, \
 		OPS_OUTPUT, OPS_HELP, OPS_CHECK, OPS_CODE, OPS_PRECEDENCE, SETUP_ZIP, \
-		BASE_CONNCFG, BASE_FILTERS_RE, PROC_SRC_BODY_FNAME, \
-		STORAGE_VERSION
+		BASE_CONNCFG, PROC_SRC_BODY_FNAME, STORAGE_VERSION  #  BASE_FILTERS_RE
 		
 from src.read import srcreader, gen_proc_fname, reverse_proc_fname
 from src.connect import Connections
@@ -907,7 +906,7 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 			# repr de um índice
 			# ['tables', 'devestagio', 'import_payshop', 'index', 'ix_estagio_import_payshop_index']
 
-			if grpkeys[0] == "tables" and grpkeys[3] == "index":
+			if grpkeys[0] == "tables" and len(grpkeys) > 3 and grpkeys[3] == "index":
 
 				sch = grpkeys[1]
 				tabname = grpkeys[2]

@@ -61,11 +61,14 @@ def gen_where_from_re_list(p_filter_fieldname, p_re_list, dojoin=False, intersec
 	
 	if dojoin and len(lst) > 1:
 		seq = "(%s)" % seq
-		
-	if dojoin:
-		ret = prevjoiner % seq
-	else:
-		ret = "where %s" % seq
+
+	if len(seq) < 1:
+		ret = None
+	else:		
+		if dojoin:
+			ret = prevjoiner % seq
+		else:
+			ret = "where %s" % seq
 	
 	return ret
 
