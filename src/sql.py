@@ -237,7 +237,7 @@ SQL = {
 										when 1 then 'ROW'::text
 										else 'STATEMENT'::text
 						end as trigger_level,
-				 		ns1.nspname as function_schema,
+				 		ns2.nspname as function_schema,
 						p.proname as function_name
 				 from pg_trigger t
 				 left join pg_class c on t.tgrelid = c.oid
