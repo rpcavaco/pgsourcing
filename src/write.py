@@ -28,8 +28,10 @@
 import re
 import logging 
 
+
 from src.fileandpath import load_currentref
 from src.common import CFG_GROUPS, CFG_LISTGROUPS, COL_ITEMS_CHG_AVOIDING_SUBSTITUTION
+from copy import deepcopy
 
 SQL_CREATE_PK = """%s ADD CONSTRAINT %s PRIMARY KEY (%s)
     USING INDEX TABLESPACE %s"""
@@ -71,35 +73,52 @@ def changegrp(p_chg_group, p_currdiff_block, p_updates_ids_list, p_keys_byref, p
 	if len(p_keys_byref) > 15:
 		raise RuntimeError("changegrp: excessiva recursao, seq de chaves: %s" % str(p_keys_byref))
 
+	try:
+		print("\n>>", p_keys_byref, p_chg_group.keys(), p_currdiff_block.keys())
+	except AttributeError:
+		print('Err:', p_keys_byref, p_chg_group, p_currdiff_block)
+		raise
+
 	if isinstance(p_currdiff_block, dict):
-		
+
 		for k in p_currdiff_block.keys():	
-			
+
 			if k == p_keys_byref[-1]:
 				raise RuntimeError("changegrp: erro recursao, seq de chaves identicas: %s + %s" % (str(p_keys_byref), k))
-			diff_item = p_currdiff_block[k]
-			if isinstance(diff_item, list):
-				assert isinstance(p_chg_group, list), "Incoerencia: list diff para alterar dicionario: '%s'" % str(diff_item)
-				changed = changed | changegrp_list(p_chg_group, diff_item, p_updates_ids_list)
+
+			if not k in p_chg_group.keys():
+				p_chg_group[k] = {}
+
+			# objects that can occur within other objects
+			if k in ["index"]:
+
+				changed = changed | changegrp(p_chg_group[k], p_currdiff_block[k], p_updates_ids_list, p_keys_byref+[k], p_limkeys_list) 
+
 			else:
-				if "diffoper" in diff_item.keys():
-					if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:
-						#print(k)
-						if len(p_limkeys_list) < 1 or k in p_limkeys_list:
-							#print(diff_item["operorder"], p_updates_ids_list)
-							if diff_item["diffoper"] == "insert":
-								#print(p_keys_byref, k, "oper:", diff_item["diffoper"], "new:", diff_item["newvalue"])	
-								p_chg_group[k] = diff_item["newvalue"]
-								changed = True
-								#print("-->", p_chg_group)	
-							elif diff_item["diffoper"] == "update":
-								p_chg_group[k] = diff_item["newvalue"]
-								changed = True
-							elif diff_item["diffoper"] == "delete":
-								p_chg_group.pop(k, None)
-								changed = True						
+
+				diff_item = p_currdiff_block[k]
+
+				if isinstance(diff_item, list):
+					assert isinstance(p_chg_group, list), "Incoerencia: list diff para alterar dicionario: '%s'" % str(diff_item)
+					changed = changed | changegrp_list(p_chg_group, diff_item, p_updates_ids_list)
 				else:
-					changed = changed | changegrp(p_chg_group[k], diff_item, p_updates_ids_list, p_keys_byref+[k], p_limkeys_list) 
+					if "diffoper" in diff_item.keys():
+						if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:
+							if len(p_limkeys_list) < 1 or k in p_limkeys_list:
+								#print(diff_item["operorder"], p_updates_ids_list)
+								if diff_item["diffoper"] == "insert":
+									#print(p_keys_byref, k, "oper:", diff_item["diffoper"], "new:", diff_item["newvalue"])	
+									p_chg_group[k] = diff_item["newvalue"]
+									changed = True
+									#print("-->", p_chg_group)	
+								elif diff_item["diffoper"] == "update":
+									p_chg_group[k] = diff_item["newvalue"]
+									changed = True
+								elif diff_item["diffoper"] == "delete":
+									p_chg_group.pop(k, None)
+									changed = True						
+					else:
+						changed = changed | changegrp(p_chg_group[k], diff_item, p_updates_ids_list, p_keys_byref+[k], p_limkeys_list) 
 					
 	elif isinstance(p_currdiff_block, list):
 		
@@ -237,7 +256,6 @@ def table_operation(p_sch, p_tname, p_diff_item, p_delmode, p_out_sql_src):
 			for cname in p_diff_item["newvalue"]["unique"].keys():	
 				di = p_diff_item["newvalue"]["unique"][cname]
 				p_out_sql_src.append(SQL_CREATE_UNIQUE % (tmplt % (p_sch, p_tname), cname, ",".join(di["columns"]), di["index_tablespace"]))									
-
 		if "trigger" in p_diff_item["newvalue"].keys():	
 			for trname in p_diff_item["newvalue"]["trigger"].keys():	
 				di = p_diff_item["newvalue"]["trigger"][trname]

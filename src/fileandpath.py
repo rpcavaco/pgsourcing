@@ -93,8 +93,15 @@ def load_currentref(p_proj):
 	return ret	
 	
 def to_jsonfile(p_obj, p_output):
-	with open(p_output, "w") as fj:
-		json.dump(p_obj, fj, indent=2, sort_keys=True)
+	try:
+		flagv = isinstance(p_output, basestring)
+	except NameError:
+		flagv = isinstance(p_output, str)
+	if flagv:
+		with open(p_output, "w") as fj:
+			json.dump(p_obj, fj, indent=2, sort_keys=True)
+	else:
+		json.dump(p_obj, p_output, indent=2, sort_keys=True)
 
 def from_jsonfile(p_input, o_obj):
 	if not exists(p_input):
