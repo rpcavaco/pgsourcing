@@ -133,7 +133,7 @@ def parse_args():
 	parser.add_argument("-r", "--removecolorder", help="Remover ordenacao das colunas nas tabelas", action="store_true")
 	parser.add_argument("-g", "--genprocsdir", help="Gerar sources dos procedimentos, indicar pasta a criar", action="store")
 	parser.add_argument("-d", "--opsorder", help="Lista de operacoes (sequencia de oporder) a efetuar", action="store")
-	parser.add_argument("-k", "--limkeys", help="Filtro de atributios a alterar: apenas estes atributos serao alterados", action="store")
+	parser.add_argument("-k", "--limkeys", help="Filtro de atributos a alterar: apenas estes atributos serao alterados", action="store")
 	parser.add_argument("-m", "--delmode", help="Modo apagamento: NODEL (default), DEL, CASCADE", action="store")
 	parser.add_argument("-a", "--addnewproc", help="Gerar novo ficheiro de procedure", action="store_true")
 	parser.add_argument("-t", "--addnewtrig", help="Gerar novo ficheiro de trigger", action="store_true")

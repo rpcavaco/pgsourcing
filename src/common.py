@@ -38,7 +38,7 @@ OPS_HELP = {
 		"upddest": "gerar script para b.d. destino",
 		"upddir": "atualizar diretamente b.d. destino",
 		"updcode": "atualizar codigo na b.d. fonte",
-		"filldata": "carregar dados de tebelas de parametros numa b.d. de destino"
+		"filldata": "carregar dados de tabelas de parametros numa b.d. de destino"
 	}
 }
 
