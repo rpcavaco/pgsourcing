@@ -43,7 +43,8 @@ OPS_HELP = {
 }
 
 OPS_PRECEDENCE = {
-	"updref": "chksrc"
+	"updref": "chksrc",
+	"upddest": "chkdest"	
 }
 
 SETUP_ZIP = "pgsourcing_setup.zip"
