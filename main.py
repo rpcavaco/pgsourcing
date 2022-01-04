@@ -54,7 +54,7 @@ from difflib import unified_diff as dodiff
 from subprocess import check_call
 
 #################
-import pdb
+# import pdb
 #################
 
 
@@ -1147,13 +1147,13 @@ def gen_newprocfile_items():
 
 	ret = None
 	prlist = [
-		"Schema do novo procedimento (x ou vazio para sair sem criar):",
-		"Nome do novo procedimento:",
-		"Tipo de dados de retorno:",
-		"Login proprietario:"
+		"New procedure schema (enter 'x' or blank to terminate):"
+		"New procedure name:",
+		"Return type:",
+		"Owner:"
 		]
 		
-	prfinal = "tipo de dados %so. argumento (x ou vazio para terminar):"
+	prfinal = "data type of argument #%s (enter 'x' or blank to terminate):"
 	
 	doexit = False
 	tiposargs = []
