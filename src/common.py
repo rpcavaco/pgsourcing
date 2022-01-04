@@ -18,11 +18,11 @@ LOG_CFG = {
 ########################################################################
 
 LANG = "pt"
-OPS = ["chksrc", "chkdest", "updref", "upddest", "upddir", "chkcode", "updcode", "filldata"]
+OPS = ["chksrc", "chkdest", "updref", "updscript", "upddirect", "chkcode", "updcode", "filldata"]
 OPS_CHECK = ["chksrc", "chkdest"]
-OPS_CONNECTED = ["chksrc", "chkdest", "upddir", "updcode", "filldata"]
-OPS_INPUT = ["updref", "upddest", "upddir", "updcode"]
-OPS_OUTPUT = ["upddest"]
+OPS_CONNECTED = ["chksrc", "chkdest", "upddirect", "updcode", "filldata"]
+OPS_INPUT = ["updref", "updscript", "upddirect", "updcode"]
+OPS_OUTPUT = ["updscript"]
 OPS_CODE = ["chkcode", "updcode"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
@@ -31,20 +31,21 @@ STORAGE_VERSION = 2
 
 OPS_HELP = {
 	"pt": {
-		"chksrc": "comparar b.d. fonte com o repositorio de referencia",
-		"chkdest": "comparar o repositorio de referencia com uma b.d. destino",
-		"chkcode": "comparar codigo externo (procedures) com o repositorio de referencia",
-		"updref": "atualizar o repositorio de referencia desde a b.d. fonte",
-		"upddest": "gerar script para b.d. destino",
-		"upddir": "atualizar diretamente b.d. destino",
-		"updcode": "atualizar codigo na b.d. fonte",
-		"filldata": "carregar dados de tabelas de parametros numa b.d. de destino"
+		"chksrc": "compare source (development) database to reference local repository (instantiate it in case this is not laready done)",
+		"chkdest": "compare reference local repository to destination (production) database",
+		"chkcode": "compare procedure source code files to reference local repository",
+		"updref": "update reference local repository from source (development) database",
+		"updscript": "generate SQL and DDL script to update destination (production) database, includes procedural code",
+		"upddirect": "directly update destination (production) database (should 'updscript' first to check all changes prior to update), includes procedural code",
+		"updcode": "update procedural code in source (development) database, from local repository",
+		"filldata": "fill parameter table values in destination (production) database"
 	}
 }
 
 OPS_PRECEDENCE = {
 	"updref": "chksrc",
-	"upddest": "chkdest"	
+	"updscript": "chkdest",
+	"upddirect": "chkdest"	
 }
 
 SETUP_ZIP = "pgsourcing_setup.zip"

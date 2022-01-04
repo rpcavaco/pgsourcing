@@ -112,7 +112,7 @@ class Singleton(object):
 
 def parse_args():
 	
-	parser = argparse.ArgumentParser(description='Diff e migracao de definicoes de base de dados PostgreSQL')
+	parser = argparse.ArgumentParser(description='Diff and definition migrations on PostgreSQL')
 	
 	projdir = path_join(dirname(abspath(__file__)), 'projetos')	
 	projetos = listdir(projdir)
@@ -120,29 +120,29 @@ def parse_args():
 	ops_help = OPS_HELP[LANG]
 	ops_input = ",".join(OPS_INPUT)
 	
-	parser.add_argument("proj", nargs="?", action="store", help="Indique um projeto de entre estes: %s" % str(projetos))
-	parser.add_argument("oper", nargs="?", action="store", help="Indique uma operacao de entre estas: %s" % json.dumps(ops_help, indent=4))
-	parser.add_argument("-o", "--output", help="Ficheiro de saida",
-                    action="store")
+	parser.add_argument("proj", nargs="?", action="store", help="Project name, chosen from these: %s" % str(projetos))
+	parser.add_argument("oper", nargs="?", action="store", help="Operation name, chosen from these: %s" % json.dumps(ops_help, indent=4))
+	parser.add_argument("-o", "--output", help="Output file", action="store")
 
-	parser.add_argument("-i", "--input", help="Ficheiro de entrada (OBRIGATORIO com 'oper' %s)" % ops_input, action="store")
-	parser.add_argument("-c", "--connkey", help="Chave da ligacao de base de dados (por defeito 'src' se op for 'chksrc')", action="store")
-	parser.add_argument("-s", "--setup", help="Apenas criar ZIP de setup", action="store_true")
-	parser.add_argument("-n", "--newproj", help="Apenas criar novo projeto vazio", action="store")
-	parser.add_argument("-p", "--includepublic", help="Incluir schema public", action="store_true")
-	parser.add_argument("-r", "--removecolorder", help="Remover ordenacao das colunas nas tabelas", action="store_true")
-	parser.add_argument("-g", "--genprocsdir", help="Gerar sources dos procedimentos, indicar pasta a criar", action="store")
-	parser.add_argument("-d", "--opsorder", help="Lista de operacoes (sequencia de oporder) a efetuar", action="store")
-	parser.add_argument("-k", "--limkeys", help="Filtro de atributos a alterar: apenas estes atributos serao alterados", action="store")
-	parser.add_argument("-m", "--delmode", help="Modo apagamento: NODEL (default), DEL, CASCADE", action="store")
-	parser.add_argument("-a", "--addnewproc", help="Gerar novo ficheiro de procedure", action="store_true")
-	parser.add_argument("-t", "--addnewtrig", help="Gerar novo ficheiro de trigger", action="store_true")
-	parser.add_argument("-u", "--simulupdcode", help="Simular atualizacao codigo", action="store_true")
-	
+	parser.add_argument("-i", "--input", help="Input file (REQUIRED on 'oper' %s)" % ops_input, action="store")
+	parser.add_argument("-c", "--connkey", help="Database connection key on project config (default is 'src' for 'chksrc' op)", action="store")
+	parser.add_argument("-s", "--setup", help="Just generate a setup ZIP (ZIP will include the whole pgsourcing software and existing projects)", action="store_true")
+	parser.add_argument("-n", "--newproj", help="Create empty project", action="store")
+	parser.add_argument("-p", "--includepublic", help="Include public schema", action="store_true")
+	parser.add_argument("-r", "--removecolorder", help="Remove table column ordering", action="store_true")
+	parser.add_argument("-g", "--genprocsdir", help="Procedure source folder name to create", action="store")
+	parser.add_argument("-d", "--updateids", help="Update ids list, to filter tasks in update operation", action="store")
+	parser.add_argument("-m", "--delmode", help="Delete mode: NODEL (default), DEL, CASCADE", action="store")
+	parser.add_argument("-a", "--addnewproc", help="Generate a new empty procedure source file", action="store_true")
+	parser.add_argument("-t", "--addnewtrig", help="Generate a new empty trigger source file", action="store_true")
+	parser.add_argument("-u", "--simulupdcode", help="Activate simulation mode, only for 'updcode' operation", action="store_true")
+
+	parser.add_argument("-k", "--limkeys", help="[INTERNAL USE] object type keys list to filter update op, only the types listed will be changed (comma, semicolon and optional additional space separated list)", action="store")
+
 	args = parser.parse_args()
 	
 	logger = logging.getLogger('pgsourcing')	
-	logger.info("Inicio, args: %s" % args)
+	logger.info("Starting, args: %s" % args)
 	
 	mutexflags = set()
 	if args.setup:
@@ -152,13 +152,13 @@ def parse_args():
 	
 	if len(mutexflags) > 1:
 		parser.print_help()
-		raise RuntimeError("opcoes -s e -n sao mutuamente exclusivas")
+		raise RuntimeError("options -s e -n are mutually exclusive")
 	
 	proj = None
 	if len(mutexflags) == 0:
 		if args.proj is None:
 			parser.print_help()
-			raise RuntimeError("A indicacao de projeto (proj) obrigatoria exceto nas opcoes -s e -n")
+			raise RuntimeError("Project name required (parameter proj), except when using options -s e -n")
 		if args.proj in projetos:
 			proj = args.proj
 		else:
@@ -171,10 +171,10 @@ def parse_args():
 			if len(possibs) == 1:
 				proj = possibs[0]
 			else:
-				raise RuntimeError("Projeto '%s' nao existe, projetos encontrados: %s" % (args.proj, str(projetos)))
+				raise RuntimeError("Project '%s' is missing, found projects: %s" % (args.proj, str(projetos)))
 				
 		if not args.addnewproc and not args.oper in OPS:
-			raise RuntimeError("Operacao '%s' invalida, ops disponiveis: %s" % (args.oper, json.dumps(ops_help, indent=4)))
+			raise RuntimeError("Invalid operation '%s', available ops: %s" % (args.oper, json.dumps(ops_help, indent=4)))
 
 		# if args.oper in OPS_INPUT and args.input is None:
 		# 	parser.print_help()
@@ -182,7 +182,7 @@ def parse_args():
 
 		if args.oper in OPS_OUTPUT and args.output is None:
 			parser.print_help()
-			raise RuntimeError("Operacao '%s' exige indicacao ficheiro de saida com opcao -o" % args.oper)
+			raise RuntimeError("Operation '%s' requires output file name, given with option -o" % args.oper)
 			
 	if args.input:
 		assert exists(args.input), "Ficheiro de entrada inexistente: '%s'" % args.input
@@ -350,14 +350,14 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 				if p_oper == "chksrc":
 
 					if not conns.checkConn("src"):
-						raise RuntimeError("Chksource: connection identificada com 'src' nao existe, necessario indicar chave respetiva")
+						raise RuntimeError("Chksrc, implicit 'src' connection is not defined, must provide an explicit conn key using -c / --connkey option")
 					else:
 						connkey = 'src'
 
 				elif p_oper == "chkdest":
 
 					if not conns.checkConn("dest"):
-						raise RuntimeError("Chksource: connection identificada com 'dest' nao existe, necessario indicar chave respetiva")
+						raise RuntimeError("Chkdest, implicit 'dest' connection is not defined, must provide an explicit conn key using -c / --connkey option")
 					else:
 						connkey = 'dest'
 
@@ -449,7 +449,7 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 			upd_ids_list = process_intervals_string(updates_ids)
 		elif isinstance(updates_ids, list):
 			upd_ids_list = updates_ids
-			
+
 	limkeys_list = []
 	if not limkeys is None:
 		limkeys_list.extend(re.split("[ \,;]+", limkeys))
@@ -486,7 +486,7 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 
 			logger.info("reference changed, proj:%s" % (p_proj,))
 		
-	elif p_oper == "upddest":
+	elif p_oper == "updscript":
 
 		assert not diffdict is None
 		
@@ -495,7 +495,7 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 
 		logger.info("dest change script for proj. %s, %s" % (p_proj,output))
 		
-	elif p_oper == "upddir":
+	elif p_oper == "upddirect":
 
 		assert not diffdict is None
 		
@@ -509,8 +509,12 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 		with cn.cursor() as cr:
 			# execute_batch(cr, script, (), page_size=10)
 			for ln in out_sql_src:
-				print('>>', ln)
-				cr.execute(ln)
+				if isinstance(ln, list):
+					strcontent = '\n'.join(ln)
+				else:
+					strcontent = ln
+				# print('0>>', strcontent, '<<||')
+				cr.execute(strcontent)
 		cn.commit()
 			
 		logger.info("direct dest change for proj. %s" % p_proj)
@@ -611,13 +615,13 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 							with codecs.open(frompath, "r", "utf-8") as flA:
 								srca = flA.read()
 						except:
-							raise RuntimeError("Erro de leitura de %s" % frompath)
+							raise RuntimeError("Read error on %s" % frompath)
 						
 						try:
 							with codecs.open(topath, "r", "utf-8") as flB:
 								srcb = flB.read()
 						except:
-							raise RuntimeError("Erro de leitura de %s" % topath)
+							raise RuntimeError("Read error on %s" % topath)
 							
 
 						listA = []
@@ -967,7 +971,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	root_diff_dict = { "content": {} }
 	#ordered_diffkeys = {}
 	replaces = {}
-	
+
 	comparison_mode, connkey = check_oper_handler(p_proj, p_oper, 
 		refcodedir, reftablesdir, destcodedir, check_dict, \
 		replaces, p_connkey=p_connkey, include_public=include_public, 
@@ -1028,7 +1032,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		elif comparison_mode == "From REF":
 			
 			if not exists_currentref(p_proj):
-				raise RuntimeError("Referencia do projeto '%s' em falta, necessario correr chksrc primeiro" % p_proj)
+				raise RuntimeError("Project '%s' has no reference data, 'chksrc' must be run first" % p_proj)
 			else:
 				do_compare = True
 		
@@ -1063,7 +1067,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				
 				if not "procedures" in root_diff_dict["content"].keys():					
 					
-					logger.warning("Sem procedimentos para colocar em '%s'" % newgenprocsdir)
+					logger.warning("No procedures to dump on '%s'" % newgenprocsdir)
 					
 				else:
 									
@@ -1085,7 +1089,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			logger.info("result: NO DIFF (proj '%s')" % p_proj)
 			# do_output(check_dict, output=output, interactive=canuse_stdout)
 			
-	else:
+	else: # if not check_dict
 
 		diffdict = None
 		if p_oper in OPS_INPUT:
@@ -1300,35 +1304,53 @@ def cli_main():
 				if args.oper in OPS_INPUT and args.input is None:	
 
 					if not args.oper in OPS_PRECEDENCE.keys():
-						raise RuntimeError("Operacao '%s' exige indicacao ficheiro de entrada com opcao -i" % args.oper)
+						raise RuntimeError("Operation '%s' requires input file given using -i option" % args.oper)
 
-					preoper = OPS_PRECEDENCE[args.oper]
+					operitem = args.oper
+					operlist = [args.oper]
+					streams = []
+					while operitem in OPS_PRECEDENCE.keys():					
+						operitem = OPS_PRECEDENCE[operitem]
+						operlist.insert(0, operitem)
 
-					with io.StringIO() as outf:
+					for oi, operitem in enumerate(operlist):
 
-						# prev operation
-						main(proj, preoper, args.connkey, args.genprocsdir, 
-								output=outf, inputf=None, 
+						if operitem in OPS_CHECK:						
+							streams = [args.input, io.StringIO()]
+						else:
+
+							if operitem in OPS_INPUT:
+								if len(streams) > 0:
+									if not streams[0] is None:
+										streams[0].close()
+									del streams[0]
+
+							if operitem in OPS_OUTPUT:
+								streams.append(io.StringIO())
+
+						if len(streams) < 2:
+							streams.append(args.output)
+
+						print(operitem, streams[0], streams[1])
+
+						main(proj, operitem, args.connkey, args.genprocsdir, 
+								output=streams[1], inputf=streams[0], 
 								canuse_stdout=True, 
 								include_public=args.includepublic, 
 								include_colorder = not args.removecolorder,
-								updates_ids = args.opsorder,
+								updates_ids = args.updateids,
 								limkeys = args.limkeys,
 								delmode = args.delmode,
 								simulupdcode = args.simulupdcode)
 
-						assert outf.tell() > 0, "Nothing to do on '{}', prev operation '{}' result is empty".format(args.oper, preoper)
+						if oi < len(operlist)-1:
+							
+							assert streams[1].tell() > 0, "Nothing to do on op '{} - {}', prev result is empty".format(oi+1, operitem)
+							
+							# print("----------------------------------->")
+							# print(streams[1].getvalue()[:300])
+							# print("->--------------------------------||")
 
-						# requested operation
-						main(proj, args.oper, args.connkey, args.genprocsdir, 
-								output=args.output, inputf=outf, 
-								canuse_stdout=True, 
-								include_public=args.includepublic, 
-								include_colorder = not args.removecolorder,
-								updates_ids = args.opsorder,
-								limkeys = args.limkeys,
-								delmode = args.delmode,
-								simulupdcode = args.simulupdcode)
 
 				else:   # NOT args.oper in OPS_INPUT OR NOT args.input is None
 
@@ -1337,7 +1359,7 @@ def cli_main():
 							canuse_stdout=True, 
 							include_public=args.includepublic, 
 							include_colorder = not args.removecolorder,
-							updates_ids = args.opsorder,
+							updates_ids = args.updateids,
 							limkeys = args.limkeys,
 							delmode = args.delmode,
 							simulupdcode = args.simulupdcode)

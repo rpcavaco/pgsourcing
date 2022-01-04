@@ -187,7 +187,7 @@ SQL = {
 	"PROCS_PRE11": """SELECT procedure_schema, procedure_name, args, return_type,
 				procedure_owner, language_type, %s, provolatile
 			FROM
-			  (SELECT ns1.nspname as procedure_schema, 
+			  (SELECT p.pronamespace::regnamespace::text as procedure_schema, 
 				p.proname AS procedure_name,
 				pg_get_function_identity_arguments(p.oid) args, 
 				t1.typname AS return_type,
@@ -198,7 +198,6 @@ SQL = {
 			FROM pg_proc p
 			LEFT JOIN pg_type t1 ON p.prorettype=t1.oid   
 			LEFT JOIN pg_language l ON p.prolang=l.oid
-			join pg_namespace ns1 on p.pronamespace = ns1.oid
 			WHERE l.lanname not in ('internal', 'c')
 				-- and p.prokind in ('f', 'p')
 				AND NOT p.proisagg) a
@@ -206,7 +205,7 @@ SQL = {
 	"PROCS_FROM11": """SELECT procedure_schema, procedure_name, args, return_type,
 				procedure_owner, language_type, %s, provolatile
 			FROM
-			  (SELECT ns1.nspname as procedure_schema, 
+			  (SELECT p.pronamespace::regnamespace::text as procedure_schema, 
 				p.proname AS procedure_name,
 				pg_get_function_identity_arguments(p.oid) args, 
 				t1.typname AS return_type,
@@ -217,10 +216,16 @@ SQL = {
 			FROM pg_proc p
 			LEFT JOIN pg_type t1 ON p.prorettype=t1.oid   
 			LEFT JOIN pg_language l ON p.prolang=l.oid
-			join pg_namespace ns1 on p.pronamespace = ns1.oid
 			WHERE l.lanname not in ('internal', 'c')
 				and p.prokind in ('f', 'p')) a
 				where not procedure_schema in ('pg_catalog', 'information_schema')""" % (PROC_SRC_BODY_FNAME,PROC_SRC_BODY_FNAME),
+	"PROCS_RETTYPE_TABLE": """select string_agg(t.column_name || ' '|| t.arg_type::regtype::text, ', ')
+		from pg_proc p
+		cross join unnest(proargnames, proargmodes, proallargtypes) 
+		with ordinality as t(column_name, arg_mode, arg_type, col_num)
+		where p.pronamespace::regnamespace::text = %s
+		and p.proname = %s
+		and t.arg_mode = 't'""",
 	"TRIGGERS": """select
 				 		ns1.nspname as table_schema,
 				 		c.relname as table_name,
@@ -235,10 +240,10 @@ SQL = {
 										when 16 then 'UPDATE'
 										when 8 then 'DELETE'
 										when 4 then 'INSERT'
-										when 20 then 'INSERT, UPDATE'
-										when 28 then 'INSERT, UPDATE, DELETE'
-										when 24 then 'UPDATE, DELETE'
-										when 12 then 'INSERT, DELETE'
+										when 20 then 'INSERT OR UPDATE'
+										when 28 then 'INSERT OR UPDATE OR DELETE'
+										when 24 then 'UPDATE OR DELETE'
+										when 12 then 'INSERT OR DELETE'
 						end as trigger_event,
 						case t.tgtype::integer & 1
 										when 1 then 'ROW'::text

@@ -276,6 +276,7 @@ def schemas(p_cursor, p_filters_cfg, p_include_public, out_dict):
 		out_dict["content"] = {}	
 
 	owners = set()
+	the_dict = {}
 	for row in p_cursor:
 		
 		if not "schemas" in out_dict["content"].keys():
@@ -307,6 +308,9 @@ def ownership(p_cursor, p_filters_cfg, out_dict):
 		owners = set(out_dict["content"]["owners"])
 	else:
 		owners = set()
+
+	if not "schemas" in out_dict["content"].keys():
+		raise RuntimeError("blocked access or missing schemata in source")
 	
 	for sch in out_dict["content"]["schemas"]:
 		
@@ -435,7 +439,7 @@ def tables(p_cursor, p_filters_cfg, out_dict):
 				# continue
 				
 			## remover tabelas internas ArcGIS
-			m = re.match("i[\d]+", row["tablename"])
+			m = re.match("[adi][\d]+", row["tablename"])
 			if not m is None:
 				continue
 
@@ -890,13 +894,13 @@ def sequences(p_conn, p_majorversion, out_dict):
 
 					cr.execute(SQL["SEQUENCES"], (schema_name, seq_name))
 
-					the_dict = seq_root[schema_name][seq_name]["seqdetails"] = { }
 					row =  cr.fetchone()
 					
 					if row is None:
-						#raise RuntimeError, cr.mogrify(SQL["SEQUENCES"], (schema_name, seq_name))
-						the_dict["error"] = "unreadable"
+						raise RuntimeError(f"cannot read sequence definitions on schema {schema_name}, most probably the aplicational role being used in this project is lacking the required read permissions")
+						# the_dict["empty"] = "true"
 					else:
+						the_dict = seq_root[schema_name][seq_name]["seqdetails"] = { }
 						for item in items:
 							# print(item, row[item])
 							if not row[item] is None:
@@ -1146,6 +1150,15 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dic
 
 			if not genprocsdir is None:
 				gen_proc_file(genprocsdir, sch, row)
+
+		for schname in the_dict.keys():
+			schdict = the_dict[schname]
+			for procfname in schdict.keys():
+				pdict = schdict[procfname]
+				if "return_type" in pdict.keys() and pdict["return_type"] == "record":
+					p_cursor.execute(SQL["PROCS_RETTYPE_TABLE"], (schname, pdict["procedure_name"]))		
+					row = p_cursor.fetchone()
+					pdict["return_table"] = row[0] 
 					
 		# trigger funcs
 		if len(tr_funcnames) > 0:
@@ -1199,7 +1212,7 @@ def srcreader(p_conn, p_filters_cfg, out_dict, outtables_dir,
 	with p_conn as cnobj:
 
 		if cnobj.dict_cursor_factory is None:
-			raise RuntimeError("srcreader precisa de cursor dictionary, este driver nao parece ter um")
+			raise RuntimeError("srcreader requires a cursor dictionary, this driver doesn't seem to have one")
 
 		trigger_functions = set()
 		

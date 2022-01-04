@@ -409,11 +409,16 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 										
 			elif k in rkeys and not k in tmp_l.keys():
 
+				if isinstance(tmp_r[k], dict):
+					rightkeys = list(tmp_r[k].keys())
+				else:
+					rightkeys = None
+
 				if printdbg:
-					print("right only:", grpkey, k, level, "tmp_r['"+k+"'].keys():", tmp_r[k].keys())
+					print("right only:", grpkey, k, level, "tmp_r['"+k+"'].keys():", rightkeys)
 
 				# right only
-				diff_item = get_diff_item('b1', diff_dict, klist, opt_leaf_keys=list(tmp_r[k].keys()))
+				diff_item = get_diff_item('b1', diff_dict, klist, opt_leaf_keys=rightkeys)
 				p_opordmgr.setord(diff_item)
 				diff_item["diffoper"] = "delete"
 
