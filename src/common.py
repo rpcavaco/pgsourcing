@@ -20,7 +20,6 @@ LOG_CFG = {
 LANG = "pt"
 OPS = ["chksrc", "chkdest", "updref", "updscript", "upddirect", "chkcode", "updcode", "filldata"]
 OPS_CHECK = ["chksrc", "chkdest"]
-OPS_CONNECTED = ["chksrc", "chkdest", "upddirect", "updcode", "filldata"]
 OPS_INPUT = ["updref", "updscript", "upddirect", "updcode"]
 OPS_OUTPUT = ["updscript"]
 OPS_CODE = ["chkcode", "updcode"]
@@ -31,7 +30,7 @@ STORAGE_VERSION = 2
 
 OPS_HELP = {
 	"pt": {
-		"chksrc": "compare source (development) database to reference local repository (instantiate it in case this is not laready done)",
+		"chksrc": "compare source (development) database to reference local repository (instantiate it in case this is not already done)",
 		"chkdest": "compare reference local repository to destination (production) database",
 		"chkcode": "compare procedure source code files to reference local repository",
 		"updref": "update reference local repository from source (development) database",

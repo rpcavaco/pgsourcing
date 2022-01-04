@@ -70,7 +70,7 @@ import io
 import pprint as pp
 
 
-from src.common import LOG_CFG, LANG, OPS, OPS_CONNECTED, OPS_INPUT, \
+from src.common import LOG_CFG, LANG, OPS, OPS_INPUT, \
 		OPS_OUTPUT, OPS_HELP, OPS_CHECK, OPS_CODE, OPS_PRECEDENCE, SETUP_ZIP, \
 		BASE_CONNCFG, PROC_SRC_BODY_FNAME, STORAGE_VERSION  #  BASE_FILTERS_RE
 		
@@ -340,29 +340,27 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 	
 	if p_oper in OPS_CHECK:
 	
-		if p_oper in OPS_CONNECTED:
+		cfgpath = get_conn_cfg_path(p_proj)
+		conns = Connections(cfgpath, subkey="conn")
+		
+		if p_connkey is None:
+		
+			if p_oper == "chksrc":
 
-			cfgpath = get_conn_cfg_path(p_proj)
-			conns = Connections(cfgpath, subkey="conn")
-			
-			if p_connkey is None:
-			
-				if p_oper == "chksrc":
+				if not conns.checkConn("src"):
+					raise RuntimeError("Chksrc, implicit 'src' connection is not defined, must provide an explicit conn key using -c / --connkey option")
+				else:
+					connkey = 'src'
 
-					if not conns.checkConn("src"):
-						raise RuntimeError("Chksrc, implicit 'src' connection is not defined, must provide an explicit conn key using -c / --connkey option")
-					else:
-						connkey = 'src'
+			elif p_oper == "chkdest":
 
-				elif p_oper == "chkdest":
+				if not conns.checkConn("dest"):
+					raise RuntimeError("Chkdest, implicit 'dest' connection is not defined, must provide an explicit conn key using -c / --connkey option")
+				else:
+					connkey = 'dest'
 
-					if not conns.checkConn("dest"):
-						raise RuntimeError("Chkdest, implicit 'dest' connection is not defined, must provide an explicit conn key using -c / --connkey option")
-					else:
-						connkey = 'dest'
-
-			else:	
-				connkey = p_connkey		
+		else:	
+			connkey = p_connkey		
 		
 		if p_oper == "chksrc":
 
@@ -457,18 +455,16 @@ def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict,
 	now_dt = dt.now()
 	base_ts = now_dt.strftime('%Y%m%dT%H%M%S')
 
-	if p_oper in OPS_CONNECTED:
-		
-		cfgpath = get_conn_cfg_path(p_proj)
-		conns = Connections(cfgpath, subkey="conn")
+	cfgpath = get_conn_cfg_path(p_proj)
+	conns = Connections(cfgpath, subkey="conn")
 
-		if p_connkey is None:
-			if not conns.checkConn("dest"):
-				raise RuntimeError("default 'dest' connection not found, need to pass connection key to use")
-			else:
-				connkey = 'dest'
-		else:	
-			connkey = p_connkey		
+	if p_connkey is None:
+		if not conns.checkConn("dest"):
+			raise RuntimeError("default 'dest' connection not found, need to pass connection key to use")
+		else:
+			connkey = 'dest'
+	else:	
+		connkey = p_connkey		
 	
 	if p_oper == "updref":
 
