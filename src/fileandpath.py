@@ -77,7 +77,7 @@ def get_destcodedir(p_proj):
 	return pth
 	
 def get_reftablesdir(p_proj):
-	pth = path_join(_get_refdir(p_proj), "tables")
+	pth = path_join(_get_refdir(p_proj), "parameterstables")
 	if not exists(pth):
 		makedirs(pth)
 	return pth

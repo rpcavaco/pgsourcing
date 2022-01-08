@@ -94,12 +94,12 @@ def gen_where_from_list(p_filter_fieldname, p_re_list, dojoin=False, intersect=F
 	
 	return ret
 	
-def gen_tables_where_from_re_list(p_schemafilter_fieldname, p_tablefilter_fieldname, p_curr_schema, p_filters_cfg, dojoin=False, intersect=False):
+def gen_tables_where_from_re_list(p_tablefilter_fieldname, p_curr_schema, p_filters_cfg, dojoin=False, intersect=False, table_key="tables"):
 
 	wherecl = None
 
-	if "tables" in p_filters_cfg and len(p_filters_cfg["tables"].keys()) > 0 and p_curr_schema in p_filters_cfg["tables"].keys():
-		wherecl = gen_where_from_re_list(p_tablefilter_fieldname, p_filters_cfg["tables"][p_curr_schema], dojoin=dojoin, intersect=intersect)
+	if table_key in p_filters_cfg and len(p_filters_cfg[table_key].keys()) > 0 and p_curr_schema in p_filters_cfg[table_key].keys():
+		wherecl = gen_where_from_re_list(p_tablefilter_fieldname, p_filters_cfg[table_key][p_curr_schema], dojoin=dojoin, intersect=intersect)
 			
 	return wherecl
 
@@ -340,7 +340,7 @@ def ownership(p_cursor, p_filters_cfg, out_dict):
 	# Tables
 	for sch in out_dict["content"]["schemata"]:
 		
-		wherecl = gen_tables_where_from_re_list("schemaname", "tablename", sch, p_filters_cfg, dojoin=True, intersect=True)
+		wherecl = gen_tables_where_from_re_list("tablename", sch, p_filters_cfg, dojoin=True, intersect=True)
 
 		if not wherecl is None:
 			sql = "%s %s" % (SQL["TABLE_SU_OWNED"], wherecl)
@@ -422,7 +422,7 @@ def tables(p_cursor, p_filters_cfg, out_dict):
 			if len(p_filters_cfg["tables"].keys()) > 0  and sch not in p_filters_cfg["tables"].keys():
 				continue 
 			
-		wherecl = gen_tables_where_from_re_list("schemaname", "tablename", sch, p_filters_cfg, dojoin=True, intersect=True)
+		wherecl = gen_tables_where_from_re_list("tablename", sch, p_filters_cfg, dojoin=True, intersect=True)
 		if wherecl is None:
 			wherecl = "and schemaname = '%s'" % sch
 		else:
@@ -1214,14 +1214,29 @@ def paramtables(p_cursor, p_filters_cfg, p_gendumpsdir):
 				
 	for sch in p_filters_cfg["parameterstables"].keys():
 		
-		for tname in  p_filters_cfg["parameterstables"][sch]:
-			
-			ftname = "%s.%s" % (sch, tname)
+		# for tname_patt in  p_filters_cfg["parameterstables"][sch]:
+
+		wherecl = gen_tables_where_from_re_list("tablename", sch, p_filters_cfg, dojoin=True, intersect=True, table_key="parameterstables")
+		if wherecl is None:
+			wherecl = "and schemaname = '%s'" % sch
+		else:
+			wherecl = "and schemaname = '%s' %s" % (sch, wherecl)
+
+		sql = "%s %s" % (SQL["TABLES"], wherecl)
+		p_cursor.execute(sql)
+		#print(p_cursor.mogrify(sql))
+
+		work_list = []
+		for row in p_cursor:
+
+			ftname = "%s.%s" % (row[0], row[1])
 			fname = "%s.copy" % (ftname)
 			fullp = path_join(p_gendumpsdir, fname)
+
+			work_list.append((fullp, ftname))
 			
+		for fullp, ftname in work_list:	
 			with open(fullp, "wb") as fp:
-				
 				p_cursor.copy_to(fp, ftname)
 						
 def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir, 
