@@ -233,7 +233,7 @@ def srvanddb_metadata(p_conn, out_dict):
 			
 	return ret_majorversion
 			
-def get_grants(p_the_dict, p_cursor, forschemas=False):
+def get_grants(p_the_dict, p_cursor, forschemata=False):
 
 	def _getit(p_pthe_dict, p_pcursor, p_sch, p_obj = None):
 		if not p_obj is None:
@@ -255,7 +255,7 @@ def get_grants(p_the_dict, p_cursor, forschemas=False):
 				p_pthe_dict[p_sch]["grants"][row["grantee"]] = privs
 					
 	for sch in p_the_dict.keys():		
-		if forschemas:
+		if forschemata:
 			_getit(p_the_dict, p_cursor, sch)			
 		else:					
 			for obj in p_the_dict[sch].keys():				
@@ -263,7 +263,7 @@ def get_grants(p_the_dict, p_cursor, forschemas=False):
 			
 
 	
-def schemas(p_cursor, p_filters_cfg, p_include_public, out_dict):
+def schemata(p_cursor, p_filters_cfg, p_include_public, p_db_direction, out_dict):
 	
 	if "schema" in p_filters_cfg and len(p_filters_cfg["schema"]) > 0:
 		sql = "%s %s" % (SQL["SCHEMAS"], gen_where_from_list("schema_name", p_filters_cfg["schema"]))
@@ -277,24 +277,31 @@ def schemas(p_cursor, p_filters_cfg, p_include_public, out_dict):
 
 	owners = set()
 	the_dict = {}
+	sch_found = False
 	for row in p_cursor:
 		
-		if not "schemas" in out_dict["content"].keys():
-			out_dict["content"]["schemas"] = {}
-		the_dict = out_dict["content"]["schemas"]
+		if not "schemata" in out_dict["content"].keys():
+			out_dict["content"]["schemata"] = {}
+		the_dict = out_dict["content"]["schemata"]
 			
 		schema_name = row["schema_name"]
 		schema_owner = row["schema_owner"]
 		if schema_name.startswith("pg_") or schema_name == "information_schema":
 			continue
 		if schema_name == "public" and not p_include_public:
-			continue	
+			continue
+
+		sch_found = True
+
 		owners.add(schema_owner)	
 		the_dict[schema_name] = {
 			"schdetails": { "auth": schema_owner }
 		}	
+
+	if not sch_found and p_db_direction == "source": 
+		raise RuntimeError(f"no schemata -- blocked access, missing schemata in source database or wrong schemata filters in config")
 		
-	get_grants(the_dict, p_cursor, forschemas=True)
+	get_grants(the_dict, p_cursor, forschemata=True)
 		
 	out_dict["content"]["owners"] = list(owners)
 
@@ -309,10 +316,11 @@ def ownership(p_cursor, p_filters_cfg, out_dict):
 	else:
 		owners = set()
 
-	if not "schemas" in out_dict["content"].keys():
-		raise RuntimeError("blocked access or missing schemata in source")
+	if not "schemata" in out_dict["content"].keys():
+		return
+		# raise RuntimeError("no schemata in source: blocked access, missing schemata in source database or wrong schemata filters in config")
 	
-	for sch in out_dict["content"]["schemas"]:
+	for sch in out_dict["content"]["schemata"]:
 		
 		p_cursor.execute(SQL["PROC_SU_OWNED"], [sch])
 		#print(p_cursor.mogrify(SQL["PROC_SU_OWNED"], [sch]))
@@ -330,7 +338,7 @@ def ownership(p_cursor, p_filters_cfg, out_dict):
 				owners.add(row["ownr"])
 
 	# Tables
-	for sch in out_dict["content"]["schemas"]:
+	for sch in out_dict["content"]["schemata"]:
 		
 		wherecl = gen_tables_where_from_re_list("schemaname", "tablename", sch, p_filters_cfg, dojoin=True, intersect=True)
 
@@ -404,9 +412,11 @@ def roles(p_cursor, p_filters_cfg, out_dict):
 def tables(p_cursor, p_filters_cfg, out_dict):
 
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
-	assert "schemas" in out_dict["content"].keys(), "'content.schemas' em falta no dic. de saida"
+	# assert "schemata" in out_dict["content"].keys(), "'content.schemata' em falta no dic. de saida"
+	if "schemata" not in out_dict["content"].keys():
+		return
 
-	for sch in out_dict["content"]["schemas"]:
+	for sch in out_dict["content"]["schemata"]:
 
 		if "tables" in p_filters_cfg.keys():
 			if len(p_filters_cfg["tables"].keys()) > 0  and sch not in p_filters_cfg["tables"].keys():
@@ -463,10 +473,13 @@ def tables(p_cursor, p_filters_cfg, out_dict):
 def views(p_cursor, p_filters_cfg, out_dict):
 
 	# Previously tested on "tables"
-	# assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
-	# assert "schemas" in out_dict["content"].keys(), "'content.schemas' em falta no dic. de saida"
+	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
+	# assert "schemata" in out_dict["content"].keys(), "'content.schemata' em falta no dic. de saida"
 
-	for sch in out_dict["content"]["schemas"]:
+	if not "schemata" in out_dict["content"].keys():
+		return
+
+	for sch in out_dict["content"]["schemata"]:
 
 		if "views" in p_filters_cfg.keys():
 			if len(p_filters_cfg["views"].keys()) > 0 and sch not in p_filters_cfg["views"].keys():
@@ -520,10 +533,13 @@ def views(p_cursor, p_filters_cfg, out_dict):
 def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict):
 
 	# Previously tested on "tables"
-	# assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
-	# assert "schemas" in out_dict["content"].keys(), "'content.schemas' em falta no dic. de saida"
+	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
+	# assert "schemata" in out_dict["content"].keys(), "'content.schemata' em falta no dic. de saida"
 
-	for sch in out_dict["content"]["schemas"]:
+	if not "schemata" in out_dict["content"].keys():
+		return
+
+	for sch in out_dict["content"]["schemata"]:
 
 		if "matviews" in p_filters_cfg.keys():
 			if len(p_filters_cfg["matviews"].keys()) > 0 and sch not in p_filters_cfg["matviews"].keys():
@@ -647,8 +663,8 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 					
 					if not row[opt_colname] is None:
 						
-						# detetar dependencias entre schemas, avaliando se
-						# sao invocadas sequencias de outros schemas
+						# detetar dependencias entre schemata, avaliando se
+						# sao invocadas sequencias de outros schemata
 						#
 						if opt_key == "default":
 							
@@ -803,8 +819,8 @@ def constraints(p_cursor, p_deftablespace, out_dict):
 					"updtype": row["updtype"],
 					"deltype": row["deltype"]				
 				}
-				# detetar dependencias entre schemas, avaliando se
-				# sao invocadas tabelas de outros schemas nas foreign keys
+				# detetar dependencias entre schemata, avaliando se
+				# sao invocadas tabelas de outros schemata nas foreign keys
 				#
 
 				schema_dependency(out_dict, row["schema_ref"], schema_name, "fkeys")
@@ -1089,8 +1105,11 @@ def gen_proc_file(p_genprocsdir, p_schema, p_proc_row, winendings=False):
 def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dict, genprocsdir=None):
 	
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
-	assert "schemas" in out_dict["content"].keys(), "'content.schemas' em falta no dic. de saida"
-	
+	# assert "schemata" in out_dict["content"].keys(), "'content.schemata' em falta no dic. de saida"
+
+	if not "schemata" in out_dict["content"].keys():
+		return
+
 	trig_dict = {}
 	for tr_schema, tr_funcname in in_trigger_functions:
 		if not tr_schema in trig_dict.keys():
@@ -1108,7 +1127,7 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dic
 	if not genprocsdir is None:
 		clear_dir(genprocsdir, ".sql")
 
-	for sch in out_dict["content"]["schemas"]:
+	for sch in out_dict["content"]["schemata"]:
 		
 		if "procedures" in p_filters_cfg.keys():			
 			if len(p_filters_cfg["procedures"].keys()) > 0 and sch not in p_filters_cfg["procedures"].keys():
@@ -1205,27 +1224,34 @@ def paramtables(p_cursor, p_filters_cfg, p_gendumpsdir):
 				
 				p_cursor.copy_to(fp, ftname)
 						
-def srcreader(p_conn, p_filters_cfg, out_dict, outtables_dir, 
-		outprocs_dir=None, include_public=False, include_colorder=False):
+def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir, 
+		outprocs_dir=None, include_public=False, include_colorder=False, is_upstreamdb=None):
 	
 	logger = logging.getLogger('pgsourcing')
 	with p_conn as cnobj:
 
 		if cnobj.dict_cursor_factory is None:
-			raise RuntimeError("srcreader requires a cursor dictionary, this driver doesn't seem to have one")
+			raise RuntimeError("dbreader requires a cursor dictionary, this driver doesn't seem to have one")
 
 		trigger_functions = set()
-		
-		logger.info("reading server and db metadata ...")
+
+		if is_upstreamdb is None:
+			db_direction = ""
+		elif is_upstreamdb:
+			db_direction = "source"
+		else:
+			db_direction = "destination"
+
+		logger.info(f"reading server and {db_direction}db metadata ...")
 		
 		majorversion = srvanddb_metadata(cnobj, out_dict)
 			
 		cn = cnobj.getConn()
 		with cn.cursor(cursor_factory=cnobj.dict_cursor_factory) as cr:
 			
-			logger.info("reading roles and schemas ..")
+			logger.info("reading roles and schemata ..")
 			
-			schemas(cr, p_filters_cfg, include_public, out_dict)			
+			schemata(cr, p_filters_cfg, include_public, db_direction, out_dict)			
 			ownership(cr, p_filters_cfg, out_dict)		
 			roles(cr, p_filters_cfg, out_dict)
 			

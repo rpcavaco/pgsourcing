@@ -26,7 +26,7 @@
 #=======================================================================
 
 # -------------------------------------------------- #
-# pgsourcing/main.py - Versão 1.0 - Python 2 e 3     #
+# pgsourcing/main.py - Versão 2.0 - Python 3         #
 # -------------------------------------------------- #
 # Rui Pedro Cavaco Barrosa, Porto, Setembro de 2020  #
 # -------------------------------------------------- #
@@ -74,7 +74,7 @@ from src.common import LOG_CFG, LANG, OPS, OPS_INPUT, \
 		OPS_OUTPUT, OPS_HELP, OPS_CHECK, OPS_CODE, OPS_PRECEDENCE, SETUP_ZIP, \
 		BASE_CONNCFG, PROC_SRC_BODY_FNAME, STORAGE_VERSION  #  BASE_FILTERS_RE
 		
-from src.read import srcreader, gen_proc_fname, reverse_proc_fname
+from src.read import dbreader, gen_proc_fname, reverse_proc_fname
 from src.connect import Connections
 from src.compare import comparing, sources_to_lists
 from src.zip import gen_setup_zip
@@ -361,18 +361,22 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 
 		else:	
 			connkey = p_connkey		
+
+		is_upstreamdb = None
 		
 		if p_oper == "chksrc":
 
 			logger.info("checking, proj:%s  oper:%s" % (p_proj,p_oper))
 			outprocs_dir = p_outprocsdir
 			ret = "From SRC"
+			is_upstreamdb = True
 			
 		elif p_oper == "chkdest":
 			
 			logger.info("checking, proj:%s  oper:%s" % (p_proj,p_oper))
 			outprocs_dir = p_outprocsdestdir
 			ret = "From REF"
+			is_upstreamdb = False
 		
 		if not connkey is None:
 			
@@ -382,7 +386,7 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 			if "transformschema" in filters_cfg.keys():
 				o_replaces.update(filters_cfg["transformschema"])
 
-			srcreader(conns.getConn(connkey), filters_cfg, o_checkdict, p_outtables_dir, outprocs_dir=outprocs_dir, include_public=include_public, include_colorder=include_colorder)
+			dbreader(conns.getConn(connkey), filters_cfg, o_checkdict, p_outtables_dir, outprocs_dir=outprocs_dir, include_public=include_public, include_colorder=include_colorder, is_upstreamdb=is_upstreamdb)
 		
 	return ret, connkey
 
@@ -419,7 +423,7 @@ def process_intervals_string(p_input_str):
 		
 	return sorted(sequence)
 	
-def update_oper_handler(p_proj, p_oper, p_opordermgr, diffdict, 
+def update_oper_handler(p_proj, p_oper, diffdict, 
 		updates_ids=None, p_connkey=None, limkeys=None, 
 		include_public=False, include_colorder=False,
 		output=None, canuse_stdout=False, delmode="NODEL"):
@@ -763,14 +767,14 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 								with codecs.open(full_path, "r", "utf-8") as fl:
 									src = fl.read()
 									if simulupdcode and canuse_stdout:
-										print("insert or update src of ", src[:60])
+										logger.info("insert or update src of ", src[:60])
 									else:
 										with cn.cursor() as cr:
 											try:
 												cr.execute(src)
 												changed = True
 											except:
-												print("ficheiro %s" % diff_item["fname"])
+												logger.error("ficheiro %s" % diff_item["fname"])
 												raise
 										logger.info("inserting script for proj. %s, %s.%s" % (p_proj,sch,pname))	
 							elif diff_item["diffoper"] == "delete":
@@ -783,7 +787,7 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 								if not fmt is None:
 									sqlstr = fmt % ("%s(%s)" % (diff_item["procname"], diff_item["args"]))
 									if simulupdcode and canuse_stdout:
-										print("delete sqlstr", sqlstr)
+										logger.info("delete sqlstr", sqlstr)
 									else:
 										with cn.cursor() as cr:
 											cr.execute(sqlstr)
@@ -828,6 +832,9 @@ def check_objtype(p_relkind, p_typestr):
 # Cleaning up unnecessary diff items and branches that become empty 
 #  during cleaning
 def erase_diff_item(p_diff_dict, p_grpkeys):
+
+	# print("erase_diff_item:", p_diff_dict, p_grpkeys)
+	logger = logging.getLogger('pgsourcing')	
 	
 	diff_dict = p_diff_dict
 	last_key = p_grpkeys[-1]
@@ -835,7 +842,12 @@ def erase_diff_item(p_diff_dict, p_grpkeys):
 		if k != last_key:
 			diff_dict = diff_dict[k]
 		else:
-			del diff_dict[k]
+			try:
+				del diff_dict[k]
+			except:
+				logger.error("** k:", k, p_grpkeys)
+				logger.error("** diff_dict keys:", diff_dict.keys())
+				raise
 
 	# Clean empty branches
 	count = 0
@@ -868,8 +880,8 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 			erase_diff_item(p_pdiff_dict, grpkeys)
 			return
 
-		if grpkeys[0] == "schemas":
-			assert len(grpkeys) == 2
+		if grpkeys[0] == "schemata":
+			assert len(grpkeys) >= 2, f"grpkeys: {grpkeys}"
 			sch = grpkeys[1]
 			name = None
 		else:
@@ -881,7 +893,7 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 		obj_exists = False
 		ret = False
 
-		if grpkeys[0] == "schemas":
+		if grpkeys[0] == "schemata":
 
 			p_cr.execute(SQL["SCHEMA_CHK"], (sch,))
 			row = p_cr.fetchone()
@@ -893,13 +905,27 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 				obj_exists = False
 				
 			else:
-			
-				assert len(p_op) == 4, p_op
-				
+
+				_phase_label, op_content = p_op
+				assert len(op_content) == 3, f"length of {op_content} != 3"
+
+				curr_dicttree_level = p_diff_dict
+				for li in range(3):
+					assert op_content[li] in curr_dicttree_level.keys(), f"{op_content[li]} not in {curr_dicttree_level.keys()}"
+					curr_dicttree_level = curr_dicttree_level[op_content[li]]
+				assert 'newvalue' in curr_dicttree_level.keys(), f"{'newvalue'} not in {curr_dicttree_level.keys()}"
+				curr_dicttree_level = curr_dicttree_level['newvalue']
+
+				assert 'args' in curr_dicttree_level.keys(), f"'args' not in {curr_dicttree_level.keys()}"
+				assert 'return_type' in curr_dicttree_level.keys(), f"'return_type' not in {curr_dicttree_level.keys()}"
+
+				args = curr_dicttree_level['args']
+				return_type = curr_dicttree_level['return_type']
+
 				p_cr.execute(SQL["PROC_CHECK"], (sch, name))
 				row = p_cr.fetchone()
 				if not row is None:
-					obj_exists = (row[0] == p_op[2] and row[1] == p_op[3])
+					obj_exists = (row[0] == args and row[1] == return_type)
 			
 		else:
 
@@ -937,6 +963,8 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 	cnobj = conns.getConn(p_connkey)	
 	cn = cnobj.getConn()
 	with cn.cursor() as cr:
+
+		# print("p_cd_ops:", p_cd_ops)
 
 		ops = p_cd_ops["insert"]
 		for op in ops:
@@ -1130,7 +1158,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			# Se a operacao for updref ou chkdest o dicionario check_dict sera 
 			#  preenchido.
 			
-			update_oper_handler(p_proj, p_oper, opordmgr, 
+			update_oper_handler(p_proj, p_oper,  
 				diffdict, updates_ids=updates_ids, p_connkey=p_connkey, 
 				limkeys=limkeys, include_public=include_public, 
 				include_colorder=include_colorder, output=output, 
@@ -1322,12 +1350,15 @@ def cli_main():
 									del streams[0]
 
 							if operitem in OPS_OUTPUT:
-								streams.append(io.StringIO())
+								if args.output is None:
+									streams.append(io.StringIO())
+								else:
+									streams.append(args.output)
 
 						if len(streams) < 2:
 							streams.append(args.output)
 
-						print(operitem, streams[0], streams[1])
+						logger.info("operation:{}, streams input:{}, output:{}".format(operitem, streams[0], streams[1]))
 
 						main(proj, operitem, args.connkey, args.genprocsdir, 
 								output=streams[1], inputf=streams[0], 

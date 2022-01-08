@@ -85,13 +85,13 @@ def changegrp(p_chg_group, p_currdiff_block, p_updates_ids_list, p_keys_byref, p
 	changed = False
 	
 	if len(p_keys_byref) > 15:
-		raise RuntimeError("changegrp excessive recursiono, key seq: %s" % str(p_keys_byref))
+		raise RuntimeError("changegrp excessive recursion, key seq: %s" % str(p_keys_byref))
 
-	try:
-		print("\n||>>", p_keys_byref, p_chg_group.keys(), p_currdiff_block.keys())
-	except AttributeError:
-		print('Err:', p_keys_byref, p_chg_group, p_currdiff_block)
-		raise
+	# try:
+	# 	print("\n||>>", p_keys_byref, p_chg_group.keys(), p_currdiff_block.keys())
+	# except AttributeError:
+	# 	print('Err:', p_keys_byref, p_chg_group, p_currdiff_block)
+	# 	raise
 
 	if isinstance(p_currdiff_block, dict):
 
@@ -529,14 +529,17 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 			
 			diff_item = currdiff_block[role]
 			assert "diffoper" in diff_item.keys()
+			assert "insert" in diff_item["diffoper"].keys() or "update" in diff_item["diffoper"].keys() or "delete" in diff_item["diffoper"].keys(), f"not 'inserting', not 'updating' and not 'deleting', diffoper:{diff_item['diffoper']}"
+
+			operorder = diff_item['newvalue']['operorder']
 			
-			if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
+			if len(p_updates_ids_list) < 1 or operorder in p_updates_ids_list:	
 
 				if docomment and not header_printed:
 					out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Roles\n" + "-- " + "".join(['#'] * 77))
 					header_printed = True
 					
-				out_sql_src.append("-- Op #%d" % diff_item["operorder"])
+				out_sql_src.append("-- Op #%d" % operorder)
 
 				if delmode == "NODEL":
 					xtmpl = "-- DROP ROLE %s"
@@ -559,8 +562,8 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 				elif diff_item["diffoper"] == "delete":
 					out_sql_src.append(xtmpl % role)
 
-	grpkey = "schemas"	
-	dropped_schemas = []
+	grpkey = "schemata"	
+	dropped_schemata = []
 	
 	if grpkey in diff_content.keys():	
 		
@@ -570,16 +573,19 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		for sch in sorted(currdiff_block.keys()):
 			
 			diff_item = currdiff_block[sch]
-			if "diffoper" in diff_item.keys():							
-				if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
+			if "schdetails" in diff_item.keys():
+
+				di_base = diff_item["schdetails"]
+				operorder = di_base['operorder']						
+				if len(p_updates_ids_list) < 1 or operorder in p_updates_ids_list:	
 
 					if docomment and not header_printed:
 						out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Schemas\n" + "-- " + "".join(['#'] * 77))
 						header_printed = True
 					if docomment:
-						out_sql_src.append("-- Op #%d" % diff_item["operorder"])
+						out_sql_src.append("-- Op #%d" % operorder)
 				
-					if diff_item["diffoper"] in ("delete", "update"):
+					if di_base["diffoper"] in ("delete", "update"):
 						if delmode == "NODEL":
 							xtmpl = "-- DROP SCHEMA %s"
 						elif delmode == "DEL":
@@ -589,41 +595,43 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 						else:
 							xtmpl = "??????? %s"
 						out_sql_src.append(xtmpl % sch)
-						dropped_schemas.append(sch)
+						dropped_schemata.append(sch)
 
-					if diff_item["diffoper"] in ("insert", "update"):
+					if di_base["diffoper"] in ("insert", "update"):
+						out_sql_src.append("CREATE SCHEMA %s AUTHORIZATION %s" % (sch, di_base["newvalue"]["auth"]))
 
-						assert "schdetails" in diff_item["newvalue"].keys()
-						di = diff_item["newvalue"]["schdetails"]
-						
-						out_sql_src.append("CREATE SCHEMA %s AUTHORIZATION %s" % (sch, di["auth"]))
-
-						if "grants" in diff_item["newvalue"].keys():
-							for user_name in diff_item["newvalue"]["grants"].keys():
-								privs = diff_item["newvalue"]["grants"][user_name]
-								out_sql_src.append("GRANT %s ON SCHEMA %s TO %s" % (privs, sch, user_name))
+						# if "grants" in diff_item["newvalue"].keys():
+						# 	for user_name in diff_item["newvalue"]["grants"].keys():
+						# 		privs = diff_item["newvalue"]["grants"][user_name]
+						# 		out_sql_src.append("GRANT %s ON SCHEMA %s TO %s" % (privs, sch, user_name))
 						
 			if "grants" in diff_item.keys():
-				for user_name in diff_item["grants"].keys():
-					di = diff_item["grants"][user_name]					
-					if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
+				di_base = diff_item["grants"]
+				for user_name in di_base['newvalue'].keys():
+					privs = di_base['newvalue'][user_name]	
+					operorder = di_base['operorder']	
+					if len(p_updates_ids_list) < 1 or operorder in p_updates_ids_list:
 						if docomment and not header_printed:
 							out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Schemas\n" + "-- " + "".join(['#'] * 77))
 							header_printed = True
 						if docomment:
-							out_sql_src.append("-- Op #%d" % di["operorder"])
-						if di["diffoper"] in ("update", "delete"):
-							if di["diffoper"] == "delete":
+							try:
+								out_sql_src.append("-- Op #%d" % operorder)
+							except:
+								logger.error("privs:", privs)
+								logger.error("di_base:", di_base)
+								raise
+						if di_base['newvalue'] in ("update", "delete"):
+							if di_base['diffoper'] == "delete":
 								privs = "ALL"
 							else:
-								privs = di["newvalue"]	
+								privs = di_base['newvalue']	
 							if delmode == "NODEL":
 								xtmpl = "-- REVOKE %s ON %s FROM %s"
 							else:
 								xtmpl = "REVOKE %s ON %s FROM %s"
 							out_sql_src.append(xtmpl % (privs, sch, user_name))
-						if di["diffoper"] in ("update", "insert"):
-							privs = di["newvalue"]
+						if di_base['diffoper'] in ("update", "insert"):
 							out_sql_src.append("GRANT %s ON SCHEMA %s TO %s" % (privs, sch, user_name))
 
 	grpkey = "procedures"	
@@ -632,7 +640,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		currdiff_block = diff_content[grpkey]			
 		for sch in sorted(currdiff_block.keys()):
 
-			if sch in dropped_schemas:
+			if sch in dropped_schemata:
 				logger.warning("CONFLICT: schema to drop '%s' is in use in procedures." % sch)
 			
 			for procname in sorted(currdiff_block[sch].keys()):
@@ -686,7 +694,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		currdiff_block = diff_content[grpkey]			
 		for sch in sorted(currdiff_block.keys()):
 			
-			if sch in dropped_schemas:
+			if sch in dropped_schemata:
 				logger.warning("CONFLICT: schema to drop '%s' is in use in sequences." % sch)
 			
 			for sname in sorted(currdiff_block[sch].keys()):
@@ -744,7 +752,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		currdiff_block = diff_content[grpkey]			
 		for sch in sorted(currdiff_block.keys()):	
 
-			if sch in dropped_schemas:
+			if sch in dropped_schemata:
 				logger.warning("CONFLICT: schema to drop '%s' is in use in tables." % sch)
 								
 			for tname in sorted(currdiff_block[sch].keys()):
@@ -940,7 +948,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		currdiff_block = diff_content[grpkey]			
 		for sch in sorted(currdiff_block.keys()):	
 
-			if sch in dropped_schemas:
+			if sch in dropped_schemata:
 				logger.warning("CONFLICT: schema to drop '%s' is in use in views." % sch)
 								
 			for vname in sorted(currdiff_block[sch].keys()):
@@ -996,7 +1004,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 		currdiff_block = diff_content[grpkey]			
 		for sch in sorted(currdiff_block.keys()):	
 
-			if sch in dropped_schemas:
+			if sch in dropped_schemata:
 				logger.warning("CONFLICT: schema to drop '%s' is in use in matviews." % sch)
 								
 			for vname in sorted(currdiff_block[sch].keys()):

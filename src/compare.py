@@ -287,7 +287,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 	# print("    p_rightdict:", p_rightdic.keys()) #, diff_dict)
 	
 	printdbg = False
-	if grpkey in []: # ("sequences",):
+	if grpkey in ["schemata"]: # ("sequences",):
 		printdbg = True
 	
 	if not grpkey in p_rightdic.keys():
@@ -371,7 +371,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 			if k in tmp_l.keys() and not k in rkeys:
 				
 				if printdbg:
-					print("left only:", grpkey, k, level, tmp_l.keys(), rkeys)
+					print("** left only:", grpkey, k, level, tmp_l.keys(), rkeys)
 				# left only
 				
 				# If starting a new group from scratch
@@ -401,6 +401,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						diff_item["newvalue"] = newvalue
 
 						new_grpkeys = grpkeys + [k]
+						# print("***", grpkeys, '+', k)
 						if isinstance(newvalue, dict) and grpkeys[0] == "procedures":
 							assert "args" in newvalue.keys() and "return_type" in newvalue.keys(), newvalue.keys()
 							o_cd_ops["insert"].append(('d1', new_grpkeys, newvalue["args"], newvalue["return_type"]))
@@ -635,7 +636,7 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 	
 	upperlevel_ops = {}
 	
-	print("comparison_mode:", p_comparison_mode)
+	logger.info("comparison_mode:", p_comparison_mode)
 
 	if p_comparison_mode == "From SRC": 
 				
@@ -651,15 +652,15 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 		
 		if p_transformschema:
 						
-			first_schema_names = list(l_dict["schemas"].keys())
+			first_schema_names = list(l_dict["schemata"].keys())
 			for sch in first_schema_names:
 				for trans in p_transformschema["trans"]:
 					if sch == trans["src"]:
-						l_dict["schemas"][trans["dest"]] = l_dict["schemas"].pop(sch)
+						l_dict["schemata"][trans["dest"]] = l_dict["schemata"].pop(sch)
 						break
 
 			for tk in p_transformschema["types"]:
-				if tk == "schemas":
+				if tk == "schemata":
 					continue
 				first_types = list(l_dict.keys())
 				if tk in first_types:

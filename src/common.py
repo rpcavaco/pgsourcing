@@ -26,7 +26,7 @@ OPS_CODE = ["chkcode", "updcode"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
 
-STORAGE_VERSION = 2
+STORAGE_VERSION = 3
 
 OPS_HELP = {
 	"pt": {
@@ -82,20 +82,20 @@ BASE_CONNCFG = {
 }
 
 CFG_GROUPS = [
-	"owners", "roles", "schemas", 
+	"owners", "roles", "schemata", 
 	"sequences", "tables", 
 	"views", "matviews", "procedures"
 ]
 
 CFG_DEST_GROUPS = [
-	"roles", "schemas", 
+	"roles", "schemata", 
 	"sequences", "tables", 
 	"views", "matviews", "procedures"
 ]
 
 CFG_LISTGROUPS = ["owners"]
 
-CFG_SHALLOW_GROUPS = ["schemas", "roles"]
+CFG_SHALLOW_GROUPS = ["schemata", "roles"]
 SHALLOW_DEPTH = 2
 
 FLOAT_TYPES = ["numeric", "float"]
