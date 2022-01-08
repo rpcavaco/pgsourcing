@@ -27,9 +27,10 @@
 
 import json
 
-from os import makedirs, walk, remove as removefile
+from os import listdir, makedirs, walk, remove as removefile
 from os.path import exists, dirname, abspath, join as path_join
 from shutil import rmtree
+from re import search
 
 
 from src.common import PROJECTDIR
@@ -145,6 +146,26 @@ def get_srccodedir_trigger(p_cfgpath, p_key):
 		
 	return path_join(cfgdict[p_key]["srccodedir"], "triggers")
 		
+def dropref(p_proj):
+
+	rd = _get_refdir(p_proj)
+	patt = "REF[0-9T]+.json"
+
+	currjson = path_join(rd, "current.json")
+	if exists(currjson):
+		removefile(currjson)
+
+	for fl in listdir(rd):
+		if search(patt, fl):
+			flfull = path_join(rd, fl)
+			removefile(flfull)
+
+	the_dirs = ["code", "code_dest", "tables"]
+	for dirname in the_dirs:
+		the_dir = path_join(rd, dirname)
+		if exists(the_dir):
+			rmtree(the_dir)
+
 
 # ######################################################################
 

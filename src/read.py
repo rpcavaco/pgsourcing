@@ -681,11 +681,7 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 							else:
 								parsed_val =  row[opt_colname]
 								
-							try:
-								flagv = isinstance(parsed_val, basestring)
-							except NameError:
-								flagv = isinstance(parsed_val, str)
-								
+							flagv = isinstance(parsed_val, str)							
 							if flagv:
 								
 								match = pattern.match(parsed_val)
@@ -702,9 +698,12 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 										out_dict["content"]["sequences"][found_schema] = {}
 									seqs = out_dict["content"]["sequences"][found_schema]										
 									if not seqname in seqs.keys():
-										seqs[seqname] = {}										
+										seqs[seqname] = {}	
+									if not "serialcols_dependencies" in seqs[seqname].keys(): 	
+										seqs[seqname]["serialcols_dependencies"] = {}	
+									seqs[seqname]["serialcols_dependencies"][table_name] = row["column_name"]			
 									if found_schema != schema_name:
-										schema_dependency(out_dict, found_schema, schema_name, "sequences")											
+										schema_dependency(out_dict, found_schema, schema_name, "sequences")
 									col_dict[opt_key] = parsed_val	
 									
 								else:
@@ -722,7 +721,8 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 										seqs = out_dict["content"]["sequences"][schema_name]											
 										if not seqname in seqs.keys():
 											seqs[seqname] = {}											
-										col_dict[opt_key] = parsed_val.replace(seqname, "%s.%s" % (schema_name, seqname))												
+										col_dict[opt_key] = parsed_val.replace(seqname, "%s.%s" % (schema_name, seqname))
+									
 									else:										
 										col_dict[opt_key] = parsed_val
 								

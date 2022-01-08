@@ -449,21 +449,27 @@ def create_sequence(p_schema, p_name, p_new_value, o_sql_linebuffer):
 	
 	try:
 
+		seqdetails = p_new_value["seqdetails"]
+		if "serialcols_dependencies" in p_new_value.keys():
+			has_tablecol_dependency = True
+		else:
+			has_tablecol_dependency = False
+
 		cr = "CREATE SEQUENCE %s.%s\n"
 			
 		o_sql_linebuffer.append(cr % (p_schema, p_name))	
-		o_sql_linebuffer.append("\tINCREMENT %s\n" % p_new_value["increment"])
-		o_sql_linebuffer.append("\tSTART %s\n" % p_new_value["start_value"])
-		o_sql_linebuffer.append("\tMINVALUE %s\n" % p_new_value["minimum_value"])
-		o_sql_linebuffer.append("\tMAXVALUE %s\n" % p_new_value["maximum_value"])
-		if p_new_value["cycle_option"] != "NO":
+		o_sql_linebuffer.append("\tINCREMENT %s\n" % seqdetails["increment"])
+		o_sql_linebuffer.append("\tSTART %s\n" % seqdetails["start_value"])
+		o_sql_linebuffer.append("\tMINVALUE %s\n" % seqdetails["minimum_value"])
+		o_sql_linebuffer.append("\tMAXVALUE %s\n" % seqdetails["maximum_value"])
+		if seqdetails["cycle_option"] != "NO":
 			o_sql_linebuffer.append("\tCYCLE\n")
-		o_sql_linebuffer.append("\tCACHE %s;\n" % p_new_value["cache_value"])
+		o_sql_linebuffer.append("\tCACHE %s;\n" % seqdetails["cache_value"])
 
-		if "current" in p_new_value.keys():
-			o_sql_linebuffer.append("\nSELECT setval('%s.%s', %s, true);\n" % (p_schema, p_name, p_new_value["current"]))
+		if not has_tablecol_dependency and "current" in seqdetails.keys():
+			o_sql_linebuffer.append("\nSELECT setval('%s.%s', %s, true);\n" % (p_schema, p_name, seqdetails["current"]))
 			
-		o_sql_linebuffer.append("\nALTER SEQUENCE %s.%s OWNER to %s" % (p_schema, p_name, p_new_value["owner"]))
+		o_sql_linebuffer.append("\nALTER SEQUENCE %s.%s OWNER to %s" % (p_schema, p_name, seqdetails["owner"]))
 
 	except:
 		logger = logging.getLogger('pgsourcing')
@@ -717,7 +723,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 						if diff_item["diffoper"] in ("update", "insert"):
 							
 							flines = []
-							create_sequence(sch, sname, diff_item["newvalue"]["seqdetails"], flines)						
+							create_sequence(sch, sname, diff_item["newvalue"], flines)						
 							out_sql_src.append("".join(flines))
 
 							if "grants" in diff_item["newvalue"].keys():

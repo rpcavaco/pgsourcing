@@ -81,7 +81,7 @@ from src.zip import gen_setup_zip
 from src.fileandpath import get_conn_cfg_path, get_filters_cfg, \
 		exists_currentref, to_jsonfile, save_ref, get_refcodedir, \
 		get_destcodedir, save_warnings, clear_dir, get_srccodedir, \
-		get_reftablesdir
+		get_reftablesdir, dropref
 from src.write import updateref, updatedb, create_function_items
 from src.sql import SQL
 
@@ -986,6 +986,11 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	logger = logging.getLogger('pgsourcing')	
 	
 	# pp = pprint.PrettyPrinter()
+
+	if p_oper == "dropref":
+		dropref(p_proj)
+		logger.info("reference dropped, proj:%s" % (p_proj,))
+		return
 	
 	refcodedir = get_refcodedir(p_proj)
 	destcodedir = get_destcodedir(p_proj)

@@ -17,8 +17,8 @@ LOG_CFG = {
 # Version-related configs -- DO NOT EDIT
 ########################################################################
 
-LANG = "pt"
-OPS = ["chksrc", "chkdest", "updref", "updscript", "upddirect", "chkcode", "updcode", "filldata"]
+LANG = "en"
+OPS = ["chksrc", "chkdest", "dropref", "updref", "updscript", "upddirect", "chkcode", "updcode", "filldata"]
 OPS_CHECK = ["chksrc", "chkdest"]
 OPS_INPUT = ["updref", "updscript", "upddirect", "updcode"]
 OPS_OUTPUT = ["updscript"]
@@ -26,13 +26,14 @@ OPS_CODE = ["chkcode", "updcode"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
 
-STORAGE_VERSION = 3
+STORAGE_VERSION = 4
 
 OPS_HELP = {
-	"pt": {
+	"en": {
 		"chksrc": "compare source (development) database to reference local repository (instantiate it in case this is not already done)",
 		"chkdest": "compare reference local repository to destination (production) database",
 		"chkcode": "compare procedure source code files to reference local repository",
+		"dropref": "drop reference data, becase it became invalid, e.g., existing storage format version was superseded by a new one, imeplemented in the software",
 		"updref": "update reference local repository from source (development) database",
 		"updscript": "generate SQL and DDL script to update destination (production) database, includes procedural code",
 		"upddirect": "directly update destination (production) database (should 'updscript' first to check all changes prior to update), includes procedural code",

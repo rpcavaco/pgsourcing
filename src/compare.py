@@ -28,7 +28,6 @@
 import json
 import re
 import logging
-import warnings
 
 from os.path import exists
 from copy import copy, deepcopy
@@ -332,9 +331,6 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 		
 	else:
 
-		if printdbg:
-			print("IN right keys:", grpkey)
-	
 		tmp_r = p_rightdic[grpkey]
 		keyset = set(tmp_l.keys())	
 		keyset.update(tmp_r.keys())
@@ -416,7 +412,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 					rightkeys = None
 
 				if printdbg:
-					print("right only:", grpkey, k, level, "tmp_r['"+k+"'].keys():", rightkeys)
+					print("*** right only:", grpkey, k, level, "tmp_r['"+k+"'].keys():", rightkeys)
 
 				# right only
 				diff_item = get_diff_item('b1', diff_dict, klist, opt_leaf_keys=rightkeys)
@@ -431,9 +427,6 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 			
 			else:
 
-				if printdbg:
-					print("both left and right:", grpkey, k, level)
-				
 				if isinstance(tmp_l[k], dict) and isinstance(tmp_r[k], dict):
 					upperlevel_ops = comparegrp(tmp_l, tmp_r, klist, p_transformschema, p_opordmgr, diff_dict, o_cd_ops, level=level+1)
 					if upperlevel_ops:
@@ -622,6 +615,7 @@ def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict): #,
 
 def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops):
 	
+	logger = logging.getLogger('pgsourcing')
 	raw_ref_json = load_currentref(p_proj)
 
 	# print("--------")
@@ -629,14 +623,16 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 	# print("--------")
 	
 	assert not raw_ref_json is None
-	if raw_ref_json["pgsourcing_storage_ver"] <= STORAGE_VERSION:
-		warnings.warn("Deprecated storager ver %s > %s. Must run 'updref' ASAP" % (raw_ref_json["pgsourcing_storage_ver"], STORAGE_VERSION), DeprecationWarning) 
+	if raw_ref_json["pgsourcing_storage_ver"] < STORAGE_VERSION:
+		logger.warning("DEPRECATED STORAGE format version %s < %s. Must delete reference. Please run, in sequence, 'dropref' and 'chksrc' ASAP" % (raw_ref_json["pgsourcing_storage_ver"], STORAGE_VERSION)) 
+	if raw_ref_json["pgsourcing_storage_ver"] > STORAGE_VERSION:
+		raise RuntimeError("UNRECOGNIZED STORAGE format version %s > %s!" % (raw_ref_json["pgsourcing_storage_ver"], STORAGE_VERSION)) 
 	
 	ref_json = raw_ref_json["content"]
 	
 	upperlevel_ops = {}
 	
-	logger.info("comparison_mode:", p_comparison_mode)
+	logger.info(f"comparison_mode: {p_comparison_mode}")
 
 	if p_comparison_mode == "From SRC": 
 				
