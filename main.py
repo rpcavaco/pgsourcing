@@ -46,7 +46,7 @@
 # ----------------------------------------------------------------------
 
 from __future__ import print_function
-from os import listdir, mkdir, makedirs, walk, remove as removefile
+from os import scandir, mkdir, makedirs, walk, remove as removefile
 from os.path import abspath, dirname, exists, splitext, join as path_join
 from datetime import datetime as dt
 from copy import deepcopy, copy
@@ -115,35 +115,40 @@ def parse_args():
 	parser = argparse.ArgumentParser(description='Diff and definition migrations on PostgreSQL')
 	
 	projdir = path_join(dirname(abspath(__file__)), 'projetos')	
-	projetos = listdir(projdir)
+	projetos = [ f.name for f in scandir(projdir) if f.is_dir() ]
 	
 	ops_help = OPS_HELP[LANG]
 	ops_input = ",".join(OPS_INPUT)
 	
-	parser.add_argument("proj", nargs="?", action="store", help="Project name, chosen from these: %s" % str(projetos))
-	parser.add_argument("oper", nargs="?", action="store", help="Operation name, chosen from these: %s" % json.dumps(ops_help, indent=4))
-	parser.add_argument("-o", "--output", help="Output file", action="store")
+	project_oriented = parser.add_argument_group('project_oriented', 'Project oriented arguments')
+	project_oriented.add_argument("proj", nargs="?", action="store", help="Project name, chosen from these: %s" % str(projetos))
+	project_oriented.add_argument("oper", nargs="?", action="store", help="Operation name, chosen from these: %s" % json.dumps(ops_help, indent=4))
+	
+	project_oriented.add_argument("-o", "--output", help="Output file", action="store")
+	project_oriented.add_argument("-i", "--input", help="Input file (REQUIRED on 'oper' %s)" % ops_input, action="store")
+	project_oriented.add_argument("-c", "--connkey", help="Database connection key on project config (default is 'src' for 'chksrc' op)", action="store")
+	project_oriented.add_argument("-p", "--includepublic", help="Include public schema", action="store_true")
+	project_oriented.add_argument("-r", "--removecolorder", help="Remove table column ordering", action="store_true")
+	project_oriented.add_argument("-g", "--genprocsdir", help="Procedure source folder name to create", action="store")
+	project_oriented.add_argument("-d", "--updateids", help="Update ids list, to filter tasks in update operation", action="store")
+	project_oriented.add_argument("-m", "--delmode", help="Delete mode: NODEL (default), DEL, CASCADE", action="store")
+	project_oriented.add_argument("-a", "--addnewproc", help="Generate a new empty procedure source file", action="store_true")
+	project_oriented.add_argument("-t", "--addnewtrig", help="Generate a new empty trigger source file", action="store_true")
+	project_oriented.add_argument("-u", "--simulupdcode", help="Activate simulation mode on 'updcode' operation: actual update is replaced by stdout messages (without DDL)", action="store_true")
 
-	parser.add_argument("-i", "--input", help="Input file (REQUIRED on 'oper' %s)" % ops_input, action="store")
-	parser.add_argument("-c", "--connkey", help="Database connection key on project config (default is 'src' for 'chksrc' op)", action="store")
-	parser.add_argument("-s", "--setup", help="Just generate a setup ZIP (ZIP will include the whole pgsourcing software and existing projects)", action="store_true")
-	parser.add_argument("-n", "--newproj", help="Create empty project", action="store")
-	parser.add_argument("-p", "--includepublic", help="Include public schema", action="store_true")
-	parser.add_argument("-r", "--removecolorder", help="Remove table column ordering", action="store_true")
-	parser.add_argument("-g", "--genprocsdir", help="Procedure source folder name to create", action="store")
-	parser.add_argument("-d", "--updateids", help="Update ids list, to filter tasks in update operation", action="store")
-	parser.add_argument("-m", "--delmode", help="Delete mode: NODEL (default), DEL, CASCADE", action="store")
-	parser.add_argument("-a", "--addnewproc", help="Generate a new empty procedure source file", action="store_true")
-	parser.add_argument("-t", "--addnewtrig", help="Generate a new empty trigger source file", action="store_true")
-	parser.add_argument("-u", "--simulupdcode", help="Activate simulation mode, only for 'updcode' operation", action="store_true")
+	non_project = parser.add_argument_group('non_project', 'Non-project generic command options')
+	non_project.add_argument("-s", "--setup", help="Just generate a setup ZIP (ZIP will include the whole pgsourcing software and existing projects)", action="store_true")
+	non_project.add_argument("-n", "--newproj", help="Create empty project", action="store")
 
-	parser.add_argument("-k", "--limkeys", help="[INTERNAL USE] object type keys list to filter update op, only the types listed will be changed (comma, semicolon and optional additional space separated list)", action="store")
+	expert_group = parser.add_argument_group('expert_group', 'Expert use options')
+	expert_group.add_argument("-k", "--limkeys", help="[EXPERT USE] object type keys list to filter update op, only the types listed will be changed (comma, semicolon and optional additional space separated list)", action="store")
 
 	args = parser.parse_args()
 	
 	logger = logging.getLogger('pgsourcing')	
 	logger.info("Starting, args: %s" % args)
 	
+	# mutually exclusive flags
 	mutexflags = set()
 	if args.setup:
 		mutexflags.add("setup")
@@ -988,8 +993,9 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	# pp = pprint.PrettyPrinter()
 
 	if p_oper == "dropref":
-		dropref(p_proj)
-		logger.info("reference dropped, proj:%s" % (p_proj,))
+		if not canuse_stdout or input("are you sure? (enter 'y' to drop, any other key to exit): ").lower() == "y":
+			dropref(p_proj)
+			logger.info("reference dropped, proj:%s" % (p_proj,))
 		return
 	
 	refcodedir = get_refcodedir(p_proj)

@@ -626,7 +626,7 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 	if raw_ref_json["pgsourcing_storage_ver"] < STORAGE_VERSION:
 		logger.warning("DEPRECATED STORAGE format version %s < %s. Must delete reference. Please run, in sequence, 'dropref' and 'chksrc' ASAP" % (raw_ref_json["pgsourcing_storage_ver"], STORAGE_VERSION)) 
 	if raw_ref_json["pgsourcing_storage_ver"] > STORAGE_VERSION:
-		raise RuntimeError("UNRECOGNIZED STORAGE format version %s > %s!" % (raw_ref_json["pgsourcing_storage_ver"], STORAGE_VERSION)) 
+		raise RuntimeError("INVALID STORAGE format version %s > %s!" % (raw_ref_json["pgsourcing_storage_ver"], STORAGE_VERSION)) 
 	
 	ref_json = raw_ref_json["content"]
 	
