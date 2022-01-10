@@ -1016,10 +1016,6 @@ def gen_proc_hdr(p_sch, p_row):
 	%s 
 AS $BODY$\n""" 
 
-	if p_row["return_type"] == "record":
-		print("1020:", p_row["procedure_name"], list(p_row.keys()))
-
-
 	if p_row["return_type"] == "record" and "return_table" in p_row.keys():
 		return_type = f"TABLE({ p_row['return_table'] })"
 	else:
@@ -1028,58 +1024,6 @@ AS $BODY$\n"""
 	return template % (p_sch, p_row["procedure_name"], p_row["args"],
 		return_type, p_row["language_type"], volatdict[p_row["provolatile"]])
 
-# def condensed_pgdtype(p_typestr):
-# 	if len(p_typestr) > 4:
-# 		hashv = hashlib.sha1(p_typestr.encode("UTF-8")).hexdigest()
-# 		ret = p_typestr[:2] + hashv[:2]
-# 	else:
-# 		ret = p_typestr
-# 	return ret
-
-# def gen_proc_fname(p_pname, p_rettype, p_argtypes_list):
-	
-# 	if len(p_argtypes_list) > 0:
-# 		template = "%s#%s$%s" 
-# 		catlist = [condensed_pgdtype(cat) for cat in p_argtypes_list]
-# 		ret = template % (p_pname, 
-# 		condensed_pgdtype(p_rettype), "-".join(catlist))
-# 	else:
-# 		template = "%s$%s" 
-# 		ret = template % (p_pname, 
-# 		condensed_pgdtype(p_rettype))
-
-# 	return ret	
-		
-# def gen_proc_fname_argsstr(p_pname, p_rettype, p_args):
-	
-# 	if p_args:
-# 		args = re.split(",[ ]+", p_args)
-# 		argtypeslist = [spl.split(" ")[1] for spl in re.split(",[ ]+", 
-# 		p_args)]
-# 		ret = gen_proc_fname(p_pname, p_rettype, argtypeslist)
-# 	else:
-# 		ret = gen_proc_fname(p_pname, p_rettype, [])
-
-# 	return ret
-
-# def gen_proc_fname_row(p_row):
-	
-# 	return gen_proc_fname_argsstr(p_row["procedure_name"], 
-# 			p_row["return_type"], p_row["args"])
-	
-# def reverse_proc_fname(p_fname, o_dict):
-	
-# 	schema, rest = p_fname.split(".")
-	
-# 	if "#" in rest:
-# 		# has arguments
-# 		procname, rest2 = rest.split("#")
-# 	else:
-# 		procname, rest2 = rest.split("$")
-		
-# 	o_dict["procschema"] = schema
-# 	o_dict["procname"] = procname
-	
 def gen_proc_ftr(p_sch, p_row):
 
 	template = """$BODY$;\n

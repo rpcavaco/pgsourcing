@@ -502,7 +502,7 @@ def print_matviewhdr(p_docomment, p_sch, p_name, p_out_sql_src, o_flag_byref):
 		p_out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Materialized view %s.%s\n" % (p_sch, p_name) + "-- " + "".join(['#'] * 77))
 		o_flag_byref[0] = True
 
-def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, docomment=True):
+def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomment=True):
 	
 	diff_content = p_difdict["content"]	
 	out_sql_src = []
@@ -526,7 +526,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 	tmplt = "ALTER TABLE %s.%s"
 
 	grpkey = "roles"
-	if grpkey in diff_content.keys():	
+	if (len(p_limkeys_list) < 1 or grpkey in p_limkeys_list) and grpkey in diff_content.keys():
 		
 		header_printed = False
 	
@@ -571,7 +571,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 	grpkey = "schemata"	
 	dropped_schemata = []
 	
-	if grpkey in diff_content.keys():	
+	if (len(p_limkeys_list) < 1 or grpkey in p_limkeys_list) and grpkey in diff_content.keys():
 		
 		header_printed = False
 	
@@ -641,7 +641,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 							out_sql_src.append("GRANT %s ON SCHEMA %s TO %s" % (privs, sch, user_name))
 
 	grpkey = "procedures"	
-	if grpkey in diff_content.keys():	
+	if (len(p_limkeys_list) < 1 or grpkey in p_limkeys_list) and grpkey in diff_content.keys():
 
 		currdiff_block = diff_content[grpkey]			
 		for sch in sorted(currdiff_block.keys()):
@@ -693,7 +693,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 							raise RuntimeError("function %s.%s, wrong diffoper: %s" % (sch, usable_proc, proc_blk["diffoper"]))
 					
 	grpkey = "sequences"	
-	if grpkey in diff_content.keys():	
+	if (len(p_limkeys_list) < 1 or grpkey in p_limkeys_list) and grpkey in diff_content.keys():
 	
 		header_printed = False
 
@@ -751,7 +751,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 								out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, sname, user_name))
 	
 	grpkey = "tables"	
-	if grpkey in diff_content.keys():	
+	if (len(p_limkeys_list) < 1 or grpkey in p_limkeys_list) and grpkey in diff_content.keys():
 
 		header_printed = [False]
 			
@@ -947,7 +947,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 									out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, tname, user_name))
 
 	grpkey = "views"
-	if grpkey in diff_content.keys():	
+	if (len(p_limkeys_list) < 1 or grpkey in p_limkeys_list) and grpkey in diff_content.keys():
 
 		header_printed = [False]
 			
@@ -1003,7 +1003,7 @@ def updatedb(p_proj, p_difdict, p_updates_ids_list, limkeys_list, delmode=None, 
 								out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, vname, user_name))
 
 	grpkey = "matviews"
-	if grpkey in diff_content.keys():	
+	if (len(p_limkeys_list) < 1 or grpkey in p_limkeys_list) and grpkey in diff_content.keys():
 
 		header_printed = [False]
 			

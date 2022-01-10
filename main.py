@@ -489,7 +489,7 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 
 		assert not diffdict is None
 		
-		out_sql_src = updatedb(p_proj, diffdict, upd_ids_list, limkeys_list, delmode=delmode)			
+		out_sql_src = updatedb(diffdict, upd_ids_list, limkeys_list, delmode=delmode)			
 		do_linesoutput(out_sql_src, output=output, interactive=canuse_stdout)
 
 		logger.info("dest change script for proj. %s, %s" % (p_proj,output))
@@ -499,7 +499,7 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 		assert not diffdict is None
 		
 		output = StringIO()
-		out_sql_src = updatedb(p_proj, diffdict, upd_ids_list, limkeys_list, delmode=delmode, docomment=False)			
+		out_sql_src = updatedb(diffdict, upd_ids_list, limkeys_list, delmode=delmode, docomment=False)			
 		#do_linesoutput(out_sql_src, output=output, interactive=False)		
 		#script = output.getvalue()
 		
