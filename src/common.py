@@ -20,12 +20,12 @@ LOG_CFG = {
 ########################################################################
 
 LANG = "en"
-OPS = ["chksrc", "chkdest", "dropref", "updref", "updscript", "upddirect", "chkcode", "updcode", "filldata"]
-OPS_CHECK = ["chksrc", "chkdest", "chkcode"]
+OPS = ["chksrc", "chkdest", "dropref", "updref", "updestscript", "upddestdirect", "chksrccode", "updcodeinsrc", "filldata"]
+OPS_CHECK = ["chksrc", "chkdest", "chksrccode"]
 OPS_DBCHECK = ["chksrc", "chkdest"]
-OPS_INPUT = ["updref", "updrefcode", "updscript", "upddirect", "updcode"]
-OPS_OUTPUT = ["updscript"]
-OPS_CODE = ["chkcode", "updcode"]
+OPS_INPUT = ["updref", "updrefcode", "updestscript", "upddestdirect", "updcodeinsrc"]
+OPS_OUTPUT = ["updestscript"]
+OPS_CODE = ["chksrccode", "updcodeinsrc"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
 
@@ -35,21 +35,21 @@ OPS_HELP = {
 	"en": {
 		"chksrc": "compare source (development) database to reference local repository (instantiate it in case this is not already done), clears and refills 'code' folder",
 		"chkdest": "compare reference local repository to destination (production) database",
-		"chkcode": "compare source code files to reference local repository",
+		"chksrccode": "compare source code files to reference local repository",
 		"dropref": "drop reference data, becase it became invalid, e.g., existing storage format version was superseded by a new one, imeplemented in the software",
 		"updref": "update reference local repository from source (development) database",
-		"updscript": "generate SQL and DDL script to update destination (production) database, includes procedural code",
-		"upddirect": "directly update destination (production) database (should 'updscript' first to check all changes prior to update), includes procedural code",
-		"updcode": "update code in source (development) database, from source code files",
+		"updestscript": "generate SQL and DDL script to update destination (production) database, includes procedural code",
+		"upddestdirect": "directly update destination (production) database (should 'updestscript' first to check all changes prior to update), includes procedural code",
+		"updcodeinsrc": "update code in source (development) database, from source code files",
 		"filldata": "fill parameter table values in destination (production) database"
 	}
 }
 
 OPS_PRECEDENCE = {
 	"updref": "chksrc",
-	"updscript": "chkdest",
-	"upddirect": "chkdest",
-	"updcode": "chkcode"
+	"updestscript": "chkdest",
+	"upddestdirect": "chkdest",
+	"updcodeinsrc": "chksrccode"
 }
 
 SETUP_ZIP = "pgsourcing_setup.zip"

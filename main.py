@@ -130,7 +130,7 @@ def parse_args():
 	project_oriented.add_argument("-m", "--delmode", help="Delete mode: NODEL (default), DEL, CASCADE", action="store")
 	project_oriented.add_argument("-a", "--addnewproc", help="Generate a new empty procedure source file", action="store_true")
 	project_oriented.add_argument("-t", "--addnewtrig", help="Generate a new empty trigger source file", action="store_true")
-	project_oriented.add_argument("-u", "--simulupdcode", help="Activate simulation mode on 'updcode' operation: actual update is replaced by stdout messages (without DDL)", action="store_true")
+	project_oriented.add_argument("-u", "--simulupdcode", help="Activate simulation mode on 'updcodeinsrc' operation: actual update is replaced by stdout messages (without DDL)", action="store_true")
 
 	non_project = parser.add_argument_group('non_project', 'Non-project generic command options')
 	non_project.add_argument("-s", "--setup", help="Just generate a setup ZIP (ZIP will include the whole pgsourcing software and existing projects)", action="store_true")
@@ -174,8 +174,23 @@ def parse_args():
 			else:
 				raise RuntimeError("Project '%s' is missing, found projects: %s" % (args.proj, str(projetos)))
 				
+		if not args.oper is None and not args.addnewproc and not args.oper in OPS:
+
+			startwiths = []
+			for a_op in OPS:
+				if a_op.startswith(args.oper):
+					startwiths.append(a_op)
+			if len(startwiths) == 1:
+				resp = input(f"- operation '{args.oper}' not found, you meant '{startwiths[0]}' (y/other) ? ")
+				if resp.lower() == 'y':	
+					args.oper = startwiths[0]			
+			
 		if not args.addnewproc and not args.oper in OPS:
-			raise RuntimeError("Invalid operation '%s', available ops: %s" % (args.oper, json.dumps(ops_help, indent=4)))
+
+			logger.error("--- available ops --")
+			logger.error(json.dumps(list(ops_help.keys()), indent=4))
+			logger.error(json.dumps(ops_help, indent=4))
+			raise RuntimeError("Invalid operation '%s'" % (args.oper,))
 
 		# if args.oper in OPS_INPUT and args.input is None:
 		# 	parser.print_help()
@@ -213,9 +228,9 @@ def do_output(p_obj, output=None, interactive=False, diff=False):
 		else:
 			dosave = False
 			if not isinstance(output, StringIO) and exists(output) and interactive:
-				prompt = "Ficheiro de saida existe, sobreescrever ? (s/n)"
+				prompt = "Out file exists, overwrite ? (y/other)"
 				resp = input(prompt)
-				if resp.lower() == 's':
+				if resp.lower() == 'y':
 					dosave = True
 			else:
 				dosave = True
@@ -264,9 +279,9 @@ def do_linesoutput(p_obj, output=None, interactive=False):
 			if flagv:
 				
 				if exists(output) and interactive:
-					prompt = "Ficheiro de saida existe, sobreescrever ? (s/n)"
+					prompt = "Out file exists, overwrite ? (y/other)"
 					resp = input(prompt)
-					if resp.lower() == 's':
+					if resp.lower() == 'y':
 						dosave = True
 				else:
 					dosave = True
@@ -486,7 +501,7 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 
 			logger.info(f"reference NOT changed, proj:{p_proj}")
 		
-	elif p_oper == "updscript":
+	elif p_oper == "updestscript":
 
 		assert not diffdict is None
 		
@@ -495,7 +510,7 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 
 		logger.info("dest change script for proj. %s, %s" % (p_proj,output))
 		
-	elif p_oper == "upddirect":
+	elif p_oper == "upddestdirect":
 
 		assert not diffdict is None
 		
@@ -688,7 +703,7 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 
 			else:
 
-				logger.info("result chkcode: NO DIFF (proj '%s')" % p_proj)
+				logger.info("result chksrccode: NO DIFF (proj '%s')" % p_proj)
 
 		except AssertionError as err:
 			logger.exception("Source code dir exists test")
@@ -1183,13 +1198,13 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		
 		if p_oper in OPS_CODE:
 			
-			if p_oper == "chkcode":
+			if p_oper == "chksrccode":
 
 				chkcode_handler(p_proj, refcodedir, opordmgr, 
 					p_connkey=p_connkey, output=output, 
 					interactive=canuse_stdout)
 
-			elif p_oper == "updcode":
+			elif p_oper == "updcodeinsrc":
 			
 				updcode_handler(p_proj, diffdict, 
 					updates_ids=updates_ids, p_connkey=p_connkey, 
