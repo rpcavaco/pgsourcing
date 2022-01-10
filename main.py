@@ -45,7 +45,7 @@
 #
 # ----------------------------------------------------------------------
 
-from __future__ import print_function
+#from __future__ import print_function
 from os import scandir, mkdir, makedirs, walk, remove as removefile
 from os.path import abspath, dirname, exists, splitext, join as path_join
 from datetime import datetime as dt
@@ -58,7 +58,8 @@ from subprocess import check_call
 #################
 
 
-from psycopg2.extras import execute_batch
+# from psycopg2.extras import execute_batch
+from psycopg2.errors import InvalidFunctionDefinition
 
 import argparse
 import logging
@@ -579,8 +580,8 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 	if not srccodedir is None:
 		
 		try:
-			check_dict = { "content": { "procedures": {} } }
-			procs_dict = check_dict["content"]["procedures"]
+			check_dict = { "content": { } }
+			procs_dict = None
 
 			assert exists(srccodedir), "Missing source code dir: %s" % srccodedir			
 			for r, d, fs in walk(srccodedir):
@@ -591,6 +592,8 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 						continue
 						
 					frompath = path_join(r, fl)
+					assert exists(frompath), f"missing source file: {frompath}"
+
 					topath = path_join(p_outprocsdir, fll)
 					# print("  topath:", topath)
 
@@ -601,32 +604,61 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 					assert "procschema" in revdict.keys()
 					assert "procname" in revdict.keys()
 
+					try:
+						with codecs.open(frompath, "r", "utf-8") as flA:
+							srca = flA.read()
+					except:
+						raise RuntimeError("Read error on %s" % frompath)
+
+					patt1 = "function[\s]+([^\)]+\))"
+					patt2 = "\(([^\)]+)\)"
+
+					mo = re.search(patt1, srca, re.I)
+					function_complete_name = None
+					args = None
+					if not mo is None:
+						function_complete_name = mo.group(1)
+					else:
+						raise RuntimeError(f"impossible to retrieve function name from source file: {fl}")
+					
+					assert not function_complete_name is None
+					mo2 = re.search(patt2, function_complete_name, re.I)
+					if not mo2 is None:
+						args = mo2.group(1)
+
+					if not args is None:
+						args_str = args
+					else:
+						args_str = ""
+
+					# print(f" function '{fl}' args: '{args_str}'")
+
 					# if procedure doesn't exist in 'code' transient folder
 					if not exists(topath):
 						
 						if not revdict["procschema"] in procs_dict.keys():
+							if procs_dict is None:
+								check_dict["content"]["procedures"] = {}
+								procs_dict = check_dict["content"]["procedures"]
 							procs_dict[revdict["procschema"]] = {}
 						if not revdict["procname"] in procs_dict[revdict["procschema"]].keys():
+							if procs_dict is None:
+								check_dict["content"]["procedures"] = {}
+								procs_dict = check_dict["content"]["procedures"]
 							di = procs_dict[revdict["procschema"]][revdict["procname"]] = {
 								"diffoper": "insert",
-								"fname": fll
+								"fname": fll,
+								"args": args
 							}
 							p_opordmgr.setord(di)
 						
 					else: # if procedure DOES exist in 'code' transient folder, let's check if is equal to source (meaning it's equal in source database)
-						try:
-							with codecs.open(frompath, "r", "utf-8") as flA:
-								srca = flA.read()
-						except:
-							raise RuntimeError("Read error on %s" % frompath)
-						
 						try:
 							with codecs.open(topath, "r", "utf-8") as flB:
 								srcb = flB.read()
 						except:
 							raise RuntimeError("Read error on %s" % topath)
 							
-
 						listA = []
 						listB = []						
 						sources_to_lists(srca, srcb, listA, listB)	
@@ -639,67 +671,12 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 								di = procs_dict[revdict["procschema"]][revdict["procname"]] = {
 									"diffoper": "update",
 									"difflines": copy(diff),
-									"fname": fll
+									"fname": fll,
+									"args": args
 								}
 								p_opordmgr.setord(di)
 
 				break
-
-			
-			# In case a procedure is missing form source files, 
-			#    -- because was created directly in source db and was retrieved to 'code' dir previously with 'chksrc' operation)  --
-			#    lets fill the missing source file from 'code' folder file contents
-			#
-			for r, d, fs in walk(p_outprocsdir):
-				for fl in fs:
-					
-					fll = fl.lower()
-					if not fll.endswith(".sql"):
-						continue
-
-					frompath = path_join(r, fl)
-					topath = path_join(srccodedir, fll)
-					
-					#print("topath:", topath)
-
-					# fname, ext = splitext(fll)
-					# revdict = {}
-					# reverse_proc_fname(fname, revdict)
-
-					# assert "procschema" in revdict.keys()
-					# assert "procname" in revdict.keys()
-					
-					# if revdict["procschema"] == "":
-					# 	sch = "public"
-					# else:
-					# 	sch = revdict["procschema"]
-
-					if not exists(topath):
-
-						copyfile(frompath, topath)
-						
-						# NOT NECESSARY
-						# A procedure already in database but missing from sources needs no update!
-
-						# with codecs.open(frompath, "r", "utf-8") as open_fl:
-						# 	src = open_fl.read()
-						# 	m = re.match("[\s]?(CREATE|CREATE[\s]+OR[\s]+REPLACE)[\s]+FUNCTION[\s]+[^\(]+\s?\(\)", src, re.MULTILINE)
-						# 	args = ""
-						# 	if m is None:
-						# 		m2 = re.search("[\s]?(CREATE|CREATE[\s]+OR[\s]+REPLACE)[\s]+FUNCTION[\s]+[^\(]+\s?\(([^\)]+)\)", src, re.MULTILINE)
-						# 		if not m2 is None:
-						# 			args = m2.group(2).strip()									
-
-						# if not sch in check_dict["content"].keys():
-						# 	check_dict["content"][sch] = {}
-						# if not revdict["procname"] in check_dict["content"][sch].keys():
-						# 	di = check_dict["content"][sch][revdict["procname"]] = {
-						# 		"diffoper": "delete",
-						# 		"filename": fll,
-						# 		"procname": ".".join((sch, revdict["procname"])),
-						# 		"args": args
-						# 	}
-						# 	p_opordmgr.setord(di)
 				
 			if check_dict["content"]:
 
@@ -708,6 +685,10 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 				check_dict["pgsourcing_output_type"] = "codediff"
 				check_dict["pgsourcing_storage_ver"] = STORAGE_VERSION		
 				do_output(check_dict, output=output, interactive=interactive, diff=True)
+
+			else:
+
+				logger.info("result chkcode: NO DIFF (proj '%s')" % p_proj)
 
 		except AssertionError as err:
 			logger.exception("Source code dir exists test")
@@ -782,14 +763,36 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 									if simulupdcode and canuse_stdout:
 										logger.info("insert or update, in database, src of ", src[:60])
 									else:
-										with cn.cursor() as cr:
-											try:
-												cr.execute(src)
-												changed = True
-											except:
-												logger.error("ficheiro %s" % diff_item["fname"])
-												raise
+										
+										dropcmd = f"DROP FUNCTION {sch}.{pname}({diff_item['args']})"
+										drop_first = False 
+
+										count = 0
+										while True:
+
+											count += 1
+											if count > 2:
+												raise RuntimeError(f"excessive cycling ({count} cycles) on updcode_handler, create function code execution block")
+
+											with cn.cursor() as cr:
+
+												try:
+													if drop_first:
+														cr.execute(dropcmd)
+														drop_first = False
+													cr.execute(src)
+													changed = True
+													break
+												except InvalidFunctionDefinition:
+													drop_first = True
+													cn.rollback()
+													# (continue)
+												except:
+													logger.error("file %s" % diff_item["fname"])
+													raise
+
 										logger.info("inserting script for proj. %s, %s.%s" % (p_proj,sch,pname))	
+
 							elif diff_item["diffoper"] == "delete":
 								if delmode == "DEL":
 									fmt = "DROP FUNCTION %s"

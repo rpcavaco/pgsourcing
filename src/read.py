@@ -1016,9 +1016,24 @@ def gen_proc_hdr(p_sch, p_row):
 	%s 
 AS $BODY$\n""" 
 
-	if p_row["return_type"] == "record" and "return_table" in p_row.keys():
-		return_type = f"TABLE({ p_row['return_table'] })"
-	else:
+# 1024: dict_keys(['procedure_name', 'args', 'return_type', 'procedure_owner', 'language_type', 'body', 'provolatile'])
+
+
+	# if p_row["return_type"] == "record" and "return_table" in p_row.keys():
+	# 	return_type = f"TABLE({ p_row['return_table'] })"
+	# else:
+	# 	return_type = p_row["return_type"]
+
+	# print("1024:", p_row.keys())
+
+	return_type = None
+	if p_row["return_type"] == "record":
+		if not p_row["return_table"] is None:
+			return_type = f"TABLE({p_row['return_table']})"
+	elif p_row["return_type"] == "_text":
+		return_type = "text[]"
+
+	if return_type is None:
 		return_type = p_row["return_type"]
 
 	return template % (p_sch, p_row["procedure_name"], p_row["args"],

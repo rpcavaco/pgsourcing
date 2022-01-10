@@ -149,9 +149,10 @@ def dropref(p_proj):
 	rd = _get_refdir(p_proj)
 	patt = "REF[0-9T]+.json"
 
-	currjson = path_join(rd, "current.json")
-	if exists(currjson):
-		removefile(currjson)
+	for currfile in ("current.json", "warnings.json"):
+		currpath = path_join(rd, currfile)
+		if exists(currpath):
+			removefile(currpath)
 
 	for fl in listdir(rd):
 		if search(patt, fl):
