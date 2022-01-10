@@ -29,8 +29,9 @@ import json
 
 from os import listdir, makedirs, walk, remove as removefile
 from os.path import exists, dirname, abspath, join as path_join
-from shutil import rmtree
+from shutil import rmtree, make_archive
 from re import search
+from datetime import datetime as dt
 
 
 from src.common import PROJECTDIR
@@ -94,10 +95,7 @@ def load_currentref(p_proj):
 	return ret	
 	
 def to_jsonfile(p_obj, p_output):
-	try:
-		flagv = isinstance(p_output, basestring)
-	except NameError:
-		flagv = isinstance(p_output, str)
+	flagv = isinstance(p_output, str)
 	if flagv:
 		with open(p_output, "w") as fj:
 			json.dump(p_obj, fj, indent=2, sort_keys=True)
@@ -160,11 +158,28 @@ def dropref(p_proj):
 			flfull = path_join(rd, fl)
 			removefile(flfull)
 
-	the_dirs = ["code", "code_dest", "tables"]
+	the_dirs = ["code", "code_dest", "parameterstables", "tables"]
 	for dirname in the_dirs:
 		the_dir = path_join(rd, dirname)
 		if exists(the_dir):
 			rmtree(the_dir)
+
+def genprojectarchive(p_proj):
+
+	projdir = _get_projdir(p_proj)
+	projroot = dirname(projdir)
+
+	now_dt = dt.now()
+
+	zipfname = f"{p_proj}_{now_dt.strftime('%Y%m%dT%H%M%S')}"
+	zippath = path_join(projroot, zipfname)
+
+	make_archive(
+		zippath, 
+		"zip", 
+		root_dir=projroot,
+		base_dir=p_proj
+	)
 
 
 # ######################################################################

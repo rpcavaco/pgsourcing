@@ -66,34 +66,29 @@ import logging.config
 import json
 import codecs
 import re
-import io
-import pprint as pp
-
+# import pprint as pp
 
 from src.common import LOG_CFG, LANG, OPS, OPS_INPUT, \
-		OPS_OUTPUT, OPS_HELP, OPS_CHECK, OPS_CODE, OPS_PRECEDENCE, SETUP_ZIP, \
-		BASE_CONNCFG, PROC_SRC_BODY_FNAME, STORAGE_VERSION  #  BASE_FILTERS_RE
-		
-from src.read import dbreader, gen_proc_fname, reverse_proc_fname
+		OPS_OUTPUT, OPS_HELP, OPS_CHECK, OPS_DBCHECK, OPS_CODE, OPS_PRECEDENCE, \
+		SETUP_ZIP, BASE_CONNCFG, PROC_SRC_BODY_FNAME, STORAGE_VERSION  #  BASE_FILTERS_RE
+
+from src.common import gen_proc_fname, reverse_proc_fname		
+from src.read import dbreader
 from src.connect import Connections
 from src.compare import comparing, sources_to_lists
 from src.zip import gen_setup_zip
 from src.fileandpath import get_conn_cfg_path, get_filters_cfg, \
 		exists_currentref, to_jsonfile, save_ref, get_refcodedir, \
-		get_destcodedir, save_warnings, clear_dir, get_srccodedir, \
-		get_reftablesdir, dropref
+		get_destcodedir, save_warnings, get_srccodedir, \
+		get_reftablesdir, dropref, genprojectarchive
 from src.write import updateref, updatedb, create_function_items
 from src.sql import SQL
 
-try:
-	from StringIO import StringIO
-except ImportError:
-	from io import StringIO
+from io import StringIO, IOBase
+from shutil import copyfile 
 
-try:
-    file_types = (io.IOBase,)
-except NameError:
-    file_types = (file, StringIO)
+file_types = (IOBase,)
+
 
 
     
@@ -218,10 +213,7 @@ def do_output(p_obj, output=None, interactive=False, diff=False):
 			dosave = False
 			if not isinstance(output, StringIO) and exists(output) and interactive:
 				prompt = "Ficheiro de saida existe, sobreescrever ? (s/n)"
-				try:
-					resp = raw_input(prompt)
-				except NameError:
-					resp = input(prompt)
+				resp = input(prompt)
 				if resp.lower() == 's':
 					dosave = True
 			else:
@@ -272,10 +264,7 @@ def do_linesoutput(p_obj, output=None, interactive=False):
 				
 				if exists(output) and interactive:
 					prompt = "Ficheiro de saida existe, sobreescrever ? (s/n)"
-					try:
-						resp = raw_input(prompt)
-					except NameError:
-						resp = input(prompt)
+					resp = input(prompt)
 					if resp.lower() == 's':
 						dosave = True
 				else:
@@ -343,7 +332,7 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 	conns = None
 	connkey = None
 	
-	if p_oper in OPS_CHECK:
+	if p_oper in OPS_DBCHECK:
 	
 		cfgpath = get_conn_cfg_path(p_proj)
 		conns = Connections(cfgpath, subkey="conn")
@@ -478,6 +467,7 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 	if p_oper == "updref":
 
 		assert not diffdict is None
+		print("diffdict:", json.dumps(diffdict, indent=4))
 				
 		newref_dict = updateref(p_proj, diffdict, upd_ids_list, limkeys_list)
 		if not newref_dict is None:
@@ -490,6 +480,10 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 			save_ref(p_proj, newref_dict, now_dt)
 
 			logger.info("reference changed, proj:%s" % (p_proj,))
+
+		else:
+
+			logger.info(f"reference NOT changed, proj:{p_proj}")
 		
 	elif p_oper == "updscript":
 
@@ -579,12 +573,14 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 
 	now_dt = dt.now()
 
+	# Fetch procedures existing on source files
 	base_ts = now_dt.strftime('%Y%m%dT%H%M%S')		
 	srccodedir = get_srccodedir(cfgpath, ck)				
 	if not srccodedir is None:
 		
 		try:
-			check_dict = { "content": {} }
+			check_dict = { "content": { "procedures": {} } }
+			procs_dict = check_dict["content"]["procedures"]
 
 			assert exists(srccodedir), "Missing source code dir: %s" % srccodedir			
 			for r, d, fs in walk(srccodedir):
@@ -596,6 +592,7 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 						
 					frompath = path_join(r, fl)
 					topath = path_join(p_outprocsdir, fll)
+					# print("  topath:", topath)
 
 					fname, ext = splitext(fll)
 					revdict = {}
@@ -604,18 +601,19 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 					assert "procschema" in revdict.keys()
 					assert "procname" in revdict.keys()
 
+					# if procedure doesn't exist in 'code' transient folder
 					if not exists(topath):
 						
-						if not revdict["procschema"] in check_dict["content"].keys():
-							check_dict["content"][revdict["procschema"]] = {}
-						if not revdict["procname"] in check_dict["content"][revdict["procschema"]].keys():
-							di = check_dict["content"][revdict["procschema"]][revdict["procname"]] = {
+						if not revdict["procschema"] in procs_dict.keys():
+							procs_dict[revdict["procschema"]] = {}
+						if not revdict["procname"] in procs_dict[revdict["procschema"]].keys():
+							di = procs_dict[revdict["procschema"]][revdict["procname"]] = {
 								"diffoper": "insert",
 								"fname": fll
 							}
 							p_opordmgr.setord(di)
 						
-					else:
+					else: # if procedure DOES exist in 'code' transient folder, let's check if is equal to source (meaning it's equal in source database)
 						try:
 							with codecs.open(frompath, "r", "utf-8") as flA:
 								srca = flA.read()
@@ -635,10 +633,10 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 						diff = [l.strip() for l in list(dodiff(listB, listA)) if l.strip()]
 
 						if len(diff) > 0:
-							if not revdict["procschema"] in check_dict["content"].keys():
-								check_dict["content"][revdict["procschema"]] = {}
-							if not revdict["procname"] in check_dict["content"][revdict["procschema"]].keys():
-								di = check_dict["content"][revdict["procschema"]][revdict["procname"]] = {
+							if not revdict["procschema"] in procs_dict.keys():
+								procs_dict[revdict["procschema"]] = {}
+							if not revdict["procname"] in procs_dict[revdict["procschema"]].keys():
+								di = procs_dict[revdict["procschema"]][revdict["procname"]] = {
 									"diffoper": "update",
 									"difflines": copy(diff),
 									"fname": fll
@@ -646,8 +644,12 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 								p_opordmgr.setord(di)
 
 				break
-				
-			# reverse			
+
+			
+			# In case a procedure is missing form source files, 
+			#    -- because was created directly in source db and was retrieved to 'code' dir previously with 'chksrc' operation)  --
+			#    lets fill the missing source file from 'code' folder file contents
+			#
 			for r, d, fs in walk(p_outprocsdir):
 				for fl in fs:
 					
@@ -657,41 +659,48 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 
 					frompath = path_join(r, fl)
 					topath = path_join(srccodedir, fll)
-
-					fname, ext = splitext(fll)
-					revdict = {}
-					reverse_proc_fname(fname, revdict)
-
-					assert "procschema" in revdict.keys()
-					assert "procname" in revdict.keys()
 					
-					if revdict["procschema"] == "":
-						sch = "public"
-					else:
-						sch = revdict["procschema"]
+					#print("topath:", topath)
+
+					# fname, ext = splitext(fll)
+					# revdict = {}
+					# reverse_proc_fname(fname, revdict)
+
+					# assert "procschema" in revdict.keys()
+					# assert "procname" in revdict.keys()
+					
+					# if revdict["procschema"] == "":
+					# 	sch = "public"
+					# else:
+					# 	sch = revdict["procschema"]
 
 					if not exists(topath):
-						
-						with codecs.open(frompath, "r", "utf-8") as open_fl:
-							src = open_fl.read()
-							m = re.match("[\s]?(CREATE|CREATE[\s]+OR[\s]+REPLACE)[\s]+FUNCTION[\s]+[^\(]+\s?\(\)", src, re.MULTILINE)
-							args = ""
-							if m is None:
-								m2 = re.search("[\s]?(CREATE|CREATE[\s]+OR[\s]+REPLACE)[\s]+FUNCTION[\s]+[^\(]+\s?\(([^\)]+)\)", src, re.MULTILINE)
-								if not m2 is None:
-									args = m2.group(2).strip()									
 
-						if not sch in check_dict["content"].keys():
-							check_dict["content"][sch] = {}
-						if not revdict["procname"] in check_dict["content"][sch].keys():
-							di = check_dict["content"][sch][revdict["procname"]] = {
-								"diffoper": "delete",
-								"filename": fll,
-								"procname": ".".join((sch, revdict["procname"])),
-								"args": args
-							}
-							p_opordmgr.setord(di)
-			
+						copyfile(frompath, topath)
+						
+						# NOT NECESSARY
+						# A procedure already in database but missing from sources needs no update!
+
+						# with codecs.open(frompath, "r", "utf-8") as open_fl:
+						# 	src = open_fl.read()
+						# 	m = re.match("[\s]?(CREATE|CREATE[\s]+OR[\s]+REPLACE)[\s]+FUNCTION[\s]+[^\(]+\s?\(\)", src, re.MULTILINE)
+						# 	args = ""
+						# 	if m is None:
+						# 		m2 = re.search("[\s]?(CREATE|CREATE[\s]+OR[\s]+REPLACE)[\s]+FUNCTION[\s]+[^\(]+\s?\(([^\)]+)\)", src, re.MULTILINE)
+						# 		if not m2 is None:
+						# 			args = m2.group(2).strip()									
+
+						# if not sch in check_dict["content"].keys():
+						# 	check_dict["content"][sch] = {}
+						# if not revdict["procname"] in check_dict["content"][sch].keys():
+						# 	di = check_dict["content"][sch][revdict["procname"]] = {
+						# 		"diffoper": "delete",
+						# 		"filename": fll,
+						# 		"procname": ".".join((sch, revdict["procname"])),
+						# 		"args": args
+						# 	}
+						# 	p_opordmgr.setord(di)
+				
 			if check_dict["content"]:
 
 				check_dict["project"] = p_proj
@@ -701,7 +710,7 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 				do_output(check_dict, output=output, interactive=interactive, diff=True)
 
 		except AssertionError as err:
-			logger.exception("Source code dir test")
+			logger.exception("Source code dir exists test")
 
 
 def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None, 
@@ -725,10 +734,7 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 	upd_ids_list = []
 	if not updates_ids is None:
 
-		try:
-			flagv = isinstance(updates_ids, basestring)
-		except NameError:
-			flagv = isinstance(updates_ids, str)
+		flagv = isinstance(updates_ids, str)
 
 		if flagv:
 			upd_ids_list = process_intervals_string(updates_ids)
@@ -755,6 +761,8 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 	if not srccodedir is None:
 		
 		assert "content" in p_diffdict.keys()
+		assert "procedures" in p_diffdict["content"].keys()
+		procs_dict = p_diffdict["content"]["procedures"]
 		
 		try:
 			with connobj as con:
@@ -762,9 +770,9 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 				cn = con.getConn()
 				changed = False
 				
-				for sch in p_diffdict["content"].keys():
-					for pname in p_diffdict["content"][sch].keys():
-						diff_item = p_diffdict["content"][sch][pname]
+				for sch in procs_dict.keys():
+					for pname in procs_dict[sch].keys():
+						diff_item = procs_dict[sch][pname]
 						if len(upd_ids_list) < 1 or diff_item["operorder"] in upd_ids_list:	
 							if diff_item["diffoper"] in ("insert", "update"):
 								full_path = path_join(srccodedir, diff_item["fname"])
@@ -772,7 +780,7 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 								with codecs.open(full_path, "r", "utf-8") as fl:
 									src = fl.read()
 									if simulupdcode and canuse_stdout:
-										logger.info("insert or update src of ", src[:60])
+										logger.info("insert or update, in database, src of ", src[:60])
 									else:
 										with cn.cursor() as cr:
 											try:
@@ -831,6 +839,8 @@ def check_objtype(p_relkind, p_typestr):
 		ret = True
 	elif p_relkind.lower() == 'f' and p_typestr.lower() == 'fortables':
 		ret = True
+
+	# print("check_objtype -- p_relkind, p_typestr:", p_relkind, p_typestr, ret)
 		
 	return ret
 		
@@ -911,13 +921,29 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 				
 			else:
 
-				_phase_label, op_content = p_op
+				try:
+					_phase_label, op_content = p_op
+				except:
+					print("p_op:", p_op)
+					raise
+
 				assert len(op_content) == 3, f"length of {op_content} != 3"
+
+				# print("op_content:", op_content)
+				# print("p_diff_dict:", json.dumps(p_diff_dict, indent=4))
 
 				curr_dicttree_level = p_diff_dict
 				for li in range(3):
+					
+					# if li == 2:
+					# 	new_proc_dict = {curr_dicttree_level[k]["newvalue"]["procedure_name"]:curr_dicttree_level[k] for k in curr_dicttree_level.keys()}	
+					# 	assert op_content[li] in new_proc_dict.keys(), f"{op_content[li]} not in {new_proc_dict.keys()}"
+					# 	curr_dicttree_level = new_proc_dict[op_content[li]]
+					# else:
+
 					assert op_content[li] in curr_dicttree_level.keys(), f"{op_content[li]} not in {curr_dicttree_level.keys()}"
 					curr_dicttree_level = curr_dicttree_level[op_content[li]]
+
 				assert 'newvalue' in curr_dicttree_level.keys(), f"{'newvalue'} not in {curr_dicttree_level.keys()}"
 				curr_dicttree_level = curr_dicttree_level['newvalue']
 
@@ -978,10 +1004,7 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 		ops = p_cd_ops["delete"]
 		for op in ops:
 			should_remove(False, cr, op, p_diff_dict)
-					
-		
-	
-	
+
 def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=None, 
 		canuse_stdout=False, include_public=False, include_colorder=False, 
 		updates_ids=None, limkeys=None, delmode=None, simulupdcode=False):
@@ -994,6 +1017,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 
 	if p_oper == "dropref":
 		if not canuse_stdout or input("are you sure? (enter 'y' to drop, any other key to exit): ").lower() == "y":
+			genprojectarchive(p_proj)
 			dropref(p_proj)
 			logger.info("reference dropped, proj:%s" % (p_proj,))
 		return
@@ -1078,12 +1102,13 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				comparison_mode, replaces, opordmgr, 
 				root_diff_dict["content"], cd_ops)
 				
-			# Lista "crua" das operações
-			# print("-------------------------------")
+			# # Lista "crua" das operações
+			# print(f"--------- conn-key: {connkey:20} ----------------------")
 			# pp.pprint(cd_ops)
-			# print("-------------------------------")
+			# print("----------------------------------------------------------------")
 			
-			checkCDOps(p_proj, cd_ops, connkey, root_diff_dict["content"])
+			if comparison_mode != "From SRC":
+				checkCDOps(p_proj, cd_ops, connkey, root_diff_dict["content"])
 			
 		## TODO - deve haver uma verificacao final de coerencia
 		## Sequencias - tipo da seq. == tipo do campo serial em que e usada, etc.
@@ -1198,10 +1223,7 @@ def gen_newprocfile_items():
 	ownership = None
 			
 	for pri, pr in enumerate(prlist):		
-		try:
-			resp = raw_input(pr)
-		except NameError:
-			resp = input(pr)
+		resp = input(pr)
 		if len(resp) < 1 or resp.lower() == 'x':
 			doexit = True
 			break
@@ -1219,10 +1241,7 @@ def gen_newprocfile_items():
 		count = 0
 		while count <= 20:
 			count += 1
-			try:
-				resp = raw_input(prfinal % count)
-			except NameError:
-				resp = input(prfinal % count)
+			resp = input(prfinal % count)
 			if len(resp) < 1 or resp.lower() == 'x':
 				break
 			tiposargs.append(resp.strip().lower())
@@ -1351,7 +1370,7 @@ def cli_main():
 					for oi, operitem in enumerate(operlist):
 
 						if operitem in OPS_CHECK:						
-							streams = [args.input, io.StringIO()]
+							streams = [args.input, StringIO()]
 						else:
 
 							if operitem in OPS_INPUT:
@@ -1362,7 +1381,7 @@ def cli_main():
 
 							if operitem in OPS_OUTPUT:
 								if args.output is None:
-									streams.append(io.StringIO())
+									streams.append(StringIO())
 								else:
 									streams.append(args.output)
 

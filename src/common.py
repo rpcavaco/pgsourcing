@@ -1,4 +1,6 @@
 import logging
+import re
+import hashlib
 
 ########################################################################
 # Instalation-relatec configs
@@ -19,8 +21,9 @@ LOG_CFG = {
 
 LANG = "en"
 OPS = ["chksrc", "chkdest", "dropref", "updref", "updscript", "upddirect", "chkcode", "updcode", "filldata"]
-OPS_CHECK = ["chksrc", "chkdest"]
-OPS_INPUT = ["updref", "updscript", "upddirect", "updcode"]
+OPS_CHECK = ["chksrc", "chkdest", "chkcode"]
+OPS_DBCHECK = ["chksrc", "chkdest"]
+OPS_INPUT = ["updref", "updrefcode", "updscript", "upddirect", "updcode"]
 OPS_OUTPUT = ["updscript"]
 OPS_CODE = ["chkcode", "updcode"]
 PROJECTDIR = "projetos"
@@ -30,14 +33,14 @@ STORAGE_VERSION = 4
 
 OPS_HELP = {
 	"en": {
-		"chksrc": "compare source (development) database to reference local repository (instantiate it in case this is not already done)",
+		"chksrc": "compare source (development) database to reference local repository (instantiate it in case this is not already done), clears and refills 'code' folder",
 		"chkdest": "compare reference local repository to destination (production) database",
-		"chkcode": "compare procedure source code files to reference local repository",
+		"chkcode": "compare source code files to reference local repository",
 		"dropref": "drop reference data, becase it became invalid, e.g., existing storage format version was superseded by a new one, imeplemented in the software",
 		"updref": "update reference local repository from source (development) database",
 		"updscript": "generate SQL and DDL script to update destination (production) database, includes procedural code",
 		"upddirect": "directly update destination (production) database (should 'updscript' first to check all changes prior to update), includes procedural code",
-		"updcode": "update procedural code in source (development) database, from local repository",
+		"updcode": "update code in source (development) database, from source code files",
 		"filldata": "fill parameter table values in destination (production) database"
 	}
 }
@@ -45,7 +48,8 @@ OPS_HELP = {
 OPS_PRECEDENCE = {
 	"updref": "chksrc",
 	"updscript": "chkdest",
-	"upddirect": "chkdest"	
+	"upddirect": "chkdest",
+	"updcode": "chkcode"
 }
 
 SETUP_ZIP = "pgsourcing_setup.zip"
@@ -119,3 +123,54 @@ COL_ITEMS_CHG_AVOIDING_SUBSTITUTION = ["default", "nullable"]
 UPPERLEVELOPS = { "pkey": 1, "cols": 1, "check": 1, "index": 1, "unique": 1, "trigger": 1, "procedures": 2, "roles": 1, "schdetails": (0, True), "seqdetails": (0, True), "vdetails": (0, True), "mvdetails": (0, True) }
 
 
+def _condensed_pgdtype(p_typestr):
+	if len(p_typestr) > 4:
+		hashv = hashlib.sha1(p_typestr.encode("UTF-8")).hexdigest()
+		ret = p_typestr[:2] + hashv[:2]
+	else:
+		ret = p_typestr
+	return ret
+
+def gen_proc_fname(p_pname, p_rettype, p_argtypes_list):
+	
+	if len(p_argtypes_list) > 0:
+		template = "%s#%s$%s" 
+		catlist = [_condensed_pgdtype(cat) for cat in p_argtypes_list]
+		ret = template % (p_pname, 
+		_condensed_pgdtype(p_rettype), "-".join(catlist))
+	else:
+		template = "%s$%s" 
+		ret = template % (p_pname, 
+		_condensed_pgdtype(p_rettype))
+
+	return ret	
+		
+def gen_proc_fname_argsstr(p_pname, p_rettype, p_args):
+	
+	if p_args:
+		args = re.split(",[ ]+", p_args)
+		argtypeslist = [spl.split(" ")[1] for spl in re.split(",[ ]+", 
+		p_args)]
+		ret = gen_proc_fname(p_pname, p_rettype, argtypeslist)
+	else:
+		ret = gen_proc_fname(p_pname, p_rettype, [])
+
+	return ret
+
+def gen_proc_fname_row(p_row):
+	
+	return gen_proc_fname_argsstr(p_row["procedure_name"], 
+			p_row["return_type"], p_row["args"])
+	
+def reverse_proc_fname(p_fname, o_dict):
+	
+	schema, rest = p_fname.split(".")
+	
+	if "#" in rest:
+		# has arguments
+		procname, rest2 = rest.split("#")
+	else:
+		procname, rest2 = rest.split("$")
+		
+	o_dict["procschema"] = schema
+	o_dict["procname"] = procname

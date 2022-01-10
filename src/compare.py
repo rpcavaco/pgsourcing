@@ -35,7 +35,8 @@ from difflib import unified_diff as dodiff
 
 from src.common import PROC_SRC_BODY_FNAME, CFG_GROUPS, \
 		CFG_DEST_GROUPS, CFG_LISTGROUPS, UPPERLEVELOPS, \
-		CFG_SHALLOW_GROUPS, SHALLOW_DEPTH, STORAGE_VERSION
+		CFG_SHALLOW_GROUPS, SHALLOW_DEPTH, STORAGE_VERSION, \
+			gen_proc_fname_row
 		
 from src.fileandpath import load_currentref
 
@@ -202,7 +203,7 @@ def subtree_fromkeychain(p_dict, p_keychainlist):
 		ret = ret[k]
 		
 	return ret
-	
+
 # Generate upper level update				
 def gen_update(p_transformschema, p_opordmgr, p_upperlevel_ops, p_keychain, p_diff_dict, p_raw_parent_newvalue, p_raw_newvalue, stepback=False):
 	
@@ -318,9 +319,9 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 				diff_item["newvalue"] = newvalue
 				
 				if grpkeys[0] == "procedures" and "procedure_name" in newvalue.keys():
-					new_grpkeys = grpkeys[:-1] + [newvalue["procedure_name"]]
-					args = grpkeys[:-1] + [newvalue["args"]]
-					o_cd_ops["insert"].append(('b', new_grpkeys, newvalue["args"], newvalue["return_type"]))
+					procedure_key = gen_proc_fname_row(newvalue)
+					new_grpkeys = grpkeys[:-1] + [procedure_key]
+					o_cd_ops["insert"].append(('b', new_grpkeys)) #, newvalue["args"], newvalue["return_type"]))
 				else:
 					new_grpkeys = grpkeys
 					o_cd_ops["insert"].append(('c', new_grpkeys))

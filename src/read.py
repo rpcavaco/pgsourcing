@@ -35,7 +35,7 @@ from psycopg2.errors import UndefinedFunction
 from shutil import rmtree
 
 from src.sql import SQL
-from src.common import PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_LISTGROUPS, OPS_CHECK, FLOAT_TYPES, INT_TYPES
+from src.common import PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_LISTGROUPS, OPS_DBCHECK, FLOAT_TYPES, INT_TYPES, gen_proc_fname_row
 from src.fileandpath import clear_dir
 
 WARN_KEYS = {
@@ -1016,66 +1016,74 @@ def gen_proc_hdr(p_sch, p_row):
 	%s 
 AS $BODY$\n""" 
 
+	if p_row["return_type"] == "record":
+		print("1020:", p_row["procedure_name"], list(p_row.keys()))
+
+
+	if p_row["return_type"] == "record" and "return_table" in p_row.keys():
+		return_type = f"TABLE({ p_row['return_table'] })"
+	else:
+		return_type = p_row["return_type"]
+
 	return template % (p_sch, p_row["procedure_name"], p_row["args"],
-		p_row["return_type"], p_row["language_type"], volatdict[p_row["provolatile"]])
+		return_type, p_row["language_type"], volatdict[p_row["provolatile"]])
 
-def condensed_pgdtype(p_typestr):
-	if len(p_typestr) > 4:
-		hashv = hashlib.sha1(p_typestr.encode("UTF-8")).hexdigest()
-		ret = p_typestr[:2] + hashv[:2]
-	else:
-		ret = p_typestr
-	return ret
+# def condensed_pgdtype(p_typestr):
+# 	if len(p_typestr) > 4:
+# 		hashv = hashlib.sha1(p_typestr.encode("UTF-8")).hexdigest()
+# 		ret = p_typestr[:2] + hashv[:2]
+# 	else:
+# 		ret = p_typestr
+# 	return ret
 
-def gen_proc_fname(p_pname, p_rettype, p_argtypes_list):
+# def gen_proc_fname(p_pname, p_rettype, p_argtypes_list):
 	
-	if len(p_argtypes_list) > 0:
-		template = "%s#%s$%s" 
-		catlist = [condensed_pgdtype(cat) for cat in p_argtypes_list]
-		ret = template % (p_pname, 
-		condensed_pgdtype(p_rettype), "-".join(catlist))
-	else:
-		template = "%s$%s" 
-		ret = template % (p_pname, 
-		condensed_pgdtype(p_rettype))
+# 	if len(p_argtypes_list) > 0:
+# 		template = "%s#%s$%s" 
+# 		catlist = [condensed_pgdtype(cat) for cat in p_argtypes_list]
+# 		ret = template % (p_pname, 
+# 		condensed_pgdtype(p_rettype), "-".join(catlist))
+# 	else:
+# 		template = "%s$%s" 
+# 		ret = template % (p_pname, 
+# 		condensed_pgdtype(p_rettype))
 
-	return ret	
+# 	return ret	
 		
-def gen_proc_fname_argsstr(p_pname, p_rettype, p_args):
+# def gen_proc_fname_argsstr(p_pname, p_rettype, p_args):
 	
-	if p_args:
-		args = re.split(",[ ]+", p_args)
-		argtypeslist = [spl.split(" ")[1] for spl in re.split(",[ ]+", 
-		p_args)]
-		ret = gen_proc_fname(p_pname, p_rettype, argtypeslist)
-	else:
-		ret = gen_proc_fname(p_pname, p_rettype, [])
+# 	if p_args:
+# 		args = re.split(",[ ]+", p_args)
+# 		argtypeslist = [spl.split(" ")[1] for spl in re.split(",[ ]+", 
+# 		p_args)]
+# 		ret = gen_proc_fname(p_pname, p_rettype, argtypeslist)
+# 	else:
+# 		ret = gen_proc_fname(p_pname, p_rettype, [])
 
-	return ret
+# 	return ret
 
-def gen_proc_fname_row(p_row):
+# def gen_proc_fname_row(p_row):
 	
-	return gen_proc_fname_argsstr(p_row["procedure_name"], 
-			p_row["return_type"], p_row["args"])
+# 	return gen_proc_fname_argsstr(p_row["procedure_name"], 
+# 			p_row["return_type"], p_row["args"])
 	
-def reverse_proc_fname(p_fname, o_dict):
+# def reverse_proc_fname(p_fname, o_dict):
 	
-	schema, rest = p_fname.split(".")
+# 	schema, rest = p_fname.split(".")
 	
-	if "#" in rest:
-		# has arguments
-		procname, rest2 = rest.split("#")
-	else:
-		procname, rest2 = rest.split("$")
+# 	if "#" in rest:
+# 		# has arguments
+# 		procname, rest2 = rest.split("#")
+# 	else:
+# 		procname, rest2 = rest.split("$")
 		
-	o_dict["procschema"] = schema
-	o_dict["procname"] = procname
+# 	o_dict["procschema"] = schema
+# 	o_dict["procname"] = procname
 	
 def gen_proc_ftr(p_sch, p_row):
 
 	template = """$BODY$;\n
-ALTER FUNCTION %s.%s(%s)
-OWNER TO %s;"""
+ALTER FUNCTION %s.%s(%s) OWNER TO %s;"""
 
 	return template % (p_sch, p_row["procedure_name"], p_row["args"],
 		p_row["procedure_owner"])
@@ -1127,13 +1135,13 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dic
 	if not genprocsdir is None:
 		clear_dir(genprocsdir, ".sql")
 
+	tr_funcnames = []
 	for sch in out_dict["content"]["schemata"]:
 		
 		if "procedures" in p_filters_cfg.keys():			
 			if len(p_filters_cfg["procedures"].keys()) > 0 and sch not in p_filters_cfg["procedures"].keys():
 				continue 
 				
-		tr_funcnames = []
 		if sch in trig_dict.keys():
 			tr_funcnames = trig_dict[sch]	
 			
@@ -1167,43 +1175,43 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dic
 				if not row[item] is None:
 					pdict[item] = row[item]
 
+	for schname in the_dict.keys():
+		schdict = the_dict[schname]
+		for procfname in schdict.keys():
+			pdict = schdict[procfname]
+			if "return_type" in pdict.keys() and pdict["return_type"] == "record":
+				p_cursor.execute(SQL["PROCS_RETTYPE_TABLE"], (schname, pdict["procedure_name"]))		
+				row = p_cursor.fetchone()
+				pdict["return_table"] = row[0] 
+
+			if not genprocsdir is None:
+				gen_proc_file(genprocsdir, schname, pdict)
+
+	# trigger funcs
+	if len(tr_funcnames) > 0:
+		
+		wherecl = "and procedure_schema = %s and procedure_name = ANY(%s)"
+		p_cursor.execute("%s %s" % (SQL[dict_key], wherecl), (sch, tr_funcnames))	
+		# print(p_cursor.mogrify("%s %s" % (SQL[dict_key], wherecl), (sch, tr_funcnames)))
+			
+		for row in p_cursor:
+			
+			# if row["schema"] == "public" and not p_include_public:
+				# continue
+			
+			if not row["procedure_schema"] in the_dict.keys():
+				schdict = the_dict[row["procedure_schema"]] = {}
+			else:
+				schdict = the_dict[row["procedure_schema"]]
+				
+			procfname = gen_proc_fname_row(row)
+			pdict = schdict[procfname] = {}
+			for item in items:
+				if not row[item] is None:
+					pdict[item] = row[item]
+
 			if not genprocsdir is None:
 				gen_proc_file(genprocsdir, sch, row)
-
-		for schname in the_dict.keys():
-			schdict = the_dict[schname]
-			for procfname in schdict.keys():
-				pdict = schdict[procfname]
-				if "return_type" in pdict.keys() and pdict["return_type"] == "record":
-					p_cursor.execute(SQL["PROCS_RETTYPE_TABLE"], (schname, pdict["procedure_name"]))		
-					row = p_cursor.fetchone()
-					pdict["return_table"] = row[0] 
-					
-		# trigger funcs
-		if len(tr_funcnames) > 0:
-			
-			wherecl = "and procedure_schema = %s and procedure_name = ANY(%s)"
-			p_cursor.execute("%s %s" % (SQL[dict_key], wherecl), (sch, tr_funcnames))	
-			# print(p_cursor.mogrify("%s %s" % (SQL[dict_key], wherecl), (sch, tr_funcnames)))
-				
-			for row in p_cursor:
-				
-				# if row["schema"] == "public" and not p_include_public:
-					# continue
-				
-				if not row["procedure_schema"] in the_dict.keys():
-					schdict = the_dict[row["procedure_schema"]] = {}
-				else:
-					schdict = the_dict[row["procedure_schema"]]
-					
-				procfname = gen_proc_fname_row(row)
-				pdict = schdict[procfname] = {}
-				for item in items:
-					if not row[item] is None:
-						pdict[item] = row[item]
-
-				if not genprocsdir is None:
-					gen_proc_file(genprocsdir, sch, row)
 
 def paramtables(p_cursor, p_filters_cfg, p_gendumpsdir):
 		
