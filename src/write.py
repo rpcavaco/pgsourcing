@@ -374,23 +374,28 @@ def col_operation(docomment, p_sch, p_tname, p_colname, p_diff_item, p_delmode, 
 			colcreatitems = col_create(p_tname, p_colname, p_diff_item["newvalue"])
 			cont0 = re.sub("\s\s+", " ",   "%s %s %s %s" % tuple(colcreatitems[1:]))
 			p_out_sql_src.append("%s ADD COLUMN %s" % (tmplt % (p_sch, p_tname), cont0.strip()))
-					
-def create_function(p_schema, p_name, p_new_value, o_sql_linebuffer, replace=True):
 
-	if "return_table" in p_new_value.keys():
-		return_table_defstr = p_new_value["return_table"]
-	else:
-		return_table_defstr = None
-	
-	create_function_items(p_schema, p_name, p_new_value["args"],
-		p_new_value["return_type"], p_new_value["language_type"], 
-		p_new_value["procedure_owner"], p_new_value["provolatile"], 
-		p_new_value["body"], o_sql_linebuffer, 
-		return_table_defstr=return_table_defstr, replace=replace)
+def update_search_path(p_function_body, p_schematrans):
+
+	global_changed = False
+	current_body = None
+
+	for trans_dict in p_schematrans:
+		# changed = False 
+		if current_body is None:
+			current_body = p_function_body
+		ret = re.sub(f"(search_path['\sa-zA-Z_À-Ýà-ý0-9\$,]+){trans_dict['src']}", f"\\1{trans_dict['dest']}", current_body)
+		if ret != current_body:
+			# changed = True
+			global_changed = True
+			current_body = ret
+
+	return global_changed, ret
+
 
 def create_function_items(p_schema, p_name, p_args, p_rettype, p_langtype, p_owner, p_volatility, 
 	p_body, o_sql_linebuffer, return_table_defstr=None, replace=True):
-	
+
 	if replace:
 		cr = "CREATE OR REPLACE FUNCTION %s.%s"
 	else:
@@ -423,6 +428,24 @@ def create_function_items(p_schema, p_name, p_args, p_rettype, p_langtype, p_own
 	
 	o_sql_linebuffer.append("ALTER FUNCTION %s.%s(%s) " % (p_schema, p_name, p_args))
 	o_sql_linebuffer.append("OWNER to %s" % (p_owner,))
+					
+def create_function(p_schema, p_name, p_new_value, o_sql_linebuffer, schematrans=None, replace=True):
+
+	if "return_table" in p_new_value.keys():
+		return_table_defstr = p_new_value["return_table"]
+	else:
+		return_table_defstr = None
+
+	if not schematrans is None:
+		_bodychanged, fbody = update_search_path(p_new_value["body"], schematrans)
+	else:
+		fbody = p_new_value["body"]
+	
+	create_function_items(p_schema, p_name, p_new_value["args"],
+		p_new_value["return_type"], p_new_value["language_type"], 
+		p_new_value["procedure_owner"], p_new_value["provolatile"], 
+		fbody, o_sql_linebuffer, 
+		return_table_defstr=return_table_defstr, replace=replace)
 
 def create_role(p_rolename, p_new_value, o_sql_linebuffer):
 	
@@ -505,6 +528,11 @@ def print_matviewhdr(p_docomment, p_sch, p_name, p_out_sql_src, o_flag_byref):
 def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomment=True):
 	
 	diff_content = p_difdict["content"]	
+	if "transformschema" in p_difdict.keys():
+		transformschema = p_difdict["transformschema"]	
+	else:
+		transformschema = None
+
 	out_sql_src = []
 	
 	logger = logging.getLogger('pgsourcing')
@@ -643,6 +671,11 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 	grpkey = "procedures"	
 	if (len(p_limkeys_list) < 1 or grpkey in p_limkeys_list) and grpkey in diff_content.keys():
 
+		schema_trans = None
+		if not transformschema is None:
+			if "procedures" in transformschema["types"]:
+				schema_trans = transformschema["trans"]
+
 		currdiff_block = diff_content[grpkey]			
 		for sch in sorted(currdiff_block.keys()):
 
@@ -665,7 +698,7 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 						if proc_blk["diffoper"] == "insert":
 							
 							flines = []
-							create_function(sch, usable_proc, proc_blk["newvalue"], flines, replace=True)						
+							create_function(sch, usable_proc, proc_blk["newvalue"], flines, schematrans=schema_trans, replace=True)						
 							out_sql_src.append("".join(flines))
 							
 						elif proc_blk["diffoper"] == "delete":
@@ -685,7 +718,7 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 							# e "create function"
 							
 							flines = []
-							create_function(sch, usable_proc, proc_blk["newvalue"], flines, replace=do_replace)						
+							create_function(sch, usable_proc, proc_blk["newvalue"], flines, schematrans=schema_trans, replace=do_replace)						
 							out_sql_src.append("".join(flines))
 							
 						else:

@@ -1029,11 +1029,11 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	check_dict = { }
 	root_diff_dict = { "content": {} }
 	#ordered_diffkeys = {}
-	replaces = {}
+	replacements = {}
 
 	comparison_mode, connkey = check_oper_handler(p_proj, p_oper, 
 		refcodedir, reftablesdir, destcodedir, check_dict, \
-		replaces, p_connkey=p_connkey, include_public=include_public, 
+		replacements, p_connkey=p_connkey, include_public=include_public, 
 		include_colorder=include_colorder)
 	
 	# Se a operacao for chksrc ou chkdest o dicionario check_dict sera 
@@ -1099,8 +1099,11 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		if do_compare:
 
 			comparing(p_proj, check_dict["content"], 
-				comparison_mode, replaces, opordmgr, 
+				comparison_mode, replacements, opordmgr, 
 				root_diff_dict["content"], cd_ops)
+
+			if replacements:
+				root_diff_dict["transformschema"] = replacements
 				
 			# # Lista "crua" das operações
 			# print(f"--------- conn-key: {connkey:20} ----------------------")
