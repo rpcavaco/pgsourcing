@@ -1114,7 +1114,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				checkCDOps(p_proj, cd_ops, connkey, root_diff_dict["content"])
 			
 		## TODO - deve haver uma verificacao final de coerencia
-		## Sequencias - tipo da seq. == tipo do campo serial em que e usada, etc.
+		## Sequencias - tipo da seq. == tipo do campo serial em que e usada, etc. -- DONE
 
 		if "content" in root_diff_dict.keys() and root_diff_dict["content"]:
 			
