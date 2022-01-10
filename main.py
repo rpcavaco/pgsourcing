@@ -228,7 +228,7 @@ def do_output(p_obj, output=None, interactive=False, diff=False):
 		else:
 			dosave = False
 			if not isinstance(output, StringIO) and exists(output) and interactive:
-				prompt = "Out file exists, overwrite ? (y/other)"
+				prompt = "Out file exists, overwrite ? (y/other) "
 				resp = input(prompt)
 				if resp.lower() == 'y':
 					dosave = True
@@ -279,7 +279,7 @@ def do_linesoutput(p_obj, output=None, interactive=False):
 			if flagv:
 				
 				if exists(output) and interactive:
-					prompt = "Out file exists, overwrite ? (y/other)"
+					prompt = "Out file exists, overwrite ? (y/other) "
 					resp = input(prompt)
 					if resp.lower() == 'y':
 						dosave = True
@@ -501,7 +501,7 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 
 			logger.info(f"reference NOT changed, proj:{p_proj}")
 		
-	elif p_oper == "updestscript":
+	elif p_oper == "upddestscript":
 
 		assert not diffdict is None
 		
@@ -529,7 +529,12 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 				else:
 					strcontent = ln
 				# print('0>>', strcontent, '<<||')
-				cr.execute(strcontent)
+				try:
+					cr.execute(strcontent)
+				except:
+					logger.error("--------- statement execution ---------")
+					logger.error(strcontent)
+					raise
 		cn.commit()
 			
 		logger.info("direct dest change for proj. %s" % p_proj)

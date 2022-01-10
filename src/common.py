@@ -20,11 +20,11 @@ LOG_CFG = {
 ########################################################################
 
 LANG = "en"
-OPS = ["chksrc", "chkdest", "dropref", "updref", "updestscript", "upddestdirect", "chksrccode", "updcodeinsrc", "filldata"]
+OPS = ["chksrc", "chkdest", "dropref", "updref", "upddestscript", "upddestdirect", "chksrccode", "updcodeinsrc", "filldata"]
 OPS_CHECK = ["chksrc", "chkdest", "chksrccode"]
 OPS_DBCHECK = ["chksrc", "chkdest"]
-OPS_INPUT = ["updref", "updrefcode", "updestscript", "upddestdirect", "updcodeinsrc"]
-OPS_OUTPUT = ["updestscript"]
+OPS_INPUT = ["updref", "updrefcode", "upddestscript", "upddestdirect", "updcodeinsrc"]
+OPS_OUTPUT = ["upddestscript"]
 OPS_CODE = ["chksrccode", "updcodeinsrc"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
@@ -38,8 +38,8 @@ OPS_HELP = {
 		"chksrccode": "compare source code files to reference local repository",
 		"dropref": "drop reference data, becase it became invalid, e.g., existing storage format version was superseded by a new one, imeplemented in the software",
 		"updref": "update reference local repository from source (development) database",
-		"updestscript": "generate SQL and DDL script to update destination (production) database, includes procedural code",
-		"upddestdirect": "directly update destination (production) database (should 'updestscript' first to check all changes prior to update), includes procedural code",
+		"upddestscript": "generate SQL and DDL script to update destination (production) database, includes procedural code",
+		"upddestdirect": "directly update destination (production) database (should 'upddestscript' first to check all changes prior to update), includes procedural code",
 		"updcodeinsrc": "update code in source (development) database, from source code files",
 		"filldata": "fill parameter table values in destination (production) database"
 	}
@@ -47,7 +47,7 @@ OPS_HELP = {
 
 OPS_PRECEDENCE = {
 	"updref": "chksrc",
-	"updestscript": "chkdest",
+	"upddestscript": "chkdest",
 	"upddestdirect": "chkdest",
 	"updcodeinsrc": "chksrccode"
 }
