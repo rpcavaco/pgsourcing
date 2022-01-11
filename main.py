@@ -684,16 +684,14 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 
 					# if procedure doesn't exist in 'code' transient folder
 					if not exists(topath):
-						
+
+						if procs_dict is None:
+							check_dict["content"]["procedures"] = {}
+							procs_dict = check_dict["content"]["procedures"]
+
 						if not revdict["procschema"] in procs_dict.keys():
-							if procs_dict is None:
-								check_dict["content"]["procedures"] = {}
-								procs_dict = check_dict["content"]["procedures"]
 							procs_dict[revdict["procschema"]] = {}
 						if not revdict["procname"] in procs_dict[revdict["procschema"]].keys():
-							if procs_dict is None:
-								check_dict["content"]["procedures"] = {}
-								procs_dict = check_dict["content"]["procedures"]
 							di = procs_dict[revdict["procschema"]][revdict["procname"]] = {
 								"diffoper": "insert",
 								"fname": fll,
@@ -714,6 +712,11 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 						diff = [l.strip() for l in list(dodiff(listB, listA)) if l.strip()]
 
 						if len(diff) > 0:
+
+							if procs_dict is None:
+								check_dict["content"]["procedures"] = {}
+								procs_dict = check_dict["content"]["procedures"]
+
 							if not revdict["procschema"] in procs_dict.keys():
 								procs_dict[revdict["procschema"]] = {}
 							if not revdict["procname"] in procs_dict[revdict["procschema"]].keys():
@@ -1598,7 +1601,7 @@ def cli_main():
 								include_colorder = not args.removecolorder,
 								updates_ids = args.updateids,
 								limkeys = args.limkeys,
-								delmode = args.delmode,
+								delmode = "NODEL", #args.delmode,
 								simulupdcode = args.simulupdcode)
 
 						if oi < len(operlist)-1:
@@ -1619,7 +1622,7 @@ def cli_main():
 							include_colorder = not args.removecolorder,
 							updates_ids = args.updateids,
 							limkeys = args.limkeys,
-							delmode = args.delmode,
+							delmode = "NODEL", #args.delmode,
 							simulupdcode = args.simulupdcode)
 					
 	except:
