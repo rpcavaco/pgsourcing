@@ -209,6 +209,11 @@ def gen_update(p_transformschema, p_opordmgr, p_upperlevel_ops, p_keychain, p_di
 	
 	lower_ops = subtree_fromkeychain(p_upperlevel_ops, p_keychain)
 	assert not lower_ops is None
+
+	# TODO -- verificar impacto
+	# if only change is in 'ordpos' attribute ignore, is only used for internal ordering of items
+	if ", ".join(lower_ops.keys()) == "ordpos":
+		return
 	
 	diff_item_parent = get_diff_item('b3', p_diff_dict, p_keychain[:-1])
 	if stepback:
@@ -220,8 +225,7 @@ def gen_update(p_transformschema, p_opordmgr, p_upperlevel_ops, p_keychain, p_di
 	# upper level update 'newvalue' includes grants to set
 	if "grants" in diff_item.keys():
 		del diff_item["grants"]
-	
-	
+		
 	p_opordmgr.setord(diff_item)
 
 	diff_item["changedkeys"] =  ", ".join(lower_ops.keys())

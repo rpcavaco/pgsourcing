@@ -29,7 +29,7 @@ OPS_CODE = ["chksrccode", "updcodeinsrc"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
 
-STORAGE_VERSION = 4
+STORAGE_VERSION = 5
 
 OPS_HELP = {
 	"en": {
@@ -139,7 +139,7 @@ def gen_proc_fname(p_pname, p_rettype, p_argtypes_list):
 		ret = template % (p_pname, 
 		_condensed_pgdtype(p_rettype), "-".join(catlist))
 	else:
-		template = "%s$%s" 
+		template = "%s#%s" 
 		ret = template % (p_pname, 
 		_condensed_pgdtype(p_rettype))
 
@@ -148,7 +148,6 @@ def gen_proc_fname(p_pname, p_rettype, p_argtypes_list):
 def gen_proc_fname_argsstr(p_pname, p_rettype, p_args):
 	
 	if p_args:
-		args = re.split(",[ ]+", p_args)
 		argtypeslist = [spl.split(" ")[1] for spl in re.split(",[ ]+", 
 		p_args)]
 		ret = gen_proc_fname(p_pname, p_rettype, argtypeslist)
@@ -164,13 +163,20 @@ def gen_proc_fname_row(p_row):
 	
 def reverse_proc_fname(p_fname, o_dict):
 	
-	schema, rest = p_fname.split(".")
+	fullname, rest = p_fname.split("#")
+	schema, procname = fullname.split(".")
 	
-	if "#" in rest:
+	if "$" in rest:
 		# has arguments
-		procname, rest2 = rest.split("#")
+		rettype, argstring = rest.split("$")
 	else:
-		procname, rest2 = rest.split("$")
+		rettype, argstring = (rest, None)
 		
 	o_dict["procschema"] = schema
 	o_dict["procname"] = procname
+	o_dict["rettype"] = rettype
+	o_dict["argstring"] = argstring
+
+# Storage version history
+# 
+# 4 > 5 (11/01/2022) - Changed source file naming convention, such names are procedure  unique in reference repositoru

@@ -127,7 +127,6 @@ def parse_args():
 	project_oriented.add_argument("-r", "--removecolorder", help="Remove table column ordering", action="store_true")
 	project_oriented.add_argument("-g", "--genprocsdir", help="Procedure source folder name to create", action="store")
 	project_oriented.add_argument("-d", "--updateids", help="Update ids list, to filter tasks in update operation", action="store")
-	project_oriented.add_argument("-m", "--delmode", help="Delete mode: NODEL (default), DEL, CASCADE", action="store")
 	project_oriented.add_argument("-a", "--addnewproc", help="Generate a new empty procedure source file", action="store_true")
 	project_oriented.add_argument("-t", "--addnewtrig", help="Generate a new empty trigger source file", action="store_true")
 	project_oriented.add_argument("-u", "--simulupdcode", help="Activate simulation mode on 'updcodeinsrc' operation: actual update is replaced by stdout messages (without DDL)", action="store_true")
@@ -138,6 +137,7 @@ def parse_args():
 
 	expert_group = parser.add_argument_group('expert_group', 'Expert use options')
 	expert_group.add_argument("-k", "--limkeys", help="[EXPERT USE] object type keys list to filter update op, only the types listed will be changed (comma, semicolon and optional additional space separated list)", action="store")
+	# expert_group.add_argument("-m", "--delmode", help="[EXPERT USE] -- CAUTION - you may destroy data -- delete mode: NODEL (default), DEL, CASCADE", action="store")
 
 	args = parser.parse_args()
 	
@@ -174,7 +174,7 @@ def parse_args():
 			else:
 				raise RuntimeError("Project '%s' is missing, found projects: %s" % (args.proj, str(projetos)))
 				
-		if not args.oper is None and not args.addnewproc and not args.oper in OPS:
+		if not args.oper is None and not args.addnewproc and not args.addnewtrig and not args.oper in OPS:
 
 			startwiths = []
 			for a_op in OPS:
@@ -185,7 +185,7 @@ def parse_args():
 				if resp.lower() == 'y':	
 					args.oper = startwiths[0]			
 			
-		if not args.addnewproc and not args.oper in OPS:
+		if not args.addnewproc and not args.addnewtrig and not args.oper in OPS:
 
 			logger.error("--- available ops --")
 			logger.error(json.dumps(list(ops_help.keys()), indent=4))
@@ -1262,7 +1262,7 @@ def gen_newprocfile_items():
 
 	ret = None
 	prlist = [
-		"New procedure schema (enter 'x' or blank to terminate):"
+		"New procedure schema (enter 'x' or blank to terminate):",
 		"New procedure name:",
 		"Return type:",
 		"Owner:"
@@ -1303,13 +1303,158 @@ def gen_newprocfile_items():
 	
 		fname = gen_proc_fname(nome, rettipo, tiposargs)
 		ret = [fname, sch, nome, rettipo, tiposargs, ownership] 
-		
+
 	return ret
 
-def addnewtrigger_file(p_proj, conn=None, conf_obj=None):
+def gen_newtrigger_items():
+
+	ret = None
+	prlist = [
+		"Table schema (enter 'x' or blank to terminate): ",
+		"Table name: ",
+		"Trigger suffix (after table name): ",
+		"Is BEFORE trigger? (y/other): ",
+		"Is on INSERT? (y/other): ",
+		"Is on UPDATE? (y/other): ",
+		"Is on DELETE? (y/other): ",
+		"Is ROW trigger (y/other): ",
+		"procedure name (with schema): "
+		]
+		
+	doexit = False
+	tsch = None
+	tnome = None
+	suffix = None
+	is_before = None
+	is_insert = None
+	is_update = None
+	is_delete = None
+	is_row = None
+	proc_name = None
+			
+	for pri, pr in enumerate(prlist):		
+		resp = input(pr)
+		if len(resp) < 1 or resp.lower() == 'x':
+			doexit = True
+			break
+		if pri == 0:
+			tsch = resp.strip().lower()
+		elif pri == 1:
+			tnome = resp.strip().lower()
+		elif pri == 2:
+			suffix = resp.strip().lower()
+		elif pri == 3:
+			is_before = resp.strip().lower()
+		elif pri == 4:
+			is_insert = resp.strip().lower()
+		elif pri == 5:
+			is_update = resp.strip().lower()
+		elif pri == 6:
+			is_delete = resp.strip().lower()
+		elif pri == 7:
+			is_row = resp.strip().lower()
+		elif pri == 8:
+			proc_name = resp.strip().lower()
+			count = 0
+			while not '.' in proc_name:
+				count += 1
+				if count > 3:
+					doexit = True
+					break
+				print(f"'{proc_name}' has no schema (dot separated)")
+				resp = input(pr)
+				proc_name = resp.strip().lower()
+			
+	if not doexit:
+
+		ret = [tsch, tnome, suffix, is_before, is_insert, is_update, is_delete, is_row, proc_name] 
+
+	return ret
+
+def addnewtrigger(p_proj, conn=None, conf_obj=None):
 	
-	## TODO
-	raise NotImplementedError
+	out_buf = []
+
+	logger = logging.getLogger('pgsourcing')		
+
+	newitems = None
+	if conf_obj is None:
+		## Accesses stdin and stdout to query user
+		newitems = gen_newtrigger_items()
+
+	if newitems is None:
+		
+		logger.info("Nothing to do, new trigger creation terminated")
+
+	else:
+
+		if conf_obj is None:
+			tsch, tnome, suffix, is_before, is_insert, is_update, is_delete, is_row, proc_name = newitems		
+		else:
+			tsch = conf_obj["tableschema"]
+			tnome = conf_obj["tablename"]
+			is_before = conf_obj["isbefore"]
+			is_insert = conf_obj["isinsert"]
+			is_update = conf_obj["isupdate"]
+			is_delete = conf_obj["isdelete"]
+			is_row = conf_obj["isrow"]
+			proc_name = conf_obj["proc_name"]
+
+		assert '.' in proc_name
+		proc_name = proc_name.replace("(", "")
+		proc_name = proc_name.replace(")", "")
+
+		trig_name = f"{tnome}_{suffix}"
+
+		if is_before == "y":
+			when_str = "BEFORE"
+		else:
+			when_str = "AFTER"
+
+		event_buf = []
+		if is_insert == "y":
+			event_buf.append("INSERT")
+		if is_update == "y":
+			event_buf.append("UPDATE")
+		if is_delete == "y":
+			event_buf.append("DELETE")
+
+		evt_line = f"{when_str} {' OR '.join(event_buf)}"
+
+		out_buf.append(f"CREATE TRIGGER {trig_name}")
+		out_buf.append(evt_line)
+		out_buf.append(f"ON {tsch}.{tnome}")
+		if is_row  == "y":
+			out_buf.append("FOR EACH ROW")
+		else:
+			out_buf.append("FOR EACH STATEMENT")
+		out_buf.append(f"EXECUTE PROCEDURE {proc_name}()")
+
+	trig_sql = "\n".join(out_buf)
+
+	cfgpath = get_conn_cfg_path(p_proj)
+	if not conn is None:
+		connkey = conn
+	else:
+		connkey = "src"
+
+	conns = Connections(cfgpath, subkey="conn")
+
+	cnobj = conns.getConn(connkey)
+	cn = cnobj.getConn()
+	with cn.cursor() as cr:
+
+		try:
+			cr.execute(trig_sql)
+		except:
+			logger.error("--------- statement execution ---------")
+			logger.error(trig_sql)
+			raise
+	cn.commit()
+		
+	logger.info(f"trigger '{trig_name}' created, on table '{tsch}.{tnome}', in source database, proj: {p_proj}")
+
+
 
 	
 def addnewprocedure_file(p_proj, conn=None, conf_obj=None):
@@ -1323,7 +1468,7 @@ def addnewprocedure_file(p_proj, conn=None, conf_obj=None):
 		
 	if newitems is None:
 		
-		logger.info("New procedure creation terminated")
+		logger.info("Nothing to do, new procedure creation terminated")
 		
 	else:
 	
@@ -1352,11 +1497,12 @@ def addnewprocedure_file(p_proj, conn=None, conf_obj=None):
 					tiposargs = conf_obj["tiposargs"]
 					ownership = conf_obj["ownership"]
 					
-				complfname = "%s.%s.sql" % (sch, newfname) 
+				complnewname = "%s.%s" % (sch, newfname) 
+				complfname = "%s.sql" % (complnewname,) 
 					
 				fullenewpath = path_join(srccodedir, complfname)				
 				if exists(fullenewpath):					
-					logger.info("addnewprocedure_file, cannot create new procedure in '%s': filename in use -- %s" % (proj, fname))
+					logger.info("addnewprocedure_file, cannot create new procedure in '%s': filename in use -- %s" % (p_proj, complfname))
 				else:
 					sql_linebuffer = []
 					argslist = ["%s %s" % (chr(97+ti), ta) for ti, ta in enumerate(tiposargs)] 
@@ -1373,7 +1519,7 @@ def addnewprocedure_file(p_proj, conn=None, conf_obj=None):
 		
 		if not fullenewpath is None:
 			
-			logger.info("New procedure file created: %s" % newfname)
+			logger.info("New procedure file created: %s" % complnewname)
 			
 			# pr = "Want to open with default system editor? (y/n)"
 			# try:
@@ -1407,7 +1553,7 @@ def cli_main():
 				addnewprocedure_file(proj, conn=args.connkey, conf_obj=None)				
 			elif args.addnewtrig:
 				## conf_obj=None forces interaction with stdin and stdout
-				addnewtrigger_file(proj, conn=args.connkey, conf_obj=None)				
+				addnewtrigger(proj, conn=args.connkey, conf_obj=None)				
 			else:
 
 				if args.oper in OPS_INPUT and args.input is None:	
