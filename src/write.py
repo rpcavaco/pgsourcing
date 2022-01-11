@@ -384,7 +384,7 @@ def update_search_path(p_function_body, p_schematrans):
 		# changed = False 
 		if current_body is None:
 			current_body = p_function_body
-		ret = re.sub(f"(search_path[%\('\sa-zA-Z_À-Ýà-ý0-9\$,]+){trans_dict['src']}", f"\\1{trans_dict['dest']}", current_body)
+		ret = re.sub(f"(search_path[%\('\sa-zA-Z_À-Ýà-ý0-9_\$,]+){trans_dict['src']}", f"\\1{trans_dict['dest']}", current_body)
 		if ret != current_body:
 			# changed = True
 			global_changed = True

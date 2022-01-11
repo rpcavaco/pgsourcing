@@ -20,7 +20,7 @@ LOG_CFG = {
 ########################################################################
 
 LANG = "en"
-OPS = ["chksrc", "chkdest", "dropref", "updref", "upddestscript", "upddestdirect", "chksrccode", "updcodeinsrc", "filldata"]
+OPS = ["chksrc", "chkdest", "dropref", "updref", "upddestscript", "upddestdirect", "chksrccode", "updcodeinsrc", "fillparamdata"]
 OPS_CHECK = ["chksrc", "chkdest", "chksrccode"]
 OPS_DBCHECK = ["chksrc", "chkdest"]
 OPS_INPUT = ["updref", "updrefcode", "upddestscript", "upddestdirect", "updcodeinsrc"]
@@ -41,7 +41,7 @@ OPS_HELP = {
 		"upddestscript": "generate SQL and DDL script to update destination (production) database, includes procedural code",
 		"upddestdirect": "directly update destination (production) database (should 'upddestscript' first to check all changes prior to update), includes procedural code",
 		"updcodeinsrc": "update code in source (development) database, from source code files",
-		"filldata": "fill parameter table values in destination (production) database"
+		"fillparamdata": "fill parameter table values in destination (production) database"
 	}
 }
 

@@ -303,7 +303,46 @@ SQL = {
 			when 'UC' then true
 			else false
 		end allprivs
-		from ps"""
+		from ps""",
+	"SEQNAME_COLNAME": """select seqname, column_name from (
+			select substring(column_default from 'nextval\(''([\.a-zA-Z_À-Ýà-ý0-9_\$]+)''::regclass\)') seqname, 
+			column_name,
+			row_number() over (order by ordinal_position) rn
+			from information_schema.columns
+			where table_schema = %s
+			and table_name = %s
+			and column_default like 'nextval%'
+		) a
+		where rn = 1""",
+	"CHANGE_CURR_SEQVAL": """do 
+			$$
+			declare
+				v_maxval integer;
+				v_rec record;
+				v_schema text;
+				v_tname text;
+				v_sql text;
+			begin
+				v_schema := '{0}';
+				v_tname := '{1}';
+				for v_rec in (
+					select seqname, column_name from (
+						select substring(column_default from 'nextval\(''([\.a-zA-Z_À-Ýà-ý0-9_\$]+)''::regclass\)') seqname, 
+						column_name,
+						row_number() over (order by ordinal_position) rn
+						from information_schema.columns
+						where table_schema = v_schema
+						and table_name = v_tname
+						and column_default like 'nextval%'
+					) a
+					where rn = 1) 
+				loop
+					execute format('select max(%s) from %I.%I', v_rec.column_name, v_schema, v_tname) into v_maxval;
+					v_sql := format('select setval(''%s'', %s, true)', v_rec.seqname, v_maxval);
+					execute v_sql;
+					exit;
+				end loop;
+			end$$;"""
 }
 
 # if __name__ == "__main__":

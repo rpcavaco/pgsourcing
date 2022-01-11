@@ -483,7 +483,7 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 	if p_oper == "updref":
 
 		assert not diffdict is None
-		print("diffdict:", json.dumps(diffdict, indent=4))
+		# print("diffdict:", json.dumps(diffdict, indent=4))
 				
 		newref_dict = updateref(p_proj, diffdict, upd_ids_list, limkeys_list)
 		if not newref_dict is None:
@@ -539,7 +539,7 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 			
 		logger.info("direct dest change for proj. %s" % p_proj)
 		
-	elif p_oper == "filldata":
+	elif p_oper == "fillparamdata":
 		
 		filters_cfg = get_filters_cfg(p_proj, connkey)
 		reftablesdir = get_reftablesdir(p_proj)
@@ -550,32 +550,61 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 		with cn.cursor() as cr:
 
 			for sch in filters_cfg["parameterstables"].keys():	
-				
+
 				trschema = sch
 				if "transformschema" in filters_cfg.keys():					
 					if "tables" in filters_cfg["transformschema"]["types"]:
 						for trans in filters_cfg["transformschema"]["trans"]:
-							if trans["src"] == sch:
-								trschema = trans["dest"]
+							if trans["dest"] == sch:
+								trschema = trans["src"]
 								break
-								
-				for tname in filters_cfg["parameterstables"][sch]:
-					
-					ftname = "%s.%s" % (sch, tname)
-					trans_ftname = "%s.%s" % (trschema, tname)
-					fname = "%s.copy" % (ftname)
-					fullp = path_join(reftablesdir, fname)
-					
+
+				tablecont_files = [ 
+					{ "name": f.name, "path": f.path } 
+					for f in 
+						scandir(reftablesdir) 
+					if f.is_file and f.name.lower().endswith(".copy")  
+				]
+				remove_indices = []
+				for ti, tfile in enumerate(tablecont_files):
+
+					tname = splitext(tfile["name"])[0]
+					tschema, tbasename = tname.split('.')
+					if not tschema == trschema:
+						continue
+					tfile["desttable"] = f"{sch}.{tbasename}"
+					tfile["destschema"] = sch
+					tfile["tablebasename"] = tbasename
+
+					found = False
+					for filter_patt_tname in filters_cfg["parameterstables"][sch]:
+						mo = re.search(filter_patt_tname, tbasename)
+						if not mo is None:
+							found = True
+							break
+					if not found:
+						remove_indices.append(ti)
+
+				for idx in sorted(remove_indices, reverse=True):
+					del tablecont_files[idx]
+
+				for tfile in tablecont_files:
 					try:
-					
-						with codecs.open(fullp, "r", "utf-8") as fp:					
-							cr.copy_from(fp, trans_ftname)
+
+						cr.execute(f"delete from { tfile['desttable'] }")
+						with codecs.open(tfile["path"], "r", "utf-8") as fp:
+							cr.copy_from(fp, tfile["desttable"])
 						needscommit = True
-						
+
+						sql = SQL["CHANGE_CURR_SEQVAL"].format(tfile["destschema"], tfile["tablebasename"])
+						# print("sql:", sql)
+						cr.execute(sql)
+
 					except:
 						cn.rollback()
-						logger.exception("filldata")
-					
+						logger.exception("fillparamdata")
+						raise
+
 		if needscommit:			
 			cn.commit()
 			

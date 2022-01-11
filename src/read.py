@@ -1191,7 +1191,7 @@ def paramtables(p_cursor, p_filters_cfg, p_gendumpsdir):
 
 		sql = "%s %s" % (SQL["TABLES"], wherecl)
 		p_cursor.execute(sql)
-		#print(p_cursor.mogrify(sql))
+		#print(sql)
 
 		work_list = []
 		for row in p_cursor:
