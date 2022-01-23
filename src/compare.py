@@ -91,7 +91,11 @@ def get_prevlevel_diff(p_diff_dict, p_grpkeys):
 	diff_dict = p_diff_dict
 	for ki, k in enumerate(p_grpkeys):
 		if ki < len(p_grpkeys) - 2:
+			# try:
 			diff_dict = diff_dict[k]
+			# except:
+			# 	# print(ki, k, diff_dict.keys(), p_diff_dict.keys())
+			# 	raise
 		else:
 			ret = diff_dict[k]
 			break
@@ -302,14 +306,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 
 	logger = logging.getLogger('pgsourcing')
 
-	grpkey = grpkeys[-1]
-	
-	# FLAG = grpkey.startswith("check_")
-	
-	# print(">grpkeys", grpkeys)
-	# if isinstance(p_leftdic[grpkey], dict):
-		# print("  >>", p_leftdic[grpkey].keys())
-	
+	grpkey = grpkeys[-1]	
 	ret_upperlevel_ops = {}
 	
 	try:
@@ -448,12 +445,14 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 
 					elif grpkey == "tables" or (grpkey not in CFG_GROUPS and klist[0] == "tables"):
 
-						prevlevel_diff = get_prevlevel_diff(diff_dict, klist)
-						for exist_tblname in prevlevel_diff.keys():
-							if prevlevel_diff[exist_tblname]["diffoper"] == "rename":
-								if prevlevel_diff[exist_tblname]["newvalue"] == k:
-									do_continue = False
-									break		
+						if diff_dict:
+
+							prevlevel_diff = get_prevlevel_diff(diff_dict, klist)
+							for exist_tblname in prevlevel_diff.keys():
+								if prevlevel_diff[exist_tblname]["diffoper"] == "rename":
+									if prevlevel_diff[exist_tblname]["newvalue"] == k:
+										do_continue = False
+										break		
 
 					if do_continue:				
 					
