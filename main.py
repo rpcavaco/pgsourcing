@@ -452,11 +452,7 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 	upd_ids_list = []
 	if not updates_ids is None:
 
-		try:
-			flagv = isinstance(updates_ids, basestring)
-		except NameError:
-			flagv = isinstance(updates_ids, str)
-
+		flagv = isinstance(updates_ids, str)
 		if flagv:
 			upd_ids_list = process_intervals_string(updates_ids)
 		elif isinstance(updates_ids, list):
@@ -940,7 +936,7 @@ def erase_diff_item(p_diff_dict, p_grpkeys):
 		if outerbreak:
 			break
 				
-		
+# Check change dict ops, clearing redundancies and spurious (mostly incomplete) entries		
 def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 	
 	def should_remove(p_isinsert, p_cr, p_op, p_pdiff_dict):
@@ -979,7 +975,8 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 				try:
 					_phase_label, op_content = p_op
 				except:
-					print("p_op:", p_op)
+					logger = logging.getLogger('pgsourcing')	
+					logger.error("p_op:", p_op)
 					raise
 
 				assert len(op_content) == 3, f"length of {op_content} != 3"
@@ -1071,7 +1068,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	# pp = pprint.PrettyPrinter()
 
 	if p_oper == "dropref":
-		if not canuse_stdout or input("are you sure? (enter 'y' to drop, any other key to exit): ").lower() == "y":
+		if not canuse_stdout or input("dropping reference data, are you sure? (enter 'y' to drop, any other key to exit): ").lower() == "y":
 			genprojectarchive(p_proj)
 			dropref(p_proj)
 			logger.info("reference dropped, proj:%s" % (p_proj,))
@@ -1090,6 +1087,8 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		refcodedir, reftablesdir, destcodedir, check_dict, \
 		replacements, p_connkey=p_connkey, include_public=include_public, 
 		include_colorder=include_colorder)
+
+	# print("check_dict:", p_oper, check_dict.keys())
 	
 	# Se a operacao for chksrc ou chkdest o dicionario check_dict sera 
 	#  preenchido.
@@ -1151,6 +1150,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				do_compare = True
 		
 		cd_ops = { "insert": [], "delete": [] }
+		#cd_ops = { "insert": [], "delete": [], "rename": [] }
 		if do_compare:
 
 			comparing(p_proj, check_dict["content"], 
@@ -1168,7 +1168,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			if comparison_mode != "From SRC":
 				checkCDOps(p_proj, cd_ops, connkey, root_diff_dict["content"])
 			
-		## TODO - deve haver uma verificacao final de coerencia
+		## TODO - Verificacao final de coerencia - tópico aberto
 		## Sequencias - tipo da seq. == tipo do campo serial em que e usada, etc. -- DONE
 
 		if "content" in root_diff_dict.keys() and root_diff_dict["content"]:
@@ -1185,7 +1185,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				
 				if not "procedures" in root_diff_dict["content"].keys():					
 					
-					logger.warning("No procedures to dump on '%s'" % newgenprocsdir)
+					logger.warning("No procedures to dump on '{}'".format(newgenprocsdir))
 					
 				else:
 									
@@ -1212,11 +1212,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		diffdict = None
 		if p_oper in OPS_INPUT:
 
-			try:
-				flagv = isinstance(inputf, basestring)
-			except NameError:
-				flagv = isinstance(inputf, str)
-
+			flagv = isinstance(inputf, str)
 			if flagv:
 				if exists(inputf):
 					with open(inputf, "r") as fj:
@@ -1311,6 +1307,8 @@ def gen_newprocfile_items():
 
 def gen_newtrigger_items():
 
+	logger = logging.getLogger('pgsourcing')		
+
 	ret = None
 	prlist = [
 		"Table schema (enter 'x' or blank to terminate): ",
@@ -1364,7 +1362,7 @@ def gen_newtrigger_items():
 				if count > 3:
 					doexit = True
 					break
-				print(f"'{proc_name}' has no schema (dot separated)")
+				logger.warning(f"gen_newtrigger_items, '{proc_name}' has no schema (dot separated)")
 				resp = input(pr)
 				proc_name = resp.strip().lower()
 			

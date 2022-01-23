@@ -131,6 +131,9 @@ def changegrp(p_chg_group, p_currdiff_block, p_updates_ids_list, p_keys_byref, p
 								elif diff_item["diffoper"] == "delete":
 									p_chg_group.pop(k, None)
 									changed = True						
+								elif diff_item["diffoper"] == "rename":
+									p_chg_group[diff_item["newvalue"]] = p_chg_group.pop(k)
+									changed = True						
 					else:
 						changed = changed | changegrp(p_chg_group[k], diff_item, p_updates_ids_list, p_keys_byref+[k], p_limkeys_list) 
 					
@@ -151,7 +154,7 @@ def updateref(p_proj, p_difdict, updates_ids_list, limkeys_list):
 	ref_json = root_ref_json["content"]
 	
 	diff_content = p_difdict["content"]
-	
+
 	reading_keys = CFG_GROUPS
 	
 	for grp in reading_keys:
@@ -288,12 +291,13 @@ def col_operation(docomment, p_sch, p_tname, p_colname, p_diff_item, p_delmode, 
 		tmpltd = "ALTER TABLE %s.%s"
 		
 	tmplt = "ALTER TABLE %s.%s"
+	tmplt_new = "ALTER TABLE {}.{}"
 
 	if p_delmode == "CASCADE":
 		tmplt2 = "%s DROP COLUMN %s CASCADE"
 	else:
 		tmplt2 = "%s DROP COLUMN %s"
-	
+
 	if "diffoper" in p_diff_item.keys():
 
 		if len(p_updates_ids_list) < 1 or p_diff_item["operorder"] in p_updates_ids_list:
@@ -319,7 +323,12 @@ def col_operation(docomment, p_sch, p_tname, p_colname, p_diff_item, p_delmode, 
 				colcreatitems = col_create(p_tname, p_colname, p_diff_item["newvalue"])
 				cont0 = re.sub("\s\s+", " ",   "\t%s %s %s %s" % tuple(colcreatitems[1:]))
 				p_out_sql_src.append("%s ADD COLUMN %s" % (tmplt % (p_sch, p_tname), cont0.strip()))
-				
+
+			elif p_diff_item["diffoper"] == "rename":
+
+				p_out_sql_src.append("{} RENAME COLUMN {} TO {}".format(tmplt_new.format(p_sch, p_tname), p_colname, p_diff_item["newvalue"]))
+
+
 			## TODO - implementar o reconhecimento que uma coluna foi renomeada em SRC
 			# if p_diff_item["diffoper"] == "update":			
 				# p_out_sql_src.append("%s RENAME COLUMN %s TO %s" % (tmpltd % (p_sch, p_tname), p_colname, p_diff_item["newvalue"]))

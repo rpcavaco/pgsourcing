@@ -84,8 +84,21 @@ def traverse_replaceval(p_transformschema, p_obj, p_mode):
 
 		if isinstance(p_obj[k], dict):
 			traverse_replaceval(p_transformschema, p_obj[k], p_mode)		
-	
-def get_diff_item(p_fase, p_diff_dict, p_grpkeys, opt_leaf_keys=None, b_leaf_is_list=False):
+
+def get_prevlevel_diff(p_diff_dict, p_grpkeys):
+
+	ret = None
+	diff_dict = p_diff_dict
+	for ki, k in enumerate(p_grpkeys):
+		if ki < len(p_grpkeys) - 2:
+			diff_dict = diff_dict[k]
+		else:
+			ret = diff_dict[k]
+			break
+
+	return ret	
+
+def get_diff_item(p_diff_dict, p_grpkeys, opt_leaf_keys=None, b_leaf_is_list=False):
 	
 	diff_dict = p_diff_dict
 	for ki, k in enumerate(p_grpkeys):
@@ -215,7 +228,7 @@ def gen_update(p_transformschema, p_opordmgr, p_upperlevel_ops, p_keychain, p_di
 	if ", ".join(lower_ops.keys()) == "ordpos":
 		return
 	
-	diff_item_parent = get_diff_item('b3', p_diff_dict, p_keychain[:-1])
+	diff_item_parent = get_diff_item(p_diff_dict, p_keychain[:-1])
 	if stepback:
 		diff_item = diff_item_parent
 	else:
@@ -225,7 +238,7 @@ def gen_update(p_transformschema, p_opordmgr, p_upperlevel_ops, p_keychain, p_di
 	# upper level update 'newvalue' includes grants to set
 	if "grants" in diff_item.keys():
 		del diff_item["grants"]
-		
+
 	p_opordmgr.setord(diff_item)
 
 	diff_item["changedkeys"] =  ", ".join(lower_ops.keys())
@@ -255,7 +268,18 @@ def gen_update(p_transformschema, p_opordmgr, p_upperlevel_ops, p_keychain, p_di
 	traverse_replaceval(p_transformschema, newvalue, "doing gen_update")
 	diff_item["newvalue"] = newvalue
 				
-		
+def check_col_renaming_right(p_tmp_l, p_tmp_r, p_k):		
+
+	ret = None
+	assert "ordpos" in p_tmp_r[p_k].keys(), "check_col_renaming_right: 'ordpos' not in {}".format(", ".p_tmp_r[p_k].keys())
+
+	for lft_fldname in p_tmp_l.keys():
+		if p_tmp_r[p_k]["ordpos"] == p_tmp_l[lft_fldname]["ordpos"]:
+			if p_tmp_r[p_k] == p_tmp_l[lft_fldname]:
+				ret = lft_fldname
+				break
+
+	return ret
 																			
 def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops, level=0): 
 	
@@ -291,7 +315,9 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 	# print("    p_rightdict:", p_rightdic.keys()) #, diff_dict)
 	
 	printdbg = False
-	if grpkey in ["schemata"]: # ("sequences",):
+
+	# TODO: permanente -- verificar k está removido em produção
+	if grpkey in []: # ("sequences",):
 		printdbg = True
 	
 	if not grpkey in p_rightdic.keys():
@@ -300,7 +326,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 			print("not in right keys:", grpkey)
 		
 		try:
-			diff_item = get_diff_item('a', diff_dict, grpkeys)
+			diff_item = get_diff_item(diff_dict, grpkeys)
 			
 			if level == 0:
 				# lzero_key is a schema, if not exists is created elsewhere
@@ -372,14 +398,14 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 			if k in tmp_l.keys() and not k in rkeys:
 				
 				if printdbg:
-					print("** left only:", grpkey, k, level, tmp_l.keys(), rkeys)
+					print("*** left only:", grpkey, k, level, tmp_l.keys(), rkeys)
 				# left only
-				
+
 				# If starting a new group from scratch
 				#  avoid inserting the whole group as a single insert operation				
 				if klist[-1] in UPPERLEVELOPS.keys() or (len(klist) == SHALLOW_DEPTH and not klist[0] in CFG_SHALLOW_GROUPS):
 
-					diff_item = get_diff_item('b', diff_dict, klist)
+					diff_item = get_diff_item(diff_dict, klist)
 
 					for newkey in tmp_l[k].keys():
 					
@@ -390,24 +416,38 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 							dictupdate(ret_upperlevel_ops, upperlevel_ops)
 				
 				else:
-									
-					newvalue = deepcopy(tmp_l[k])
-					if not isinstance(newvalue, dict) or not "error" in newvalue.keys():
 
-						diff_item = get_diff_item('b', diff_dict, klist)
+					# Renamed columns - prevent the insertion of a new column 
+					#  (using renamed name) when corresponding renaming operation already exists
+					#  if diff dict
+					do_continue = True
+					if grpkey == "cols":
+						prevlevel_diff = get_prevlevel_diff(diff_dict, klist)
+						for exist_colname in prevlevel_diff.keys():
+							if prevlevel_diff[exist_colname]["diffoper"] == "rename":
+								if prevlevel_diff[exist_colname]["newvalue"] == k:
+									do_continue = False
+									break
+				
+					if do_continue:				
+					
+						newvalue = deepcopy(tmp_l[k])
+						if not isinstance(newvalue, dict) or not "error" in newvalue.keys():
 
-						p_opordmgr.setord(diff_item)
-						diff_item["diffoper"] = "insert"				
-						traverse_replaceval(p_transformschema, newvalue, "insert B")
-						diff_item["newvalue"] = newvalue
+							diff_item = get_diff_item(diff_dict, klist)
 
-						new_grpkeys = grpkeys + [k]
-						# print("***", grpkeys, '+', k)
-						if isinstance(newvalue, dict) and grpkeys[0] == "procedures":
-							assert "args" in newvalue.keys() and "return_type" in newvalue.keys(), newvalue.keys()
-							o_cd_ops["insert"].append(('d1', new_grpkeys, newvalue["args"], newvalue["return_type"]))
-						else:
-							o_cd_ops["insert"].append(('d2', new_grpkeys))
+							p_opordmgr.setord(diff_item)
+							diff_item["diffoper"] = "insert"							
+							traverse_replaceval(p_transformschema, newvalue, "insert B")
+							diff_item["newvalue"] = newvalue
+
+							new_grpkeys = grpkeys + [k]
+							# print("***", grpkeys, '+', k)
+							if isinstance(newvalue, dict) and grpkeys[0] == "procedures":
+								assert "args" in newvalue.keys() and "return_type" in newvalue.keys(), newvalue.keys()
+								o_cd_ops["insert"].append(('d1', new_grpkeys, newvalue["args"], newvalue["return_type"]))
+							else:
+								o_cd_ops["insert"].append(('d2', new_grpkeys))
 										
 			elif k in rkeys and not k in tmp_l.keys():
 
@@ -420,15 +460,32 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 					print("*** right only:", grpkey, k, level, "tmp_r['"+k+"'].keys():", rightkeys)
 
 				# right only
-				diff_item = get_diff_item('b1', diff_dict, klist, opt_leaf_keys=rightkeys)
-				p_opordmgr.setord(diff_item)
-				diff_item["diffoper"] = "delete"
+				diff_item = get_diff_item(diff_dict, klist, opt_leaf_keys=rightkeys)
 
-				o_cd_ops["delete"].append(('e', klist))
-				
-				# if grpkeys[0] == "procedures":
-					# diff_item["procedure_name"] = tmp_r[k]["procedure_name"]
-					# diff_item["args"] = tmp_r[k]["args"]
+				# HANDLE column renaming
+				# Must compare columns in same orderpos, to check if name is the single difference
+				if grpkey == "cols" and "ordpos" in rightkeys:
+					
+					renamed_colname = check_col_renaming_right(tmp_l, tmp_r, k)
+					if not renamed_colname is None:
+
+						p_opordmgr.setord(diff_item)
+						diff_item["diffoper"] = "rename"
+						diff_item["newvalue"] = renamed_colname
+
+						# Not needed
+						# o_cd_ops["rename"].append(('g', klist + [renamed_colname]))
+
+				else:
+
+					p_opordmgr.setord(diff_item)
+					diff_item["diffoper"] = "delete"
+
+					o_cd_ops["delete"].append(('e', klist))
+					
+					# if grpkeys[0] == "procedures":
+						# diff_item["procedure_name"] = tmp_r[k]["procedure_name"]
+						# diff_item["args"] = tmp_r[k]["args"]
 			
 			else:
 
@@ -447,7 +504,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						
 				elif isinstance(tmp_l[k], dict):
 					assert not isinstance(tmp_r[k], list), "dict comparing to list, key: %s" % k
-					diff_item = get_diff_item('c', diff_dict, klist)
+					diff_item = get_diff_item(diff_dict, klist)
 					p_opordmgr.setord(diff_item)
 					diff_item["diffoper"] = "replace value with dict"
 					newvalue = deepcopy(tmp_l[k])
@@ -455,7 +512,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 					diff_item["newvalue"] = newvalue
 				elif isinstance(tmp_r[k], dict):
 					assert not isinstance(tmp_l[k], list), "list a comparar com dict, chave: %s" % k
-					diff_item = get_diff_item('d', diff_dict, klist)
+					diff_item = get_diff_item(diff_dict, klist)
 					p_opordmgr.setord(diff_item)
 					newvalue = deepcopy(tmp_l[k])
 					traverse_replaceval(p_transformschema, newvalue, "replace B")
@@ -520,10 +577,10 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 
 		kcl = []
 		keychains(ret_upperlevel_ops, kcl)
-		
-		# print("--------------")
+
+		# print("------ ret_upperlevel_ops --------")
 		# print(ret_upperlevel_ops)
-		# print("--------------")
+		# print("----------------------------------")
 		
 		for ulk in UPPERLEVELOPS.keys():
 			dostepback = False
@@ -542,7 +599,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						if kc[-1] == testkey:
 							gen_update(p_transformschema, p_opordmgr, ret_upperlevel_ops, kc, diff_dict, p_leftdic, tmp_l, stepback=dostepback)
 							break
-							
+
 	return ret_upperlevel_ops
 						
 
@@ -560,7 +617,7 @@ def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict): #,
 	
 	if not grpkey in p_rightdic.keys():
 		
-		diff_item = get_diff_item('A', diff_dict, grpkeys)
+		diff_item = get_diff_item(diff_dict, grpkeys)
 		p_opordmgr.setord(diff_item)
 		diff_item["diffoper"] = "insert"
 		diff_item["newvalue"] = deepcopy(tmp_l)
@@ -602,7 +659,7 @@ def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict): #,
 				diff_item["diffoper"] = "addtolist"
 				diff_item["newvalue"] = k
 				if root_diff_item is None:
-					root_diff_item = get_diff_item('B', diff_dict, grpkeys, b_leaf_is_list=True)
+					root_diff_item = get_diff_item(diff_dict, grpkeys, b_leaf_is_list=True)
 				root_diff_item.append(deepcopy(diff_item))
 				
 			elif k in tmp_r and not k in tmp_l:			
@@ -612,7 +669,7 @@ def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict): #,
 				diff_item["diffoper"] = "removefrom"
 				diff_item["oldvalue"] = k
 				if root_diff_item is None:
-					root_diff_item = get_diff_item('B', diff_dict, grpkeys, b_leaf_is_list=True)
+					root_diff_item = get_diff_item(diff_dict, grpkeys, b_leaf_is_list=True)
 				root_diff_item.append(deepcopy(diff_item))
 				
 	return ret_upperlevel_ops
