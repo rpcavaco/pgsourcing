@@ -183,7 +183,12 @@ def parse_args():
 			if len(startwiths) == 1:
 				resp = input(f"- operation '{args.oper}' not found, you meant '{startwiths[0]}' (y/other) ? ")
 				if resp.lower() == 'y':	
-					args.oper = startwiths[0]			
+					args.oper = startwiths[0]		
+			else:
+				if args.oper == "chkref":
+					resp = input(f"- operation '{args.oper}' not found, you meant 'chksrc' (y/other) ? ")
+					if resp.lower() == 'y':	
+						args.oper = "chksrc"		
 			
 		if not args.addnewproc and not args.addnewtrig and not args.oper in OPS:
 
@@ -1168,7 +1173,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			if comparison_mode != "From SRC":
 				checkCDOps(p_proj, cd_ops, connkey, root_diff_dict["content"])
 			
-		## TODO - Verificacao final de coerencia - tópico aberto
+		## TODO: permanente - Verificacao final de coerencia - 
 		## Sequencias - tipo da seq. == tipo do campo serial em que e usada, etc. -- DONE
 
 		if "content" in root_diff_dict.keys() and root_diff_dict["content"]:

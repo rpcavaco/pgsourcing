@@ -468,7 +468,7 @@ def tables(p_cursor, p_filters_cfg, out_dict):
 		if not the_dict is None:
 			get_grants(the_dict, p_cursor)
 			
-	## TODO - contar registos, ler dados das parameterstables
+	## TODO - contar registos
 
 def views(p_cursor, p_filters_cfg, out_dict):
 

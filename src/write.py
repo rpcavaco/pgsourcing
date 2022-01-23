@@ -328,11 +328,6 @@ def col_operation(docomment, p_sch, p_tname, p_colname, p_diff_item, p_delmode, 
 
 				p_out_sql_src.append("{} RENAME COLUMN {} TO {}".format(tmplt_new.format(p_sch, p_tname), p_colname, p_diff_item["newvalue"]))
 
-
-			## TODO - implementar o reconhecimento que uma coluna foi renomeada em SRC
-			# if p_diff_item["diffoper"] == "update":			
-				# p_out_sql_src.append("%s RENAME COLUMN %s TO %s" % (tmpltd % (p_sch, p_tname), p_colname, p_diff_item["newvalue"]))
-
 	else:
 		
 		p_substitution = False
