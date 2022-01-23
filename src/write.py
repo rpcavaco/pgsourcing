@@ -222,6 +222,12 @@ def table_operation(p_sch, p_tname, p_diff_item, p_delmode, p_out_sql_src):
 		
 		p_out_sql_src.append(tmplt % (p_sch,p_tname))
 
+
+	elif p_diff_item["diffoper"] == "rename":
+
+		p_out_sql_src.append("ALTER TABLE {0}.{1} RENAME TO {0}.{2}".format(p_sch, p_tname, p_diff_item["newvalue"]))
+
+
 	elif p_diff_item["diffoper"] == "insert":
 		
 		assert "cols" in p_diff_item["newvalue"]

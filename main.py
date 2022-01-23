@@ -1155,7 +1155,6 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				do_compare = True
 		
 		cd_ops = { "insert": [], "delete": [] }
-		#cd_ops = { "insert": [], "delete": [], "rename": [] }
 		if do_compare:
 
 			comparing(p_proj, check_dict["content"], 

@@ -280,6 +280,22 @@ def check_col_renaming_right(p_tmp_l, p_tmp_r, p_k):
 				break
 
 	return ret
+
+def check_tbl_renaming_right(p_tmp_l, p_tmp_r, p_k):
+
+	ret = None 
+	tmp = None
+	eq_cnt = 0
+
+	for lft_tblname in p_tmp_l.keys():
+		if p_tmp_l[lft_tblname] == p_tmp_r[p_k]:
+			tmp = lft_tblname
+			eq_cnt += 1
+
+	if eq_cnt == 1:
+		ret = tmp
+
+	return ret
 																			
 def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops, level=0): 
 	
@@ -316,7 +332,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 	
 	printdbg = False
 
-	# TODO: permanente -- verificar k está removido em produção
+	# TODO: permanente -- verificar que está vazio em produção
 	if grpkey in []: # ("sequences",):
 		printdbg = True
 	
@@ -422,13 +438,23 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 					#  if diff dict
 					do_continue = True
 					if grpkey == "cols":
+
 						prevlevel_diff = get_prevlevel_diff(diff_dict, klist)
 						for exist_colname in prevlevel_diff.keys():
 							if prevlevel_diff[exist_colname]["diffoper"] == "rename":
 								if prevlevel_diff[exist_colname]["newvalue"] == k:
 									do_continue = False
 									break
-				
+
+					elif grpkey == "tables" or (grpkey not in CFG_GROUPS and klist[0] == "tables"):
+
+						prevlevel_diff = get_prevlevel_diff(diff_dict, klist)
+						for exist_tblname in prevlevel_diff.keys():
+							if prevlevel_diff[exist_tblname]["diffoper"] == "rename":
+								if prevlevel_diff[exist_tblname]["newvalue"] == k:
+									do_continue = False
+									break		
+
 					if do_continue:				
 					
 						newvalue = deepcopy(tmp_l[k])
@@ -473,8 +499,14 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						diff_item["diffoper"] = "rename"
 						diff_item["newvalue"] = renamed_colname
 
-						# Not needed
-						# o_cd_ops["rename"].append(('g', klist + [renamed_colname]))
+				elif grpkey == "tables" or (grpkey not in CFG_GROUPS and klist[0] == "tables"):
+
+					renamed_tablename = check_tbl_renaming_right(tmp_l, tmp_r, k)
+					if not renamed_tablename is None:
+
+						p_opordmgr.setord(diff_item)
+						diff_item["diffoper"] = "rename"
+						diff_item["newvalue"] = renamed_tablename
 
 				else:
 
