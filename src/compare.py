@@ -87,17 +87,25 @@ def traverse_replaceval(p_transformschema, p_obj, p_mode):
 
 def get_prevlevel_diff(p_diff_dict, p_grpkeys):
 
+	# logger = logging.getLogger('pgsourcing')
+
 	ret = None
 	diff_dict = p_diff_dict
 	for ki, k in enumerate(p_grpkeys):
-		if ki < len(p_grpkeys) - 2:
-			# try:
-			diff_dict = diff_dict[k]
-			# except:
-			# 	# print(ki, k, diff_dict.keys(), p_diff_dict.keys())
-			# 	raise
-		else:
-			ret = diff_dict[k]
+		try:
+			if ki < len(p_grpkeys) - 2:
+				# try:
+				diff_dict = diff_dict[k]
+				# except:
+				# 	# print(ki, k, diff_dict.keys(), p_diff_dict.keys())
+				# 	raise
+			else:
+				ret = diff_dict[k]
+				break
+		except KeyError:
+			# logger.error(f"get_prevlevel_diff error, ki:{ki}, k:{k}, diff_dict.keys():{diff_dict.keys()}, grpkeys:{p_grpkeys}")
+			# raise
+			ret = None
 			break
 
 	return ret	
@@ -270,7 +278,16 @@ def gen_update(p_transformschema, p_opordmgr, p_upperlevel_ops, p_keychain, p_di
 	else:
 		newvalue = deepcopy(p_raw_newvalue)
 	traverse_replaceval(p_transformschema, newvalue, "doing gen_update")
-	diff_item["newvalue"] = newvalue
+
+	# Prevent sequences with 'serialcols_dependencies' to be updated if only diiference is 
+	#  the current sequence value
+	do_continue = True
+	if op == "update" and p_keychain[0] == "sequences":
+		if "serialcols_dependencies" in newvalue.keys() and diff_item["changedkeys"] == "current":
+			do_continue = False
+
+	if do_continue:
+		diff_item["newvalue"] = newvalue
 				
 def check_col_renaming_right(p_tmp_l, p_tmp_r, p_k):		
 
@@ -436,23 +453,27 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 					do_continue = True
 					if grpkey == "cols":
 
-						prevlevel_diff = get_prevlevel_diff(diff_dict, klist)
-						for exist_colname in prevlevel_diff.keys():
-							if prevlevel_diff[exist_colname]["diffoper"] == "rename":
-								if prevlevel_diff[exist_colname]["newvalue"] == k:
-									do_continue = False
-									break
-
-					elif grpkey == "tables" or (grpkey not in CFG_GROUPS and klist[0] == "tables"):
-
 						if diff_dict:
 
 							prevlevel_diff = get_prevlevel_diff(diff_dict, klist)
-							for exist_tblname in prevlevel_diff.keys():
-								if prevlevel_diff[exist_tblname]["diffoper"] == "rename":
-									if prevlevel_diff[exist_tblname]["newvalue"] == k:
-										do_continue = False
-										break		
+							if not prevlevel_diff is None:
+								for exist_colname in prevlevel_diff.keys():
+									if prevlevel_diff[exist_colname]["diffoper"] == "rename":
+										if prevlevel_diff[exist_colname]["newvalue"] == k:
+											do_continue = False
+											break
+
+					elif grpkey == "tables" or (grpkey not in CFG_GROUPS and klist[0] == "tables"):
+
+						if diff_dict and "tables" in diff_dict.keys():
+
+							prevlevel_diff = get_prevlevel_diff(diff_dict, klist)
+							if not prevlevel_diff is None:
+								for exist_tblname in prevlevel_diff.keys():
+									if prevlevel_diff[exist_tblname]["diffoper"] == "rename":
+										if prevlevel_diff[exist_tblname]["newvalue"] == k:
+											do_continue = False
+											break		
 
 					if do_continue:				
 					
@@ -489,6 +510,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 
 				# HANDLE column renaming
 				# Must compare columns in same orderpos, to check if name is the single difference
+				changed = False
 				if grpkey == "cols" and "ordpos" in rightkeys:
 					
 					renamed_colname = check_col_renaming_right(tmp_l, tmp_r, k)
@@ -497,6 +519,8 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						p_opordmgr.setord(diff_item)
 						diff_item["diffoper"] = "rename"
 						diff_item["newvalue"] = renamed_colname
+						changed = True
+
 
 				elif grpkey == "tables" or (grpkey not in CFG_GROUPS and klist[0] == "tables"):
 
@@ -506,8 +530,9 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						p_opordmgr.setord(diff_item)
 						diff_item["diffoper"] = "rename"
 						diff_item["newvalue"] = renamed_tablename
+						changed = True
 
-				else:
+				if not changed:
 
 					p_opordmgr.setord(diff_item)
 					diff_item["diffoper"] = "delete"

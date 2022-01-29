@@ -137,7 +137,7 @@ def parse_args():
 
 	expert_group = parser.add_argument_group('expert_group', 'Expert use options')
 	expert_group.add_argument("-k", "--limkeys", help="[EXPERT USE] object type keys list to filter update op, only the types listed will be changed (comma, semicolon and optional additional space separated list)", action="store")
-	# expert_group.add_argument("-m", "--delmode", help="[EXPERT USE] -- CAUTION - you may destroy data -- delete mode: NODEL (default), DEL, CASCADE", action="store")
+	expert_group.add_argument("-m", "--delmode", help="[EXPERT USE] -- CAUTION - you may destroy data -- delete mode: NODEL (default), DEL, CASCADE", action="store")
 
 	args = parser.parse_args()
 	
@@ -1603,7 +1603,7 @@ def cli_main():
 								include_colorder = not args.removecolorder,
 								updates_ids = args.updateids,
 								limkeys = args.limkeys,
-								delmode = "NODEL", #args.delmode,
+								delmode = args.delmode,
 								simulupdcode = args.simulupdcode)
 
 						if oi < len(operlist)-1:
@@ -1624,7 +1624,7 @@ def cli_main():
 							include_colorder = not args.removecolorder,
 							updates_ids = args.updateids,
 							limkeys = args.limkeys,
-							delmode = "NODEL", #args.delmode,
+							delmode = args.delmode,
 							simulupdcode = args.simulupdcode)
 					
 	except:

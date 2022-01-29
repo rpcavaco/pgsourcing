@@ -696,12 +696,18 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 																
 									if not found_schema in out_dict["content"]["sequences"].keys():
 										out_dict["content"]["sequences"][found_schema] = {}
-									seqs = out_dict["content"]["sequences"][found_schema]										
+									seqs = out_dict["content"]["sequences"][found_schema]	
+									do_continue_onseq = True									
 									if not seqname in seqs.keys():
 										seqs[seqname] = {}	
-									if not "serialcols_dependencies" in seqs[seqname].keys(): 	
-										seqs[seqname]["serialcols_dependencies"] = {}	
-									seqs[seqname]["serialcols_dependencies"][table_name] = row["column_name"]			
+									else:
+										if "diffoper" in seqs[seqname].keys() and seqs[seqname]["diffoper"] == "update":
+											del seqs[seqname]
+											do_continue_onseq = False
+									if do_continue_onseq:
+										if not "serialcols_dependencies" in seqs[seqname].keys(): 	
+											seqs[seqname]["serialcols_dependencies"] = {}	
+										seqs[seqname]["serialcols_dependencies"][table_name] = row["column_name"]	
 									if found_schema != schema_name:
 										schema_dependency(out_dict, found_schema, schema_name, "sequences")
 									col_dict[opt_key] = parsed_val	
@@ -1240,9 +1246,6 @@ def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir,
 			logger.info("reading tables ..")			
 			tables(cr, p_filters_cfg, out_dict)
 
-			# if not "sequences" in out_dict["content"].keys():
-				# out_dict["content"]["sequences"] = {}
-				
 			unreadable_tables = {}
 			
 			logger.info("reading cols ..")
