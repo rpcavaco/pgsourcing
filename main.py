@@ -140,6 +140,9 @@ def parse_args():
 	expert_group.add_argument("-m", "--delmode", help="[EXPERT USE] -- CAUTION - you may destroy data -- delete mode: NODEL (default), DEL, CASCADE", action="store")
 
 	args = parser.parse_args()
+
+	if args.delmode != "NODEL" and args.oper == "upddestdirect":
+		raise RuntimeError(f"cannot use delmode != 'NODEL' when using 'upddestdirect', directly changing dest db is too dangerous with active deletion on. Update first to script using 'upddestscript' and check all risky steps")
 	
 	logger = logging.getLogger('pgsourcing')	
 	logger.info("Starting, args: %s" % args)
