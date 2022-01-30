@@ -29,7 +29,7 @@ OPS_CODE = ["chksrccode", "updcodeinsrc"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
 
-STORAGE_VERSION = 5
+STORAGE_VERSION = 6
 
 OPS_HELP = {
 	"en": {
@@ -106,7 +106,7 @@ SHALLOW_DEPTH = 2
 FLOAT_TYPES = ["numeric", "float"]
 INT_TYPES = ["integer", "smallint"]
 
-COL_ITEMS_CHG_AVOIDING_SUBSTITUTION = ["default", "nullable"]
+COL_ITEMS_CHG_AVOIDING_SUBSTITUTION = ["defaultval", "nullable"]
 
 # Upper level ops: chaves para as quais uma alteracao num detalhe obriga a 
 #  destruir e recriar o objeto completo, determinando uma operacao de 

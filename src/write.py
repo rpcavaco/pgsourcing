@@ -200,8 +200,9 @@ def col_create(p_tname, p_colname, p_col):
 	else:
 		colitems.append("")
 		
-	if "default" in p_col.keys():
-		colitems.append("DEFAULT %s" % p_col["default"])
+	#if "defaultval" in p_col.keys():
+	if p_col["defaultval"] != "NULL":
+		colitems.append("DEFAULT %s" % p_col["defaultval"])
 	else:
 		colitems.append("")
 	
@@ -304,86 +305,128 @@ def col_operation(docomment, p_sch, p_tname, p_colname, p_diff_item, p_delmode, 
 	else:
 		tmplt2 = "%s DROP COLUMN %s"
 
-	if "diffoper" in p_diff_item.keys():
+	assert 	"diffoper" in p_diff_item.keys(), ", ".join(p_diff_item.keys())
 
-		if len(p_updates_ids_list) < 1 or p_diff_item["operorder"] in p_updates_ids_list:
-						
-			print_tablehdr(docomment, p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)
-			if docomment:
-				p_out_sql_src.append("-- Op #%d" % p_diff_item["operorder"])
-		
-			if p_diff_item["diffoper"] == "delete":
-				
-				p_out_sql_src.append(tmplt2 % (tmpltd % (p_sch, p_tname), p_colname))
-				
-			elif p_diff_item["diffoper"] == "insert":
-				
-				colcreatitems = col_create(p_tname, p_colname, p_diff_item["newvalue"])
-				cont0 = re.sub("\s\s+", " ",   "\t%s %s %s %s" % tuple(colcreatitems[1:]))
-				p_out_sql_src.append("%s ADD COLUMN %s" % (tmplt % (p_sch, p_tname), cont0.strip()))
+	# if "diffoper" in p_diff_item.keys():
 
-			elif p_diff_item["diffoper"] == "update":
-
-				p_out_sql_src.append(tmplt2 % (tmpltd % (p_sch, p_tname), p_colname))
-				
-				colcreatitems = col_create(p_tname, p_colname, p_diff_item["newvalue"])
-				cont0 = re.sub("\s\s+", " ",   "\t%s %s %s %s" % tuple(colcreatitems[1:]))
-				p_out_sql_src.append("%s ADD COLUMN %s" % (tmplt % (p_sch, p_tname), cont0.strip()))
-
-			elif p_diff_item["diffoper"] == "rename":
-
-				p_out_sql_src.append("{} RENAME COLUMN {} TO {}".format(tmplt_new.format(p_sch, p_tname), p_colname, p_diff_item["newvalue"]))
-
-	else:
-		
-		p_substitution = False
-		for k in p_diff_item.keys():
-			if k not in COL_ITEMS_CHG_AVOIDING_SUBSTITUTION:
-				p_substitution = True
-				break
-
-		if not p_substitution:
-			
-			for k in p_diff_item.keys():
-				
-				if not "operorder" in p_diff_item[k].keys():
-					continue
-				
-				if len(p_updates_ids_list) > 0 and not p_diff_item[k]["operorder"] in p_updates_ids_list:	
-					continue
+	if len(p_updates_ids_list) < 1 or p_diff_item["operorder"] in p_updates_ids_list:
 					
-				print_tablehdr(docomment, p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)	
-				if docomment:			
-					p_out_sql_src.append("-- Op #%d" % p_diff_item[k]["operorder"])	
-				
-				if k == "default":				
-					if p_diff_item[k]["diffoper"] == "delete":					
-						p_out_sql_src.append("ALTER TABLE %s.%s ALTER COLUMN %s DROP DEFAULT" % (p_sch, p_tname, p_colname))
-					elif p_diff_item[k]["diffoper"] in ("insert", "update"):	
-						newval = p_diff_item[k]["newvalue"]
-						if isinstance(newval, str):
-							tmpl = "ALTER TABLE %s.%s ALTER COLUMN %s SET DEFAULT '%s'"
-						else:
-							tmpl = "ALTER TABLE %s.%s ALTER COLUMN %s SET DEFAULT %s"
-						p_out_sql_src.append(tmpl % (p_sch, p_tname, p_colname, newval ))
-				elif k == "nullable":
-					if p_diff_item[k]["diffoper"] == "update":
-						if p_diff_item[k]["newvalue"] == "NO":
-							p_out_sql_src.append("ALTER TABLE %s.%s ALTER COLUMN %s SET NOT NULL" % (p_sch, p_tname, p_colname))
-						elif p_diff_item[k]["newvalue"] == "YES":
-							p_out_sql_src.append("ALTER TABLE %s.%s ALTER COLUMN %s DROP NOT NULL" % (p_sch, p_tname, p_colname))
-							
-		else:
+		print_tablehdr(docomment, p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)
+		if docomment:
+			p_out_sql_src.append("-- Op #%d" % p_diff_item["operorder"])
+	
+		if p_diff_item["diffoper"] == "delete":
 			
-			print_tablehdr(docomment, p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)
+			p_out_sql_src.append(tmplt2 % (tmpltd % (p_sch, p_tname), p_colname))
 			
-			# remover ...
-			p_out_sql_src.append(tmpltd % (p_sch, p_tname))
+		elif p_diff_item["diffoper"] == "insert":
 			
-			# ... e recriar
 			colcreatitems = col_create(p_tname, p_colname, p_diff_item["newvalue"])
-			cont0 = re.sub("\s\s+", " ",   "%s %s %s %s" % tuple(colcreatitems[1:]))
+			cont0 = re.sub("\s\s+", " ",   "\t%s %s %s %s" % tuple(colcreatitems[1:]))
 			p_out_sql_src.append("%s ADD COLUMN %s" % (tmplt % (p_sch, p_tname), cont0.strip()))
+
+		elif p_diff_item["diffoper"] == "update":
+
+			prev_changed = False
+			if "nullable" in p_diff_item["changedkeys"].split(", "):
+				if p_diff_item["newvalue"]["nullable"] == "YES":
+					set_drop = "DROP"
+				else:
+					set_drop = "SET"
+				p_out_sql_src.append("{} ALTER COLUMN {} {} NOT NULL".format(tmplt % (p_sch, p_tname), p_colname, set_drop))
+				prev_changed = True
+
+			if "type" in p_diff_item["changedkeys"].split(", "):
+				p_out_sql_src.append("{} ALTER COLUMN {} TYPE {}".format(tmplt % (p_sch, p_tname), p_colname, p_diff_item["newvalue"]["type"]))
+				prev_changed = True
+
+			if "defaultval" in p_diff_item["changedkeys"].split(", "):
+				if "defaultval" in p_diff_item["newvalue"].keys() and p_diff_item["newvalue"]["defaultval"] != "NULL":
+					p_out_sql_src.append("{} ALTER COLUMN {} SET DEFAULT {}".format(tmplt % (p_sch, p_tname), p_colname, p_diff_item["newvalue"]["defaultval"]))
+				else:
+					p_out_sql_src.append("{} ALTER COLUMN {} FROP DEFAULT".format(tmplt % (p_sch, p_tname), p_colname))
+				prev_changed = True
+
+			if not prev_changed:
+
+				p_out_sql_src.append(tmplt2 % (tmpltd % (p_sch, p_tname), p_colname))
+				
+				colcreatitems = col_create(p_tname, p_colname, p_diff_item["newvalue"])
+				cont0 = re.sub("\s\s+", " ",   "\t%s %s %s %s" % tuple(colcreatitems[1:]))
+				p_out_sql_src.append("%s ADD COLUMN %s" % (tmplt % (p_sch, p_tname), cont0.strip()))
+
+		elif p_diff_item["diffoper"] == "rename":
+
+			p_out_sql_src.append("{} RENAME COLUMN {} TO {}".format(tmplt_new.format(p_sch, p_tname), p_colname, p_diff_item["newvalue"]))
+
+	# else:
+
+	# 	print("!! 362 !!:", list(p_diff_item.keys()))
+
+	# 	# TODO: verificar utilidade deste bloco que parece inalcancável
+		
+	# 	p_substitution = False
+	# 	for k in p_diff_item.keys():
+	# 		if k not in COL_ITEMS_CHG_AVOIDING_SUBSTITUTION:
+	# 			p_substitution = True
+	# 			break
+
+	# 	if not p_substitution:
+			
+	# 		for k in p_diff_item.keys():
+
+	# 			print("!! 372 !!:", k)
+				
+	# 			if not "operorder" in p_diff_item[k].keys():
+	# 				continue
+				
+	# 			if len(p_updates_ids_list) > 0 and not p_diff_item[k]["operorder"] in p_updates_ids_list:	
+	# 				continue
+					
+	# 			print_tablehdr(docomment, p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)	
+	# 			if docomment:			
+	# 				p_out_sql_src.append("-- Op #%d" % p_diff_item[k]["operorder"])	
+
+	# 			# if k == "defaultval":				
+	# 			# 	if p_diff_item[k]["diffoper"] == "delete":					
+	# 			# 		p_out_sql_src.append("ALTER TABLE %s.%s ALTER COLUMN %s DROP DEFAULT" % (p_sch, p_tname, p_colname))
+	# 			# 	elif p_diff_item[k]["diffoper"] in ("insert", "update"):	
+	# 			# 		newval = p_diff_item[k]["newvalue"]
+	# 			# 		if isinstance(newval, str):
+	# 			# 			tmpl = "ALTER TABLE %s.%s ALTER COLUMN %s SET DEFAULT '%s'"
+	# 			# 		else:
+	# 			# 			tmpl = "ALTER TABLE %s.%s ALTER COLUMN %s SET DEFAULT %s"
+	# 			# 		p_out_sql_src.append(tmpl % (p_sch, p_tname, p_colname, newval ))				
+	# 			if k == "defaultval":				
+	# 				if p_diff_item[k]["diffoper"] == "update":	
+	# 					newval = p_diff_item[k]["newvalue"]
+	# 					if newval != "NULL":
+	# 						if isinstance(newval, str):
+	# 							tmpl = "ALTER TABLE %s.%s ALTER COLUMN %s SET DEFAULT '%s'"
+	# 						else:
+	# 							tmpl = "ALTER TABLE %s.%s ALTER COLUMN %s SET DEFAULT %s"
+	# 						p_out_sql_src.append(tmpl % (p_sch, p_tname, p_colname, newval ))
+	# 					else:
+	# 						tmpl = "ALTER TABLE %s.%s ALTER COLUMN %s DROP DEFAULT"
+	# 						p_out_sql_src.append(tmpl % (p_sch, p_tname, p_colname ))
+	# 			elif k == "nullable":
+	# 				if p_diff_item[k]["diffoper"] == "update":
+	# 					if p_diff_item[k]["newvalue"] == "NO":
+	# 						p_out_sql_src.append("ALTER TABLE %s.%s ALTER COLUMN %s SET NOT NULL" % (p_sch, p_tname, p_colname))
+	# 					elif p_diff_item[k]["newvalue"] == "YES":
+	# 						p_out_sql_src.append("ALTER TABLE %s.%s ALTER COLUMN %s DROP NOT NULL" % (p_sch, p_tname, p_colname))
+							
+	# 	else:
+			
+	# 		print_tablehdr(docomment, p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)
+			
+	# 		# remover ...
+	# 		p_out_sql_src.append(tmpltd % (p_sch, p_tname))
+			
+	# 		# ... e recriar
+	# 		colcreatitems = col_create(p_tname, p_colname, p_diff_item["newvalue"])
+	# 		cont0 = re.sub("\s\s+", " ",   "%s %s %s %s" % tuple(colcreatitems[1:]))
+	# 		p_out_sql_src.append("%s ADD COLUMN %s" % (tmplt % (p_sch, p_tname), cont0.strip()))
 
 def update_search_path(p_function_body, p_schematrans):
 
@@ -726,7 +769,7 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 							
 							# se os parametros de entrada ou de saida forem diferentes ....
 							do_replace = True
-							if "return_type" in proc_blk["changedkeys"] or "args" in proc_blk["changedkeys"]:	
+							if "return_type" in proc_blk["changedkeys"].split(", ") or "args" in proc_blk["changedkeys"].split(", "):	
 								do_replace = False						
 								out_sql_src.append(tmplpd % (sch, usable_proc))
 							# e "create function"

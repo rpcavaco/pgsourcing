@@ -235,6 +235,9 @@ def gen_update(p_transformschema, p_opordmgr, p_upperlevel_ops, p_keychain, p_di
 	lower_ops = subtree_fromkeychain(p_upperlevel_ops, p_keychain)
 	assert not lower_ops is None
 
+#	print("** lower_ops:", lower_ops)
+#	print("** lower_ops:", lower_ops)
+
 	# TODO : prolongado -- verificar impacto
 	# if only change is in 'ordpos' attribute ignore, is only used for internal ordering of items
 	if ", ".join(lower_ops.keys()) == "ordpos":
@@ -283,7 +286,7 @@ def gen_update(p_transformschema, p_opordmgr, p_upperlevel_ops, p_keychain, p_di
 	#  the current sequence value
 	do_continue = True
 	if op == "update" and p_keychain[0] == "sequences":
-		if "serialcols_dependencies" in newvalue.keys() and diff_item["changedkeys"] == "current":
+		if "serialcols_dependencies" in newvalue.keys() and "current" in diff_item["changedkeys"].split(", "):
 			do_continue = False
 
 	if do_continue:

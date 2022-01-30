@@ -916,12 +916,15 @@ def erase_diff_item(p_diff_dict, p_grpkeys):
 		if k != last_key:
 			diff_dict = diff_dict[k]
 		else:
-			try:
+			if k in diff_dict.keys():
 				del diff_dict[k]
-			except:
-				logger.error("** k:", k, p_grpkeys)
-				logger.error("** diff_dict keys:", diff_dict.keys())
-				raise
+			# try:
+			# 	del diff_dict[k]
+			# except:
+			# 	logger.error(f"** k: {k}, lastk: {last_key}, allkeys:{p_grpkeys}")
+			# 	logger.error(f"** initial diff_dict keys: {p_diff_dict.keys()}")
+			# 	logger.error(f"** diff_dict keys: {diff_dict.keys()}")
+			# 	raise
 
 	# Clean empty branches
 	count = 0

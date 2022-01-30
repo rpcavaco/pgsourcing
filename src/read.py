@@ -615,7 +615,7 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 
 	tables_root = out_dict["content"]["tables"]
 	optionals = [
-					("column_default", "default"), 
+					("column_default", "defaultval"), 
 					("character_maximum_length", "char_max_len"), 
 					("numeric_precision", "num_precision"),
 					("numeric_precision_radix", "num_prec_radix"),
@@ -653,11 +653,18 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 				else:
 					dt = row["data_type"]
 
+				# print("** row keys", list(row.keys()))
+				# print("** row column_default", row["column_default"])
+
 				col_dict = cols_dict[row["column_name"]] = {}
 				if p_include_colorder:
 					col_dict["ordpos"] = row["ordinal_position"]
 				col_dict["type"] = dt
 				col_dict["nullable"] = row["is_nullable"]
+				if not row["column_default"] is None:
+					col_dict["defaultval"] = row["column_default"]
+				else:
+					col_dict["defaultval"] ='NULL'
 				
 				for opt_colname, opt_key in optionals:
 					
@@ -666,7 +673,7 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 						# detetar dependencias entre schemata, avaliando se
 						# sao invocadas sequencias de outros schemata
 						#
-						if opt_key == "default":
+						if opt_key == "defaultval":
 							
 							if col_dict["type"] in FLOAT_TYPES:								
 								try:
