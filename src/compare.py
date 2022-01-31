@@ -324,10 +324,10 @@ def check_tbl_renaming_right(p_tmp_l, p_tmp_r, p_k):
 																			
 def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops, level=0): 
 	
-
 	logger = logging.getLogger('pgsourcing')
 
 	grpkey = grpkeys[-1]	
+	# print("::330:: grpkey:", grpkey, grpkeys)
 	ret_upperlevel_ops = {}
 	
 	try:
@@ -405,29 +405,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 		for k in skeys:
 			
 			klist = grpkeys+[k]
-			#if k == "index" and len(klist) == 4:
-				#print("klist:", klist, "k:", k, tmp_l.keys(), tmp_r.keys(), tmp_r["index"])
 			rkeys = tmp_r.keys()
-			# reprkey = {}
-
-			# if k in tmp_l.keys() and not k in tmp_r.keys():
-
-				# if level == 0:
-					# if grpkey in p_transformschema["types"]:
-						# for trans in p_transformschema["trans"]:
-							# for tk in tmp_r.keys():
-								# if tk == trans["src"]:
-									# reprkey[tk] = trans["dest"]
-									# rkeys.append(trans["dest"])
-								# else:
-									# reprkey[tk] = tk
-									# rkeys.append(tk)
-									
-			# if len(rkeys) < 1:
-				# rkeys = tmp_r.keys()
-				# for rk in rkeys:
-					# reprkey[rk] = rk
-				
 
 			if k in tmp_l.keys() and not k in rkeys:
 				
@@ -467,7 +445,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 											do_continue = False
 											break
 
-					elif grpkey == "tables" or (grpkey not in CFG_GROUPS and klist[0] == "tables"):
+					elif grpkey not in CFG_GROUPS and klist[0] == "tables" and len(klist) == 3:
 
 						if diff_dict and "tables" in diff_dict.keys():
 
