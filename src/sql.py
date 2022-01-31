@@ -111,6 +111,29 @@ SQL = {
 			ON a.oid = atr.attrelid 
 			and a.attnum = atr.attnum
 		GROUP BY idxtblspc, conname""",
+	"PKEY_EXISTS": """select count(*)
+		from
+		(select distinct conname as constraint_name
+				from
+				(select ts.spcname as idxtblspc, c.conname, t.oid,
+				unnest(c.conkey) attnum
+				FROM pg_constraint c 
+				JOIN pg_class t
+					ON c.conrelid = t.oid
+				JOIN pg_namespace n2
+				ON n2.oid = t.relnamespace
+				JOIN pg_class i
+					ON c.conindid = i.oid
+				LEFT JOIN pg_tablespace ts
+				ON ts.oid = i.reltablespace 
+				WHERE contype IN ('p')
+				AND n2.nspname = %s
+				AND t.relname = %s) a
+				JOIN pg_attribute atr
+					ON a.oid = atr.attrelid 
+					and a.attnum = atr.attnum
+				where conname = %s
+				GROUP BY idxtblspc, conname) d", 
 	"FKEYS": """SELECT 
 		n2.nspname AS schema_ref,
 		t2.relname AS table_ref,

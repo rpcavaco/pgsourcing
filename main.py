@@ -67,7 +67,7 @@ import logging.config
 import json
 import codecs
 import re
-# import pprint as pp
+import pprint as pp
 
 from src.common import LOG_CFG, LANG, OPS, OPS_INPUT, \
 		OPS_OUTPUT, OPS_HELP, OPS_CHECK, OPS_DBCHECK, OPS_CODE, OPS_PRECEDENCE, \
@@ -967,9 +967,11 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 
 		if grpkeys[0] == "schemata":
 
-			p_cr.execute(SQL["SCHEMA_CHK"], (sch,))
-			row = p_cr.fetchone()
-			obj_exists = (row[0] == 1)
+			if len(grpkeys) == 2:
+
+				p_cr.execute(SQL["SCHEMA_CHK"], (sch,))
+				row = p_cr.fetchone()
+				obj_exists = (row[0] == 1)
 
 		elif grpkeys[0] == "procedures":
 			
@@ -1032,6 +1034,17 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 				if row[0] > 0:
 					obj_exists = True
 				already_tested = True
+
+			elif grpkeys[0] == "tables" and len(grpkeys) > 3 and grpkeys[3] == "pkey":
+
+				print("grpkeys:", grpkeys)
+				print("grpkeys:", p_diff_dict)
+
+				sch = grpkeys[1]
+				tabname = grpkeys[2]
+				pkeyname = grpkeys[4]
+
+				p_cr.execute(SQL["PKEY_EXISTS"], (sch, tabname, pkeyname))
 
 			if not already_tested:
 
@@ -1174,9 +1187,9 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				root_diff_dict["transformschema"] = replacements
 				
 			# # Lista "crua" das operações
-			# print(f"--------- conn-key: {connkey:20} ----------------------")
-			# pp.pprint(cd_ops)
-			# print("----------------------------------------------------------------")
+			print(f"--------- conn-key: {connkey:20} ----------------------")
+			pp.pprint(cd_ops)
+			print("----------------------------------------------------------------")
 
 			# pp.pprint(root_diff_dict["content"]["tables"]["estagio"]['import_stcp_nos'])
 
