@@ -144,13 +144,13 @@ def changegrp(p_chg_group, p_currdiff_block, p_updates_ids_list, p_keys_byref, p
 	return changed
 
 	
-def updateref(p_proj, p_difdict, updates_ids_list, limkeys_list):
+def updateref(p_proj, p_connkey, p_difdict, updates_ids_list, limkeys_list):
 	
 	# print("updates_ids_list:", updates_ids_list)
 	# print("limkeys_list:", limkeys_list)
 	
 	changed = False
-	root_ref_json = load_currentref(p_proj)
+	root_ref_json = load_currentref(p_proj, p_connkey)
 	ref_json = root_ref_json["content"]
 	
 	diff_content = p_difdict["content"]

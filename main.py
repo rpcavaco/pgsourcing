@@ -489,7 +489,7 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 		assert not diffdict is None
 		# print("diffdict:", json.dumps(diffdict, indent=4))
 				
-		newref_dict = updateref(p_proj, diffdict, upd_ids_list, limkeys_list)
+		newref_dict = updateref(p_proj, connkey, diffdict, upd_ids_list, limkeys_list)
 		if not newref_dict is None:
 		
 			newref_dict["timestamp"] = base_ts			
@@ -497,7 +497,7 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 			newref_dict["pgsourcing_output_type"] = "reference"	
 			newref_dict["pgsourcing_storage_ver"] = STORAGE_VERSION		 	
 
-			save_ref(p_proj, newref_dict, now_dt)
+			save_ref(p_proj, connkey, newref_dict, now_dt)
 
 			logger.info("reference changed, proj:%s" % (p_proj,))
 
@@ -1108,6 +1108,8 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	
 	# Se a operacao for chksrc ou chkdest o dicionario check_dict sera 
 	#  preenchido.
+
+	print("connkey", connkey)
 	
 	if check_dict:
 		
@@ -1127,7 +1129,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		do_compare = False
 		if comparison_mode == "From SRC":
 			
-			if not exists_currentref(p_proj):
+			if not exists_currentref(p_proj, connkey):
 				
 				ref_dict = {
 					"pgsourcing_output_type": "reference",
@@ -1138,7 +1140,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				for k in check_dict:
 					if not k.startswith("warning") and k != "pgsourcing_output_type":
 						ref_dict[k] = check_dict[k]
-				save_ref(p_proj, ref_dict, now_dt)
+				save_ref(p_proj, connkey, ref_dict, now_dt)
 
 				logger.info("reference created, proj:%s" % (p_proj,))
 				
@@ -1160,7 +1162,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			
 		elif comparison_mode == "From REF":
 			
-			if not exists_currentref(p_proj):
+			if not exists_currentref(p_proj, connkey):
 				raise RuntimeError("Project '%s' has no reference data, 'chksrc' must be run first" % p_proj)
 			else:
 				do_compare = True
@@ -1168,7 +1170,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		cd_ops = { "insert": [], "delete": [] }
 		if do_compare:
 
-			comparing(p_proj, check_dict["content"], 
+			comparing(p_proj, connkey, check_dict["content"], 
 				comparison_mode, replacements, opordmgr, 
 				root_diff_dict["content"], cd_ops)
 

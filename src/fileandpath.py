@@ -56,11 +56,11 @@ def get_filters_cfg(p_proj, p_key):
 		ret = json.load(fj)
 	return ret[p_key]["filters"]
 			
-def _get_timedref(p_proj, p_dt):
-	return path_join(_get_refdir(p_proj), "REF%s.json" % p_dt.strftime('%Y%m%dT%H%M%S'))
+def _get_timedref(p_proj, p_connkey, p_dt):
+	return path_join(_get_refdir(p_proj), "REF%s_%s.json" % (p_dt.strftime('%Y%m%dT%H%M%S'), p_connkey))
 	
-def get_currentref(p_proj):
-	return path_join(_get_refdir(p_proj), "current.json")
+def get_currentref(p_proj, p_connkey):
+	return path_join(_get_refdir(p_proj), f"current_{p_connkey}.json")
 
 def get_refwarnings(p_proj):
 	return path_join(_get_refdir(p_proj), "warnings.json")
@@ -83,11 +83,12 @@ def get_reftablesdir(p_proj):
 		makedirs(pth)
 	return pth
 
-def exists_currentref(p_proj):
-	return exists(get_currentref(p_proj))
+def exists_currentref(p_proj, p_connkey):
+	return exists(get_currentref(p_proj, p_connkey))
 
-def load_currentref(p_proj):
-	curr_ref_path = get_currentref(p_proj)
+def load_currentref(p_proj, p_connkey):
+	curr_ref_path = get_currentref(p_proj, p_connkey)
+	print("curr_ref_path:", curr_ref_path)
 	assert exists(curr_ref_path)
 	ret = None
 	with open(curr_ref_path, "r") as fl:
@@ -108,9 +109,9 @@ def from_jsonfile(p_input, o_obj):
 	with open(p_input, "r") as fj:
 		o_obj.update(json.load(fj))
 				
-def save_ref(p_proj, p_obj, p_dt):
-	to_jsonfile(p_obj, _get_timedref(p_proj, p_dt))
-	to_jsonfile(p_obj, get_currentref(p_proj))
+def save_ref(p_proj, p_connkey, p_obj, p_dt):
+	to_jsonfile(p_obj, _get_timedref(p_proj, p_connkey, p_dt))
+	to_jsonfile(p_obj, get_currentref(p_proj, p_connkey))
 
 def save_warnings(p_proj, p_obj):
 	to_jsonfile(p_obj, get_refwarnings(p_proj))
@@ -144,10 +145,10 @@ def get_srccodedir_trigger(p_cfgpath, p_key):
 		
 	return path_join(cfgdict[p_key]["srccodedir"], "triggers")
 		
-def dropref(p_proj):
+def dropref(p_proj, p_connkey):
 
 	rd = _get_refdir(p_proj)
-	patt = "REF[0-9T]+.json"
+	patt = "REF[0-9T]+_[0-9a-zA-Z_\-]+.json"
 
 	for currfile in ("current.json", "warnings.json"):
 		currpath = path_join(rd, currfile)

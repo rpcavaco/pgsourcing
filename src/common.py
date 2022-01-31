@@ -29,7 +29,7 @@ OPS_CODE = ["chksrccode", "updcodeinsrc"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
 
-STORAGE_VERSION = 6
+STORAGE_VERSION = 10
 
 OPS_HELP = {
 	"en": {
