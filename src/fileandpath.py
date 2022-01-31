@@ -56,11 +56,11 @@ def get_filters_cfg(p_proj, p_key):
 		ret = json.load(fj)
 	return ret[p_key]["filters"]
 			
-def _get_timedref(p_proj, p_connkey, p_dt):
-	return path_join(_get_refdir(p_proj), "REF%s_%s.json" % (p_dt.strftime('%Y%m%dT%H%M%S'), p_connkey))
+def _get_timedref(p_proj, p_dt):
+	return path_join(_get_refdir(p_proj), "REF%s.json" % p_dt.strftime('%Y%m%dT%H%M%S'))
 	
-def get_currentref(p_proj, p_connkey):
-	return path_join(_get_refdir(p_proj), f"current_{p_connkey}.json")
+def get_currentref(p_proj):
+	return path_join(_get_refdir(p_proj), "current.json")
 
 def get_refwarnings(p_proj):
 	return path_join(_get_refdir(p_proj), "warnings.json")
@@ -83,11 +83,11 @@ def get_reftablesdir(p_proj):
 		makedirs(pth)
 	return pth
 
-def exists_currentref(p_proj, p_connkey):
-	return exists(get_currentref(p_proj, p_connkey))
+def exists_currentref(p_proj):
+	return exists(get_currentref(p_proj))
 
-def load_currentref(p_proj, p_connkey):
-	curr_ref_path = get_currentref(p_proj, p_connkey)
+def load_currentref(p_proj):
+	curr_ref_path = get_currentref(p_proj)
 	assert exists(curr_ref_path)
 	ret = None
 	with open(curr_ref_path, "r") as fl:
@@ -108,9 +108,9 @@ def from_jsonfile(p_input, o_obj):
 	with open(p_input, "r") as fj:
 		o_obj.update(json.load(fj))
 				
-def save_ref(p_proj, p_connkey, p_obj, p_dt):
-	to_jsonfile(p_obj, _get_timedref(p_proj, p_connkey, p_dt))
-	to_jsonfile(p_obj, get_currentref(p_proj, p_connkey))
+def save_ref(p_proj, p_obj, p_dt):
+	to_jsonfile(p_obj, _get_timedref(p_proj, p_dt))
+	to_jsonfile(p_obj, get_currentref(p_proj))
 
 def save_warnings(p_proj, p_obj):
 	to_jsonfile(p_obj, get_refwarnings(p_proj))
@@ -144,10 +144,10 @@ def get_srccodedir_trigger(p_cfgpath, p_key):
 		
 	return path_join(cfgdict[p_key]["srccodedir"], "triggers")
 		
-def dropref(p_proj, p_connkey):
+def dropref(p_proj):
 
 	rd = _get_refdir(p_proj)
-	patt = "REF[0-9T]+_[0-9a-zA-Z_\-]+.json"
+	patt = "REF[0-9T]+.json"
 
 	for currfile in ("current.json", "warnings.json"):
 		currpath = path_join(rd, currfile)
@@ -170,17 +170,27 @@ def genprojectarchive(p_proj):
 	projdir = _get_projdir(p_proj)
 	projroot = dirname(projdir)
 
-	now_dt = dt.now()
+	l = len(listdir(path_join(projdir, "reference")))
 
-	zipfname = f"{p_proj}_{now_dt.strftime('%Y%m%dT%H%M%S')}"
-	zippath = path_join(projroot, zipfname)
+	ret = False
 
-	make_archive(
-		zippath, 
-		"zip", 
-		root_dir=projroot,
-		base_dir=p_proj
-	)
+	if l > 0:
+
+		now_dt = dt.now()
+
+		zipfname = f"{p_proj}_{now_dt.strftime('%Y%m%dT%H%M%S')}"
+		zippath = path_join(projroot, zipfname)
+
+		make_archive(
+			zippath, 
+			"zip", 
+			root_dir=projroot,
+			base_dir=p_proj
+		)
+
+		ret = True
+
+	return ret
 
 
 # ######################################################################

@@ -737,10 +737,10 @@ def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict): #,
 	return ret_upperlevel_ops
 										
 
-def comparing(p_proj, p_connkey, p_check_dict, p_comparison_mode, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops):
+def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops):
 
 	logger = logging.getLogger('pgsourcing')
-	raw_ref_json = load_currentref(p_proj, p_connkey)
+	raw_ref_json = load_currentref(p_proj)
 
 	# print("--------")
 	# print(json.dumps(raw_ref_json, indent=4))
