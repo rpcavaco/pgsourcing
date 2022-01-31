@@ -361,22 +361,17 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 		cfgpath = get_conn_cfg_path(p_proj)
 		conns = Connections(cfgpath, subkey="conn")
 		
-		if p_connkey is None:
-		
+		if p_connkey is None:	
 			if p_oper == "chksrc":
-
 				if not conns.checkConn("src"):
 					raise RuntimeError("Chksrc, implicit 'src' connection is not defined, must provide an explicit conn key using -c / --connkey option")
 				else:
 					connkey = 'src'
-
 			elif p_oper == "chkdest":
-
 				if not conns.checkConn("dest"):
 					raise RuntimeError("Chkdest, implicit 'dest' connection is not defined, must provide an explicit conn key using -c / --connkey option")
 				else:
 					connkey = 'dest'
-
 		else:	
 			connkey = p_connkey		
 
@@ -384,14 +379,14 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 		
 		if p_oper == "chksrc":
 
-			logger.info("checking, proj:%s  oper:%s" % (p_proj,p_oper))
+			logger.info("checking source, proj:%s  oper:%s" % (p_proj,p_oper))
 			outprocs_dir = p_outprocsdir
 			ret = "From SRC"
 			is_upstreamdb = True
 			
 		elif p_oper == "chkdest":
 			
-			logger.info("checking, proj:%s  oper:%s" % (p_proj,p_oper))
+			logger.info("checking dest, proj:%s  oper:%s" % (p_proj,p_oper))
 			outprocs_dir = p_outprocsdestdir
 			ret = "From REF"
 			is_upstreamdb = False
