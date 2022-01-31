@@ -739,8 +739,6 @@ def comparegrp_list(p_leftdic, p_rightdic, grpkeys, p_opordmgr, o_diff_dict): #,
 
 def comparing(p_proj, p_connkey, p_check_dict, p_comparison_mode, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops):
 
-	print("p_connkey:", p_connkey)
-	
 	logger = logging.getLogger('pgsourcing')
 	raw_ref_json = load_currentref(p_proj, p_connkey)
 

@@ -1213,15 +1213,16 @@ def paramtables(p_cursor, p_filters_cfg, p_gendumpsdir):
 			fname = "%s.copy" % (ftname)
 			fullp = path_join(p_gendumpsdir, fname)
 
-			work_list.append((fullp, ftname))
+			work_list.append((fullp, row[0], row[1]))
 			
-		for fullp, ftname in work_list:	
+		for fullp, ftschema, ftname in work_list:	
 			with open(fullp, "wb") as fp:
+				p_cursor.execute(f'SET search_path TO {ftschema}')
 				p_cursor.copy_to(fp, ftname)
 						
 def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir, 
 		outprocs_dir=None, include_public=False, include_colorder=False, is_upstreamdb=None):
-	
+
 	logger = logging.getLogger('pgsourcing')
 	with p_conn as cnobj:
 
@@ -1283,7 +1284,7 @@ def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir,
 					
 			logger.info("reading procedures ..")
 			procs(cr, p_filters_cfg, trigger_functions, majorversion, out_dict, genprocsdir=outprocs_dir)
-
+		
 		with cn.cursor() as cr:
 
 			logger.info("reading parameter table data ..")

@@ -40,6 +40,7 @@ class Conn(object):
 
 		self.conn = None
 		self.db = None
+		self.cndict = {}
 
 		self.dict_cursor_factory = None
 		
@@ -51,15 +52,17 @@ class Conn(object):
 		except AttributeError:
 			passw = str(b64decode(p_dict["password"]))
 			
-		newdict = {}
+		cndict = {}
 		for k in p_dict.keys():
 			if k == "password":
-				newdict[k] = passw
+				cndict[k] = passw
 			elif k == "database":
-				newdict[k] = p_dict[k]
+				cndict[k] = p_dict[k]
+				self.cndict[k] = p_dict[k]
 				self.db = p_dict[k]
 			else:
-				newdict[k] = p_dict[k]
+				cndict[k] = p_dict[k]
+				self.cndict[k] = p_dict[k]
 		if self.db is None:
 			raise ConnectionError("Conn: missing 'database' parameter")
 				
@@ -67,10 +70,13 @@ class Conn(object):
 		try:
 			import psycopg2
 			import psycopg2.extras
-			self.conn = psycopg2.connect(**newdict)	
+			self.conn = psycopg2.connect(**cndict)	
 			self.dict_cursor_factory = psycopg2.extras.DictCursor
 		except ImportError:
 			raise ConnectionError("Conn: no psycopg2 driver installed")
+
+	def __repr__(self) -> str:
+		return str(self.cndict)
 			
 	def getConn(self):
 		if self.conn is None:

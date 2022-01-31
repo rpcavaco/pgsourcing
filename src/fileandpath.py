@@ -88,7 +88,6 @@ def exists_currentref(p_proj, p_connkey):
 
 def load_currentref(p_proj, p_connkey):
 	curr_ref_path = get_currentref(p_proj, p_connkey)
-	print("curr_ref_path:", curr_ref_path)
 	assert exists(curr_ref_path)
 	ret = None
 	with open(curr_ref_path, "r") as fl:

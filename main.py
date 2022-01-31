@@ -1086,7 +1086,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	if p_oper == "dropref":
 		if not canuse_stdout or input("dropping reference data, are you sure? (enter 'y' to drop, any other key to exit): ").lower() == "y":
 			genprojectarchive(p_proj)
-			dropref(p_proj)
+			dropref(p_proj, p_connkey)
 			logger.info("reference dropped, proj:%s" % (p_proj,))
 		return
 	
@@ -1109,8 +1109,6 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 	# Se a operacao for chksrc ou chkdest o dicionario check_dict sera 
 	#  preenchido.
 
-	print("connkey", connkey)
-	
 	if check_dict:
 		
 		now_dt = dt.now()
