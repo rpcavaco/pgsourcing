@@ -949,9 +949,9 @@ def erase_diff_item(p_diff_dict, p_grpkeys):
 				
 # Check change dict ops, clearing redundancies and spurious (mostly incomplete) entries		
 def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
-	
+
 	def should_remove(p_isinsert, p_cr, p_op, p_pdiff_dict):
-		
+
 		grpkeys = p_op[1]
 		if len(grpkeys) < 3:
 			erase_diff_item(p_pdiff_dict, grpkeys)
@@ -1026,6 +1026,7 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 			# repr de um índice
 			# ['tables', 'devestagio', 'import_payshop', 'index', 'ix_estagio_import_payshop_index']
 
+			already_tested = False
 			if grpkeys[0] == "tables" and len(grpkeys) > 3 and grpkeys[3] == "index":
 
 				sch = grpkeys[1]
@@ -1035,16 +1036,19 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 				row = p_cr.fetchone()
 				if row[0] > 0:
 					obj_exists = True
+				already_tested = True
 
-			else:
+			if not already_tested:
+
+				if grpkeys[0] in ("tables", "sequences", "views", "matviews") and len(grpkeys) == 3:
 			
-				p_cr.execute(SQL["GENERIC_CHECK"], (sch, name))
-				row = p_cr.fetchone()
-				if not row is None:
-					obj_exists = check_objtype(row[0], grpkeys[0])
-				
-		if p_isinsert and obj_exists or \
-			not p_isinsert and not obj_exists:
+					p_cr.execute(SQL["GENERIC_CHECK"], (sch, name))
+					row = p_cr.fetchone()
+					if not row is None:
+						obj_exists = check_objtype(row[0], grpkeys[0])
+
+		if (p_isinsert and obj_exists) or \
+			(not p_isinsert and not obj_exists):
 				ret = True
 				
 		if ret:
@@ -1067,6 +1071,7 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 		ops = p_cd_ops["delete"]
 		for op in ops:
 			should_remove(False, cr, op, p_diff_dict)
+
 
 def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=None, 
 		canuse_stdout=False, include_public=False, include_colorder=False, 
@@ -1174,7 +1179,9 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			# print(f"--------- conn-key: {connkey:20} ----------------------")
 			# pp.pprint(cd_ops)
 			# print("----------------------------------------------------------------")
-			
+
+			# pp.pprint(root_diff_dict["content"]["tables"]["estagio"]['import_stcp_nos'])
+
 			if comparison_mode != "From SRC":
 				checkCDOps(p_proj, cd_ops, connkey, root_diff_dict["content"])
 			
@@ -1182,6 +1189,8 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		## Sequencias - tipo da seq. == tipo do campo serial em que e usada, etc. -- DONE
 
 		if "content" in root_diff_dict.keys() and root_diff_dict["content"]:
+
+			# pp.pprint(root_diff_dict["content"]["tables"]["estagio"]['import_stcp_nos'])
 			
 			logger.info("result: DIFF FOUND (proj '%s')" % p_proj)
 			out_json = deepcopy(root_diff_dict)
@@ -1215,7 +1224,6 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		else:
 			
 			logger.info("result: NO DIFF (proj '%s')" % p_proj)
-			# do_output(check_dict, output=output, interactive=canuse_stdout)
 			
 	else: # if not check_dict
 

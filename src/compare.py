@@ -120,6 +120,7 @@ def get_diff_item(p_diff_dict, p_grpkeys, opt_leaf_keys=None, b_leaf_is_list=Fal
 			else:
 				diff_dict[k] = {}
 		diff_dict = diff_dict[k]
+		# print("    ... 123 diff_dict", diff_dict.keys())
 
 	if not opt_leaf_keys is None and len(opt_leaf_keys) == 1 and not b_leaf_is_list:
 		k = opt_leaf_keys[0]
@@ -431,7 +432,8 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 			if k in tmp_l.keys() and not k in rkeys:
 				
 				if printdbg:
-					print("*** left only:", grpkey, k, level, tmp_l.keys(), rkeys)
+					print("*** left only:", grpkey, k, level, tmp_l.keys(), rkeys, ",".join(diff_dict.keys()))
+					# print("    UPPERLEVELOPS.keys():", UPPERLEVELOPS.keys())
 				# left only
 
 				# If starting a new group from scratch
@@ -445,7 +447,6 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						newklist  = klist+[newkey]		
 						upperlevel_ops = comparegrp(tmp_l[k], tmp_r, newklist, p_transformschema, p_opordmgr, diff_dict, o_cd_ops, level=level+1)
 						if upperlevel_ops:
-							#print("... 241", upperlevel_ops)
 							dictupdate(ret_upperlevel_ops, upperlevel_ops)
 				
 				else:
@@ -477,6 +478,8 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 										if prevlevel_diff[exist_tblname]["newvalue"] == k:
 											do_continue = False
 											break		
+
+					# print(" *** left only B:", grpkey, k, level, "do_continue:", do_continue)
 
 					if do_continue:				
 					
@@ -800,5 +803,5 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 		if ret:
 			dictupdate(upperlevel_ops, ret)
 			
-	chdict = o_diff_dict	
+	# chdict = o_diff_dict	
 
