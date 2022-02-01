@@ -67,7 +67,7 @@ import logging.config
 import json
 import codecs
 import re
-#import pprint as pp
+# import pprint as pp
 
 from src.common import LOG_CFG, LANG, OPS, OPS_INPUT, \
 		OPS_OUTPUT, OPS_HELP, OPS_CHECK, OPS_DBCHECK, OPS_CODE, OPS_PRECEDENCE, \

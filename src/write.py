@@ -30,7 +30,7 @@ import logging
 
 
 from src.fileandpath import load_currentref
-from src.common import CFG_GROUPS, CFG_LISTGROUPS, COL_ITEMS_CHG_AVOIDING_SUBSTITUTION
+from src.common import CFG_GROUPS, CFG_LISTGROUPS #, COL_ITEMS_CHG_AVOIDING_SUBSTITUTION
 from copy import deepcopy
 
 # import pprint as pp

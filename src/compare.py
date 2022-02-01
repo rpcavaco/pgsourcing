@@ -65,7 +65,7 @@ def do_transformschema(p_transformschema, p_obj, p_k):
 		if "views" in p_transformschema["types"]:
 			for trans in p_transformschema["trans"]:
 				p_obj[p_k] = p_obj[p_k].replace(trans["src"], trans["dest"])
-	elif p_k == "default":
+	elif p_k == "defaultval":
 		if "tables" in p_transformschema["types"]:
 			for trans in p_transformschema["trans"]:
 				p_obj[p_k] = p_obj[p_k].replace(trans["src"], trans["dest"])
@@ -340,12 +340,11 @@ def check_tbl_renaming_right(p_tmp_l, p_tmp_r, p_k):
 
 	return ret
 																			
-def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops, level=0): 
+def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops, level=0, b_dbgflag=False): 
 	
 	logger = logging.getLogger('pgsourcing')
 
 	grpkey = grpkeys[-1]	
-	# print("::330:: grpkey:", grpkey, grpkeys)
 	ret_upperlevel_ops = {}
 	
 	try:
@@ -363,15 +362,12 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 	if "error" in tmp_l.keys():
 		return ret_upperlevel_ops
 		
-	# print("comparegrp:", grpkeys, p_rightdic.keys(), level) #, diff_dict)
-	# print("    p_rightdict:", p_rightdic.keys()) #, diff_dict)
-	
 	printdbg = False
 
 	# TODO: permanente -- verificar que está vazio em produção
 	if grpkey in []: # ("sequences",):
 		printdbg = True
-	
+
 	if not grpkey in p_rightdic.keys():
 		
 		if printdbg:
@@ -541,23 +537,17 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 
 					o_cd_ops["delete"].append(('e', klist))
 					
-					# if grpkeys[0] == "procedures":
-						# diff_item["procedure_name"] = tmp_r[k]["procedure_name"]
-						# diff_item["args"] = tmp_r[k]["args"]
-			
 			else:
 
 				if isinstance(tmp_l[k], dict) and isinstance(tmp_r[k], dict):
-					upperlevel_ops = comparegrp(tmp_l, tmp_r, klist, p_transformschema, p_opordmgr, diff_dict, o_cd_ops, level=level+1)
+					dbgflag = False
+					upperlevel_ops = comparegrp(tmp_l, tmp_r, klist, p_transformschema, p_opordmgr, diff_dict, o_cd_ops, level=level+1, b_dbgflag=dbgflag)
 					if upperlevel_ops:
-						# if "tables" in upperlevel_ops.keys():
-							# print(".. 292 ..", upperlevel_ops)
 						dictupdate(ret_upperlevel_ops, upperlevel_ops)
 
 				elif isinstance(tmp_l[k], list) and isinstance(tmp_r[k], list):
 					upperlevel_ops = comparegrp_list(tmp_l, tmp_r, klist, p_opordmgr, diff_dict) #, o_cd_ops, level=level+1)
 					if upperlevel_ops:
-						# print(".. 298 ..", upperlevel_ops)
 						dictupdate(ret_upperlevel_ops, upperlevel_ops)
 						
 				elif isinstance(tmp_l[k], dict):
@@ -596,9 +586,10 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 							}
 								
 					else:
-
+						## Comparing LEAF values
 						rightval = tmp_r[k]						
 						if p_transformschema:
+							# Apply schema transformation if adequate
 							do_transformschema(p_transformschema, tmp_l, k)	
 						leftval = tmp_l[k]	
 						

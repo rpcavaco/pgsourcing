@@ -106,7 +106,7 @@ SHALLOW_DEPTH = 2
 FLOAT_TYPES = ["numeric", "float"]
 INT_TYPES = ["integer", "smallint"]
 
-COL_ITEMS_CHG_AVOIDING_SUBSTITUTION = ["defaultval", "nullable"]
+# COL_ITEMS_CHG_AVOIDING_SUBSTITUTION = ["defaultval", "nullable"]
 
 # Upper level ops: chaves para as quais uma alteracao num detalhe obriga a 
 #  destruir e recriar o objeto completo, determinando uma operacao de 

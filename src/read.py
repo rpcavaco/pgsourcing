@@ -733,7 +733,7 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 											
 										seqs = out_dict["content"]["sequences"][schema_name]											
 										if not seqname in seqs.keys():
-											seqs[seqname] = {}											
+											seqs[seqname] = {}			
 										col_dict[opt_key] = parsed_val.replace(seqname, "%s.%s" % (schema_name, seqname))
 									
 									else:										
