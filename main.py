@@ -964,6 +964,7 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 
 		obj_exists = False
 		ret = False
+		_do_show = False
 
 		if grpkeys[0] == "schemata":
 
@@ -1037,14 +1038,11 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 
 			elif grpkeys[0] == "tables" and len(grpkeys) > 3 and grpkeys[3] == "pkey":
 
-				print("grpkeys:", grpkeys)
-				print("grpkeys:", p_diff_dict)
-
-				sch = grpkeys[1]
-				tabname = grpkeys[2]
-				pkeyname = grpkeys[4]
-
-				p_cr.execute(SQL["PKEY_EXISTS"], (sch, tabname, pkeyname))
+				## No need to test existance of pkey, not itself an object e.g. like an inedex
+				_do_show = True
+				if not p_isinsert:
+					obj_exists = True
+				already_tested = True
 
 			if not already_tested:
 
@@ -1055,6 +1053,9 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 					if not row is None:
 						obj_exists = check_objtype(row[0], grpkeys[0])
 
+		if _do_show:
+			print("::1055:: p_isinsert, obj_exists:", p_isinsert, obj_exists)
+		
 		if (p_isinsert and obj_exists) or \
 			(not p_isinsert and not obj_exists):
 				ret = True

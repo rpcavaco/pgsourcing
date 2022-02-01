@@ -1,0 +1,12 @@
+lixo/
+log/
+projetos/
+src/__pycache__/
+*.zip
+lib/
+lib64
+bin/
+pyvenv.cfg
+
+
+
