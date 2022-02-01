@@ -3,10 +3,12 @@ log/
 projetos/
 src/__pycache__/
 *.zip
+*.docx
 lib/
 lib64
 bin/
 pyvenv.cfg
+Scripts/
 
 
 
