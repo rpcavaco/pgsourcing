@@ -67,7 +67,7 @@ import logging.config
 import json
 import codecs
 import re
-import pprint as pp
+#import pprint as pp
 
 from src.common import LOG_CFG, LANG, OPS, OPS_INPUT, \
 		OPS_OUTPUT, OPS_HELP, OPS_CHECK, OPS_DBCHECK, OPS_CODE, OPS_PRECEDENCE, \
@@ -967,12 +967,12 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 		_do_show = False
 
 		if grpkeys[0] == "schemata":
-
 			if len(grpkeys) == 2:
-
 				p_cr.execute(SQL["SCHEMA_CHK"], (sch,))
 				row = p_cr.fetchone()
 				obj_exists = (row[0] == 1)
+			else:
+				obj_exists = not p_isinsert
 
 		elif grpkeys[0] == "procedures":
 			
@@ -1188,14 +1188,17 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				root_diff_dict["transformschema"] = replacements
 				
 			# # Lista "crua" das operações
-			print(f"--------- conn-key: {connkey:20} ----------------------")
-			pp.pprint(cd_ops)
-			print("----------------------------------------------------------------")
+			# print(f"--------- conn-key: {connkey:20} ----------------------")
+			# pp.pprint(cd_ops)
+			# print("----------------------------------------------------------------")
 
 			# pp.pprint(root_diff_dict["content"]["tables"]["estagio"]['import_stcp_nos'])
 
 			if comparison_mode != "From SRC":
 				checkCDOps(p_proj, cd_ops, connkey, root_diff_dict["content"])
+
+		# print("::1200::")
+		# pp.pprint(root_diff_dict["content"])
 			
 		## TODO: permanente - Verificacao final de coerencia - 
 		## Sequencias - tipo da seq. == tipo do campo serial em que e usada, etc. -- DONE

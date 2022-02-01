@@ -33,6 +33,8 @@ from src.fileandpath import load_currentref
 from src.common import CFG_GROUPS, CFG_LISTGROUPS, COL_ITEMS_CHG_AVOIDING_SUBSTITUTION
 from copy import deepcopy
 
+# import pprint as pp
+
 SQL_CREATE_PK = """%s ADD CONSTRAINT %s PRIMARY KEY (%s)
     USING INDEX TABLESPACE %s"""
     
@@ -699,7 +701,10 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 			if "grants" in diff_item.keys():
 				di_base = diff_item["grants"]
 				for user_name in di_base.keys():
-					pre_privs = di_base[user_name]['newvalue']	
+					if 'newvalue' in di_base[user_name].keys():
+						pre_privs = di_base[user_name]['newvalue']	
+					else:
+						pre_privs = None
 					operorder = di_base[user_name]['operorder']	
 					if len(p_updates_ids_list) < 1 or operorder in p_updates_ids_list:
 						if docomment and not header_printed:
@@ -709,11 +714,12 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 							try:
 								out_sql_src.append("-- Op #%d" % operorder)
 							except:
-								logger.error("privs:", privs)
+								logger.error("pre_privs:", pre_privs)
 								logger.error("di_base:", di_base)
 								raise
 						if di_base[user_name]['diffoper'] in ("update", "delete"):
 							if di_base[user_name]['diffoper'] == "delete":
+								assert pre_privs is None, pre_privs
 								privs = "ALL"
 							else:
 								privs = pre_privs	
@@ -856,6 +862,8 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 				header_printed[0] = False
 				
 				diff_item = currdiff_block[sch][tname]	
+
+				# pp.pprint(diff_item)
 
 				if "diffoper" in diff_item.keys():						
 				
@@ -1015,26 +1023,42 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 									elif di["diffoper"] == "delete":
 										out_sql_src.append(xtmpl % (trname, sch, tname))
 
+					# Table priv grants
 					if "grants" in diff_item.keys():
-						for user_name in diff_item["grants"].keys():
-							di = diff_item["grants"][user_name]					
-							if len(p_updates_ids_list) < 1 or di["operorder"] in p_updates_ids_list:
-								print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
-								if docomment:
-									out_sql_src.append("-- Op #%d" % di["operorder"])							
-								if di["diffoper"] in ("update", "delete"):
-									if "newvalue" in di.keys():
-										privs = di["newvalue"]	
-									else:
-										privs = "ALL"	
-									if delmode == "NODEL":
-										xtmpl = "-- REVOKE %s ON %s.%s FROM %s"
-									else:
-										xtmpl = "REVOKE %s ON %s.%s FROM %s"
-									out_sql_src.append(xtmpl % (privs, sch, tname, user_name))
-								if di["diffoper"] in ("update", "insert"):
-									privs = di["newvalue"]	
-									out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, tname, user_name))
+
+						this_diff = diff_item["grants"]
+						if "newvalue" in this_diff.keys():
+
+							assert this_diff["diffoper"] in ("update", "insert"), this_diff["diffoper"]
+
+							for user_name in this_diff["newvalue"].keys():
+								pre_privs = this_diff["newvalue"][user_name]					
+								if len(p_updates_ids_list) < 1 or this_diff["operorder"] in p_updates_ids_list:
+									print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
+									if docomment:
+										out_sql_src.append("-- Op #%d" % this_diff["operorder"])							
+									if this_diff["diffoper"] in ("update", "delete"):
+										if "newvalue" in di.keys():
+											privs = pre_privs
+										else:
+											privs = "ALL"	
+										if delmode == "NODEL":
+											xtmpl = "-- REVOKE %s ON %s.%s FROM %s"
+										else:
+											xtmpl = "REVOKE %s ON %s.%s FROM %s"
+										out_sql_src.append(xtmpl % (privs, sch, tname, user_name))
+									if this_diff["diffoper"] in ("update", "insert"):
+										out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (pre_privs, sch, tname, user_name))
+
+						else:
+
+							assert this_diff["diffoper"] == "delete", this_diff["diffoper"]
+							privs = "ALL"
+							if delmode == "NODEL":
+								xtmpl = "-- REVOKE %s ON %s.%s FROM %s"
+							else:
+								xtmpl = "REVOKE %s ON %s.%s FROM %s"
+							out_sql_src.append(xtmpl % (privs, sch, tname, user_name))
 
 	grpkey = "views"
 	if (len(p_limkeys_list) < 1 or grpkey in p_limkeys_list) and grpkey in diff_content.keys():
