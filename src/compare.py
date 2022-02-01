@@ -288,6 +288,24 @@ def gen_update(p_transformschema, p_opordmgr, p_upperlevel_ops, p_keychain, p_di
 	do_continue = True
 	if op == "update" and p_keychain[0] == "sequences":
 		if "serialcols_dependencies" in newvalue.keys() and "current" in diff_item["changedkeys"].split(", "):
+			if stepback:
+
+				# go up in diff_dict tree to remove spurious sequence item
+				cut_keychain = copy(p_keychain[:-1])
+				objname = cut_keychain[-1]
+				cut_keychain.pop()
+				ancestor = get_diff_item(p_diff_dict, cut_keychain)
+				del ancestor[objname]
+
+				# rolling up in tree, ensure empty diff dict tree nodes area all removed
+				while not ancestor and len(cut_keychain)>0:
+					objname = cut_keychain[-1]
+					cut_keychain.pop()
+					ancestor = get_diff_item(p_diff_dict, cut_keychain)
+					del ancestor[objname]
+					if objname in CFG_GROUPS:
+						break
+
 			do_continue = False
 
 	if do_continue:

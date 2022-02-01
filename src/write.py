@@ -698,9 +698,9 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 						
 			if "grants" in diff_item.keys():
 				di_base = diff_item["grants"]
-				for user_name in di_base['newvalue'].keys():
-					privs = di_base['newvalue'][user_name]	
-					operorder = di_base['operorder']	
+				for user_name in di_base.keys():
+					pre_privs = di_base[user_name]['newvalue']	
+					operorder = di_base[user_name]['operorder']	
 					if len(p_updates_ids_list) < 1 or operorder in p_updates_ids_list:
 						if docomment and not header_printed:
 							out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Schemas\n" + "-- " + "".join(['#'] * 77))
@@ -712,18 +712,18 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 								logger.error("privs:", privs)
 								logger.error("di_base:", di_base)
 								raise
-						if di_base['newvalue'] in ("update", "delete"):
-							if di_base['diffoper'] == "delete":
+						if di_base[user_name]['diffoper'] in ("update", "delete"):
+							if di_base[user_name]['diffoper'] == "delete":
 								privs = "ALL"
 							else:
-								privs = di_base['newvalue']	
+								privs = pre_privs	
 							if delmode == "NODEL":
 								xtmpl = "-- REVOKE %s ON %s FROM %s"
 							else:
 								xtmpl = "REVOKE %s ON %s FROM %s"
 							out_sql_src.append(xtmpl % (privs, sch, user_name))
-						if di_base['diffoper'] in ("update", "insert"):
-							out_sql_src.append("GRANT %s ON SCHEMA %s TO %s" % (privs, sch, user_name))
+						if di_base[user_name]['diffoper'] in ("update", "insert"):
+							out_sql_src.append("GRANT %s ON SCHEMA %s TO %s" % (pre_privs, sch, user_name))
 
 	grpkey = "procedures"	
 	if (len(p_limkeys_list) < 1 or grpkey in p_limkeys_list) and grpkey in diff_content.keys():
