@@ -28,7 +28,7 @@
 import re
 import logging
 import codecs
-import hashlib
+import csv
 
 from os.path import exists, join as path_join
 from psycopg2.errors import UndefinedFunction
@@ -409,12 +409,16 @@ def roles(p_cursor, p_filters_cfg, out_dict):
 			"validuntil": validuntil
 		}
 
-def tables(p_cursor, p_filters_cfg, out_dict):
+def tables(p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None):
+
+	logger = logging.getLogger('pgsourcing')
 
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
 	# assert "schemata" in out_dict["content"].keys(), "'content.schemata' em falta no dic. de saida"
 	if "schemata" not in out_dict["content"].keys():
 		return
+
+	rowcounts = []
 
 	for sch in out_dict["content"]["schemata"]:
 
@@ -464,10 +468,29 @@ def tables(p_cursor, p_filters_cfg, out_dict):
 			
 			if not row["tablespace"] is None:
 				sch_dict[row["tablename"]]["tablespace"] = row["tablespace"]
-				
+
+			if not opt_rowcount_path is None:
+				rowcounts.append([sch, row["tablename"], 0])
+
 		if not the_dict is None:
 			get_grants(the_dict, p_cursor)
-			
+
+	if len(rowcounts) > 0:
+		try:
+			with open(opt_rowcount_path, 'w', newline='') as csvfl:
+				csvwriter = csv.writer(csvfl, delimiter=';',
+								quotechar='"', quoting=csv.QUOTE_MINIMAL)
+				csvwriter.writerow(('Schema', 'Table', 'Row count'))
+				for rc_row in rowcounts:
+					p_cursor.execute(SQL["ROW_COUNT"].format(rc_row[0], rc_row[1]))
+					frow = p_cursor.fetchone()
+					rc_row[2] = frow[0]
+					csvwriter.writerow(rc_row)
+		except PermissionError:
+			logger.error("- CSV file probably opened in Excel, must be closed first,")
+			logger.exception("------- tables --------")
+
+
 	## TODO - contar registos
 
 def views(p_cursor, p_filters_cfg, out_dict):
@@ -1221,7 +1244,8 @@ def paramtables(p_cursor, p_filters_cfg, p_gendumpsdir):
 				p_cursor.copy_to(fp, ftname)
 						
 def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir, 
-		outprocs_dir=None, include_public=False, include_colorder=False, is_upstreamdb=None):
+		outprocs_dir=None, include_public=False, include_colorder=False, 
+		is_upstreamdb=None, opt_rowcount_path=None):
 
 	logger = logging.getLogger('pgsourcing')
 	with p_conn as cnobj:
@@ -1252,7 +1276,7 @@ def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir,
 			roles(cr, p_filters_cfg, out_dict)
 			
 			logger.info("reading tables ..")			
-			tables(cr, p_filters_cfg, out_dict)
+			tables(cr, p_filters_cfg, out_dict, opt_rowcount_path=opt_rowcount_path)
 
 			unreadable_tables = {}
 			

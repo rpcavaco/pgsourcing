@@ -67,7 +67,7 @@ import logging.config
 import json
 import codecs
 import re
-import pprint as pp
+# import pprint as pp
 
 from src.common import LOG_CFG, LANG, OPS, OPS_INPUT, \
 		OPS_OUTPUT, OPS_HELP, OPS_CHECK, OPS_DBCHECK, OPS_CODE, OPS_PRECEDENCE, \
@@ -81,7 +81,7 @@ from src.zip import gen_setup_zip
 from src.fileandpath import get_conn_cfg_path, get_filters_cfg, \
 		exists_currentref, to_jsonfile, save_ref, get_refcodedir, \
 		get_destcodedir, save_warnings, get_srccodedir, \
-		get_reftablesdir, dropref, genprojectarchive
+		get_reftablesdir, dropref, genprojectarchive, get_rowcount_table_file
 from src.write import updateref, updatedb, create_function_items
 from src.sql import SQL
 
@@ -375,6 +375,8 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 		else:	
 			connkey = p_connkey		
 
+		csv_rowcount_table_path = get_rowcount_table_file(p_proj, connkey)
+
 		is_upstreamdb = None
 		
 		if p_oper == "chksrc":
@@ -399,7 +401,10 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 			if "transformschema" in filters_cfg.keys():
 				o_replaces.update(filters_cfg["transformschema"])
 
-			dbreader(conns.getConn(connkey), filters_cfg, o_checkdict, p_outtables_dir, outprocs_dir=outprocs_dir, include_public=include_public, include_colorder=include_colorder, is_upstreamdb=is_upstreamdb)
+			dbreader(conns.getConn(connkey), filters_cfg, o_checkdict, p_outtables_dir, 
+					outprocs_dir=outprocs_dir, include_public=include_public, 
+					include_colorder=include_colorder, is_upstreamdb=is_upstreamdb, 
+					opt_rowcount_path=csv_rowcount_table_path)
 		
 	return ret, connkey
 
@@ -1200,9 +1205,9 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				root_diff_dict["transformschema"] = replacements
 				
 			# # Lista "crua" das operações
-			print(f"--------- conn-key: {connkey:20} ----------------------")
-			pp.pprint(cd_ops)
-			print("----------------------------------------------------------------")
+			# print(f"--------- conn-key: {connkey:20} ----------------------")
+			# pp.pprint(cd_ops)
+			# print("----------------------------------------------------------------")
 
 			# pp.pprint(root_diff_dict["content"]["tables"]["estagio"]['import_stcp_nos'])
 

@@ -365,7 +365,8 @@ SQL = {
 					execute v_sql;
 					exit;
 				end loop;
-			end$$;"""
+			end$$;""",
+	"ROW_COUNT": "SELECT count(*) from {0}.{1}"
 }
 
 # if __name__ == "__main__":

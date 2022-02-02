@@ -46,6 +46,9 @@ def _get_projdir(p_proj):
 def _get_refdir(p_proj):	
 	return path_join(_get_projdir(p_proj), "reference")
 
+def get_rowcount_table_file(p_proj, p_key):
+	return path_join(_get_refdir(p_proj), f"table_rowcounts_{p_key}.csv")
+
 def get_conn_cfg_path(p_proj):	
 	return path_join(_get_projdir(p_proj), "conncfg.json")
 
