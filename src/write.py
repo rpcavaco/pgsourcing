@@ -83,7 +83,7 @@ def changegrp_list(p_chg_group_list, p_currdiff_block_list, p_updates_ids_list):
 	return changed
 
 def changegrp(p_chg_group, p_currdiff_block, p_updates_ids_list, p_keys_byref, p_limkeys_list):	
-	
+
 	changed = False
 	
 	if len(p_keys_byref) > 15:
@@ -585,7 +585,7 @@ def print_matviewhdr(p_docomment, p_sch, p_name, p_out_sql_src, o_flag_byref):
 		o_flag_byref[0] = True
 
 def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomment=True):
-	
+
 	diff_content = p_difdict["content"]	
 	if "transformschema" in p_difdict.keys():
 		transformschema = p_difdict["transformschema"]	
@@ -1032,7 +1032,8 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 							assert this_diff["diffoper"] in ("update", "insert"), this_diff["diffoper"]
 
 							for user_name in this_diff["newvalue"].keys():
-								pre_privs = this_diff["newvalue"][user_name]					
+
+								pre_privs = this_diff["newvalue"][user_name]	
 								if len(p_updates_ids_list) < 1 or this_diff["operorder"] in p_updates_ids_list:
 									print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)
 									if docomment:
@@ -1172,7 +1173,6 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 							if di["diffoper"] in ("update", "insert"):
 								out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, vname, user_name))
 
-						
 	return out_sql_src
 						
 				

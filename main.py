@@ -141,6 +141,9 @@ def parse_args():
 
 	args = parser.parse_args()
 
+	if args.delmode is None:
+		args.delmode = "NODEL"
+
 	if args.delmode != "NODEL" and args.oper == "upddestdirect":
 		raise RuntimeError(f"cannot use delmode != 'NODEL' when using 'upddestdirect', directly changing dest db is too dangerous with active deletion on. Update first to script using 'upddestscript' and check all risky steps")
 	
@@ -271,18 +274,15 @@ def do_linesoutput(p_obj, output=None, interactive=False):
 							finallines.append(item + outer_sep)
 			elif isinstance(item, list):
 				finallines.append("\n".join(item) + outer_sep)
-		
+
 		if output is None:
 			if interactive:
-				out_str = "\n".join(finallines[:5])
-				print(out_str) 
+				out_str = "\n".join(finallines)
+				print(out_str.strip()) 
 		else:
 			dosave = False
 
-			try:
-				flagv = isinstance(output, basestring)
-			except NameError:
-				flagv = isinstance(output, str)
+			flagv = isinstance(output, str)
 
 			if flagv:
 				
@@ -509,7 +509,7 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 
 		assert not diffdict is None
 		
-		out_sql_src = updatedb(diffdict, upd_ids_list, limkeys_list, delmode=delmode)			
+		out_sql_src = updatedb(diffdict, upd_ids_list, limkeys_list, delmode=delmode)		
 		do_linesoutput(out_sql_src, output=output, interactive=canuse_stdout)
 
 		logger.info("dest change script for proj. %s, %s" % (p_proj,output))

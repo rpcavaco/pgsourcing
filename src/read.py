@@ -491,8 +491,6 @@ def tables(p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None):
 			logger.exception("------- tables --------")
 
 
-	## TODO - contar registos
-
 def views(p_cursor, p_filters_cfg, out_dict):
 
 	# Previously tested on "tables"
