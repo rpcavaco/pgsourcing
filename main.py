@@ -67,7 +67,7 @@ import logging.config
 import json
 import codecs
 import re
-# import pprint as pp
+import pprint as pp
 
 from src.common import LOG_CFG, LANG, OPS, OPS_INPUT, \
 		OPS_OUTPUT, OPS_HELP, OPS_CHECK, OPS_DBCHECK, OPS_CODE, OPS_PRECEDENCE, \
@@ -976,48 +976,43 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 
 		elif grpkeys[0] == "procedures":
 			
-			if not p_isinsert:
-				obj_exists = False
+			try:
+				_phase_label, op_content = p_op
+			except:
+				logger = logging.getLogger('pgsourcing')	
+				logger.error("p_op:", p_op)
+				raise
+
+			assert len(op_content) == 3, f"length of {op_content} != 3"
+
+			# print("op_content:", op_content)
+			# print("p_diff_dict:", json.dumps(p_diff_dict, indent=4))
+
+			curr_dicttree_level = p_diff_dict
+			for li in range(3):
 				
-			else:
+				# if li == 2:
+				# 	new_proc_dict = {curr_dicttree_level[k]["newvalue"]["procedure_name"]:curr_dicttree_level[k] for k in curr_dicttree_level.keys()}	
+				# 	assert op_content[li] in new_proc_dict.keys(), f"{op_content[li]} not in {new_proc_dict.keys()}"
+				# 	curr_dicttree_level = new_proc_dict[op_content[li]]
+				# else:
 
-				try:
-					_phase_label, op_content = p_op
-				except:
-					logger = logging.getLogger('pgsourcing')	
-					logger.error("p_op:", p_op)
-					raise
+				assert op_content[li] in curr_dicttree_level.keys(), f"{op_content[li]} not in {curr_dicttree_level.keys()}"
+				curr_dicttree_level = curr_dicttree_level[op_content[li]]
 
-				assert len(op_content) == 3, f"length of {op_content} != 3"
+			assert 'newvalue' in curr_dicttree_level.keys(), f"{'newvalue'} not in {curr_dicttree_level.keys()}"
+			curr_dicttree_level = curr_dicttree_level['newvalue']
 
-				# print("op_content:", op_content)
-				# print("p_diff_dict:", json.dumps(p_diff_dict, indent=4))
+			assert 'args' in curr_dicttree_level.keys(), f"'args' not in {curr_dicttree_level.keys()}"
+			assert 'return_type' in curr_dicttree_level.keys(), f"'return_type' not in {curr_dicttree_level.keys()}"
 
-				curr_dicttree_level = p_diff_dict
-				for li in range(3):
-					
-					# if li == 2:
-					# 	new_proc_dict = {curr_dicttree_level[k]["newvalue"]["procedure_name"]:curr_dicttree_level[k] for k in curr_dicttree_level.keys()}	
-					# 	assert op_content[li] in new_proc_dict.keys(), f"{op_content[li]} not in {new_proc_dict.keys()}"
-					# 	curr_dicttree_level = new_proc_dict[op_content[li]]
-					# else:
+			args = curr_dicttree_level['args']
+			return_type = curr_dicttree_level['return_type']
 
-					assert op_content[li] in curr_dicttree_level.keys(), f"{op_content[li]} not in {curr_dicttree_level.keys()}"
-					curr_dicttree_level = curr_dicttree_level[op_content[li]]
-
-				assert 'newvalue' in curr_dicttree_level.keys(), f"{'newvalue'} not in {curr_dicttree_level.keys()}"
-				curr_dicttree_level = curr_dicttree_level['newvalue']
-
-				assert 'args' in curr_dicttree_level.keys(), f"'args' not in {curr_dicttree_level.keys()}"
-				assert 'return_type' in curr_dicttree_level.keys(), f"'return_type' not in {curr_dicttree_level.keys()}"
-
-				args = curr_dicttree_level['args']
-				return_type = curr_dicttree_level['return_type']
-
-				p_cr.execute(SQL["PROC_CHECK"], (sch, name))
-				row = p_cr.fetchone()
-				if not row is None:
-					obj_exists = (row[0] == args and row[1] == return_type)
+			p_cr.execute(SQL["PROC_CHECK"], (sch, name))
+			row = p_cr.fetchone()
+			if not row is None:
+				obj_exists = (row[0] == args and row[1] == return_type)
 			
 		else:
 
@@ -1188,9 +1183,9 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				root_diff_dict["transformschema"] = replacements
 				
 			# # Lista "crua" das operações
-			# print(f"--------- conn-key: {connkey:20} ----------------------")
-			# pp.pprint(cd_ops)
-			# print("----------------------------------------------------------------")
+			print(f"--------- conn-key: {connkey:20} ----------------------")
+			pp.pprint(cd_ops)
+			print("----------------------------------------------------------------")
 
 			# pp.pprint(root_diff_dict["content"]["tables"]["estagio"]['import_stcp_nos'])
 
