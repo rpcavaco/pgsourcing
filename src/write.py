@@ -430,22 +430,37 @@ def col_operation(docomment, p_sch, p_tname, p_colname, p_diff_item, p_delmode, 
 	# 		cont0 = re.sub("\s\s+", " ",   "%s %s %s %s" % tuple(colcreatitems[1:]))
 	# 		p_out_sql_src.append("%s ADD COLUMN %s" % (tmplt % (p_sch, p_tname), cont0.strip()))
 
-def update_search_path(p_function_body, p_schematrans):
+# def update_search_path(p_function_body, p_schematrans):
 
-	global_changed = False
+# 	global_changed = False
+# 	current_body = None
+
+# 	for trans_dict in p_schematrans:
+# 		# changed = False 
+# 		if current_body is None:
+# 			current_body = p_function_body
+# 		ret = re.sub(f"(search_path[%\('\sa-zA-Z_À-Ýà-ý0-9_\$,]+){trans_dict['src']}", f"\\1{trans_dict['dest']}", current_body)
+# 		if ret != current_body:
+# 			# changed = True
+# 			global_changed = True
+# 			current_body = ret
+
+# 	return global_changed, ret
+
+def transf_schema(p_function_body, p_schematrans):
+
 	current_body = None
 
 	for trans_dict in p_schematrans:
 		# changed = False 
 		if current_body is None:
 			current_body = p_function_body
-		ret = re.sub(f"(search_path[%\('\sa-zA-Z_À-Ýà-ý0-9_\$,]+){trans_dict['src']}", f"\\1{trans_dict['dest']}", current_body)
+		ret = re.sub(f"\\b{trans_dict['src']}\\b", trans_dict['dest'], current_body)
 		if ret != current_body:
 			# changed = True
-			global_changed = True
 			current_body = ret
 
-	return global_changed, ret
+	return ret	
 
 
 def create_function_items(p_schema, p_name, p_args, p_rettype, p_langtype, p_owner, p_volatility, 
@@ -496,7 +511,8 @@ def create_function(p_schema, p_name, p_new_value, o_sql_linebuffer, schematrans
 		return_table_defstr = None
 
 	if not schematrans is None:
-		_bodychanged, fbody = update_search_path(p_new_value["body"], schematrans)
+		# _bodychanged, fbody = update_search_path(p_new_value["body"], schematrans)
+		fbody = transf_schema(p_new_value["body"], schematrans)		
 	else:
 		fbody = p_new_value["body"]
 	
