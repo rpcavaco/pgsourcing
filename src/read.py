@@ -31,7 +31,7 @@ import codecs
 import csv
 
 from os.path import exists, join as path_join
-from psycopg2.errors import UndefinedFunction
+from psycopg2.errors import UndefinedFunction, InsufficientPrivilege
 from shutil import rmtree
 
 from src.sql import SQL
@@ -409,7 +409,7 @@ def roles(p_cursor, p_filters_cfg, out_dict):
 			"validuntil": validuntil
 		}
 
-def tables(p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None):
+def tables(p_conn, p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None):
 
 	logger = logging.getLogger('pgsourcing')
 
@@ -489,6 +489,9 @@ def tables(p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None):
 		except PermissionError:
 			logger.error("- CSV file probably opened in Excel, must be closed first,")
 			logger.exception("------- tables --------")
+		except InsufficientPrivilege:
+			p_conn.rollback()
+			logger.error("- table {}.{}, insuficient privileges for reading".format(rc_row[0], rc_row[1]))
 
 
 def views(p_cursor, p_filters_cfg, out_dict):
@@ -1274,7 +1277,7 @@ def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir,
 			roles(cr, p_filters_cfg, out_dict)
 			
 			logger.info("reading tables ..")			
-			tables(cr, p_filters_cfg, out_dict, opt_rowcount_path=opt_rowcount_path)
+			tables(cn, cr, p_filters_cfg, out_dict, opt_rowcount_path=opt_rowcount_path)
 
 			unreadable_tables = {}
 			
