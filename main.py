@@ -812,7 +812,7 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 								with codecs.open(full_path, "r", "utf-8") as fl:
 									src = fl.read()
 									if simulupdcode and canuse_stdout:
-										logger.info("insert or update, in database, src of ", src[:60])
+										logger.info(f"insert or update, in database, src of {src[:60]}")
 									else:
 										
 										dropcmd = f"DROP FUNCTION {sch}.{pname}({diff_item['args']})"
@@ -854,7 +854,7 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 								if not fmt is None:
 									sqlstr = fmt % ("%s(%s)" % (diff_item["procname"], diff_item["args"]))
 									if simulupdcode and canuse_stdout:
-										logger.info("delete sqlstr", sqlstr)
+										logger.info(f"delete sqlstr: {sqlstr}")
 									else:
 										with cn.cursor() as cr:
 											cr.execute(sqlstr)
@@ -977,10 +977,10 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 		elif grpkeys[0] == "procedures":
 			
 			try:
-				_phase_label, op_content = p_op
+				op_content = p_op[1]
 			except:
 				logger = logging.getLogger('pgsourcing')	
-				logger.error("p_op:", p_op)
+				logger.error(f"p_op: {p_op}")
 				raise
 
 			assert len(op_content) == 3, f"length of {op_content} != 3"
