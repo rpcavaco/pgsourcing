@@ -945,8 +945,11 @@ def erase_diff_item(p_diff_dict, p_grpkeys):
 # Check change dict ops, clearing redundancies and spurious (mostly incomplete) entries		
 def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 
+	
 	def should_remove(p_isinsert, p_cr, p_op, p_pdiff_dict):
 
+		logger = logging.getLogger('pgsourcing')
+	
 		grpkeys = p_op[1]
 		if len(grpkeys) < 3:
 			erase_diff_item(p_pdiff_dict, grpkeys)
@@ -1000,19 +1003,33 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 				assert op_content[li] in curr_dicttree_level.keys(), f"{op_content[li]} not in {curr_dicttree_level.keys()}"
 				curr_dicttree_level = curr_dicttree_level[op_content[li]]
 
-			assert 'newvalue' in curr_dicttree_level.keys(), f"{'newvalue'} not in {curr_dicttree_level.keys()}"
-			curr_dicttree_level = curr_dicttree_level['newvalue']
+			assert "diffoper" in curr_dicttree_level.keys(), f"'diffoper' not in {curr_dicttree_level.keys()}"
 
-			assert 'args' in curr_dicttree_level.keys(), f"'args' not in {curr_dicttree_level.keys()}"
-			assert 'return_type' in curr_dicttree_level.keys(), f"'return_type' not in {curr_dicttree_level.keys()}"
+			if curr_dicttree_level["diffoper"] in ("insert", "update"):
 
-			args = curr_dicttree_level['args']
-			return_type = curr_dicttree_level['return_type']
+				# assert 'newvalue' in curr_dicttree_level.keys(), f"'newvalue' not in {curr_dicttree_level.keys()}"
+				try:
+					newvalue = curr_dicttree_level['newvalue']
+				except KeyError:
+					logger.error(f"curr_dicttree_level:{curr_dicttree_level}")
+					logger.exception("checkCDOps")
+					raise
 
-			p_cr.execute(SQL["PROC_CHECK"], (sch, name))
-			row = p_cr.fetchone()
-			if not row is None:
-				obj_exists = (row[0] == args and row[1] == return_type)
+				assert 'args' in newvalue.keys(), f"'args' not in {newvalue.keys()}"
+				assert 'return_type' in newvalue.keys(), f"'return_type' not in {newvalue.keys()}"
+
+				args = newvalue['args']
+				return_type = newvalue['return_type']
+
+				p_cr.execute(SQL["PROC_CHECK"], (sch, name))
+				row = p_cr.fetchone()
+				if not row is None:
+					obj_exists = (row[0] == args and row[1] == return_type)
+
+			else:
+
+				# HARDCODED: assumimos obj existe
+				obj_exists = True
 			
 		else:
 
