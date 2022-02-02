@@ -714,8 +714,8 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 							try:
 								out_sql_src.append("-- Op #%d" % operorder)
 							except:
-								logger.error(f"pre_privs: {pre_privs}")
-								logger.error(f"di_base: {di_base}")
+								logger.error("pre_privs:", pre_privs)
+								logger.error("di_base:", di_base)
 								raise
 						if di_base[user_name]['diffoper'] in ("update", "delete"):
 							if di_base[user_name]['diffoper'] == "delete":
