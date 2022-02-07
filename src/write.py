@@ -621,13 +621,13 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 	# delmode: NODEL DEL CASCADE 
 	if delmode is None or delmode == "NODEL":
 		tmpltd = "-- ALTER TABLE %s.%s"
-		tmplpd = "-- DROP FUNCTION %s.%s"
+		tmplpd = "-- DROP FUNCTION %s.%s(%s)"
 		tmplsd = "-- DROP SEQUENCE %s.%s"
 		tmplvd = "-- DROP VIEW %s.%s"
 		tmplmvd = "-- DROP MATERIALIZED VIEW %s.%s"
 	else:
 		tmpltd = "ALTER TABLE %s.%s"
-		tmplpd = "DROP FUNCTION %s.%s"
+		tmplpd = "DROP FUNCTION %s.%s(%s)"
 		tmplsd = "DROP SEQUENCE %s.%s"
 		tmplvd = "DROP VIEW %s.%s"
 		tmplmvd = "DROP MATERIALIZED VIEW %s.%s"
@@ -794,9 +794,9 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 			
 			for procname in sorted(currdiff_block[sch].keys()):
 
-				usable_proc = reverse_proc_fname(procname)
+				proc_blk = currdiff_block[sch][procname]	
+				usable_proc = proc_blk['procedure_name']
 
-				proc_blk = currdiff_block[sch][procname]				
 				if "diffoper" in proc_blk.keys():
 					
 					if len(p_updates_ids_list) < 1 or proc_blk["operorder"] in p_updates_ids_list:
@@ -814,9 +814,9 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 						elif proc_blk["diffoper"] == "delete":
 							
 							if delmode == "CASCADE":
-								out_sql_src.append((tmplpd + " CASCADE") % (sch, usable_proc))
+								out_sql_src.append((tmplpd + " CASCADE") % (sch, usable_proc, proc_blk['args']))
 							else:
-								out_sql_src.append(tmplpd % (sch, usable_proc))
+								out_sql_src.append(tmplpd % (sch, usable_proc, proc_blk['args']))
 					
 						elif proc_blk["diffoper"] == "update":
 							
@@ -824,7 +824,7 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 							do_replace = True
 							if "return_type" in proc_blk["changedkeys"].split(", ") or "args" in proc_blk["changedkeys"].split(", "):	
 								do_replace = False						
-								out_sql_src.append(tmplpd % (sch, usable_proc))
+								out_sql_src.append(tmplpd % (sch, usable_proc, proc_blk['args']))
 							# e "create function"
 							
 							flines = []
