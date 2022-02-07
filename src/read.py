@@ -605,16 +605,16 @@ def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict):
 			# else:
 				# pop = "False"
 			
-			if row["tablespace"] is None:
-				tblspc = p_deftablespace
-			else:
-				tblspc = row["tablespace"]
+			# if row["tablespace"] is None:
+			# 	tblspc = p_deftablespace
+			# else:
+			# 	tblspc = row["tablespace"]
 				
 			sch_dict[row["matviewname"]] = {
 				"mvdetails": {
 					"vowner": row["viewowner"],
-					"vdef": row["definition"],
-					"vtablespace": tblspc
+					"vdef": row["definition"]
+					# "vtablespace": tblspc
 				}
 			}
 		

@@ -90,9 +90,7 @@ from shutil import copyfile
 
 file_types = (IOBase,)
 
-
-
-    
+  
 class Singleton(object):
 	_instances = {}
 	def __new__(class_, *args, **kwargs):
@@ -1064,7 +1062,7 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 			if not already_tested:
 
 				if grpkeys[0] in ("tables", "sequences", "views", "matviews") and len(grpkeys) == 3:
-			
+
 					p_cr.execute(SQL["GENERIC_CHECK"], (sch, name))
 					row = p_cr.fetchone()
 					if not row is None:
@@ -1087,8 +1085,6 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 	cnobj = conns.getConn(p_connkey)	
 	cn = cnobj.getConn()
 	with cn.cursor() as cr:
-
-		# print("p_cd_ops:", p_cd_ops)
 
 		ops = p_cd_ops["insert"]
 		for op in ops:
