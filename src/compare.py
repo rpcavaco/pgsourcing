@@ -537,7 +537,10 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 
 					if klist[0] == "procedures" and len(klist) == 3:
 						diff_item["procedure_name"] = tmp_r[k]["procedure_name"]
-						diff_item["args"] = tmp_r[k]["args"]
+						if "args" in tmp_r[k].keys():
+							diff_item["args"] = tmp_r[k]["args"]
+						else:
+							diff_item["args"] = ""
 						diff_item["return_type"] = tmp_r[k]["return_type"]
 
 					o_cd_ops["delete"].append(('e', klist))
