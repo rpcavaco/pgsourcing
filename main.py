@@ -1264,6 +1264,8 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 				else:
 					diffdict = json.load(inputf)
 				inputf.close()
+
+		# print("diffdict:", diffdict)
 				
 		if delmode is None:
 			dlmd = "NODEL"
@@ -1288,6 +1290,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 
 			# Se a operacao for updref ou chkdest o dicionario check_dict sera 
 			#  preenchido.
+			# print("diffdict 2:", diffdict)
 			
 			update_oper_handler(p_proj, p_oper,  
 				diffdict, updates_ids=updates_ids, p_connkey=p_connkey, 

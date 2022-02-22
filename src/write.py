@@ -615,7 +615,7 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 		transformschema = None
 
 	out_sql_src = []
-	
+
 	logger = logging.getLogger('pgsourcing')
 	
 	# delmode: NODEL DEL CASCADE 
@@ -794,8 +794,9 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 			
 			for procname in sorted(currdiff_block[sch].keys()):
 
-				proc_blk = currdiff_block[sch][procname]	
-				usable_proc = proc_blk['procedure_name']
+				proc_blk = currdiff_block[sch][procname]
+				newval = proc_blk["newvalue"]	
+				usable_proc = newval['procedure_name']
 
 				if "diffoper" in proc_blk.keys():
 					
