@@ -26,6 +26,7 @@
 #=======================================================================
 
 import json    
+import logging
     
 from base64 import b64decode
 from os.path import exists
@@ -51,6 +52,9 @@ class Conn(object):
 			passw = b64decode(p_dict["password"]).decode("utf-8") 
 		except AttributeError:
 			passw = str(b64decode(p_dict["password"]))
+		except:
+			raise RuntimeError(f"pass: {p_dict['password']}")
+
 			
 		cndict = {}
 		for k in p_dict.keys():
@@ -147,6 +151,9 @@ class DBI(object):
 class Connections(object):
 	
 	def __init__(self, p_db_cfg_json, rootjsonkey=None, subkey=None):
+
+		logger = logging.getLogger('pgsourcing')	
+
 		self.currkey = None
 		self.conns = {}
 		with open(p_db_cfg_json) as cfgfl:
@@ -162,7 +169,7 @@ class Connections(object):
 					else:
 						self.conns[k] = Conn(root[k][subkey])
 				except Exception as e:
-					raise ConnectionError(f"Connections: Conn creation error for key '{k}'") from e
+					logger.exception(f"Connections: Conn creation error for key '{k}'")
 
 
 	def __del__(self):
