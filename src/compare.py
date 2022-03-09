@@ -466,10 +466,13 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 							prevlevel_diff = get_prevlevel_diff(diff_dict, klist)
 							if not prevlevel_diff is None:
 								for exist_tblname in prevlevel_diff.keys():
-									if prevlevel_diff[exist_tblname]["diffoper"] == "rename":
-										if prevlevel_diff[exist_tblname]["newvalue"] == k:
-											do_continue = False
-											break		
+									# print("aaaa:", prevlevel_diff[exist_tblname])
+									# print("bbbb:", exist_tblname)
+									if "diffoper" in prevlevel_diff[exist_tblname].keys():
+										if prevlevel_diff[exist_tblname]["diffoper"] == "rename":
+											if prevlevel_diff[exist_tblname]["newvalue"] == k:
+												do_continue = False
+												break		
 
 					# print(" *** left only B:", grpkey, k, level, "do_continue:", do_continue)
 

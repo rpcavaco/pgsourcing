@@ -128,6 +128,7 @@ def parse_args():
 	project_oriented.add_argument("-a", "--addnewproc", help="Generate a new empty procedure source file", action="store_true")
 	project_oriented.add_argument("-t", "--addnewtrig", help="Generate a new empty trigger source file", action="store_true")
 	project_oriented.add_argument("-u", "--simulupdcode", help="Activate simulation mode on 'updcodeinsrc' operation: actual update is replaced by stdout messages (without DDL)", action="store_true")
+	project_oriented.add_argument("-e", "--includetbspc", help="Include reference to tablespaces", action="store_true")
 
 	non_project = parser.add_argument_group('non_project', 'Non-project generic command options')
 	non_project.add_argument("-s", "--setup", help="Just generate a setup ZIP (ZIP will include the whole pgsourcing software and existing projects)", action="store_true")
@@ -353,7 +354,7 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 
 	conns = None
 	connkey = None
-	
+
 	if p_oper in OPS_DBCHECK:
 	
 		cfgpath = get_conn_cfg_path(p_proj)
@@ -474,13 +475,15 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 	cfgpath = get_conn_cfg_path(p_proj)
 	conns = Connections(cfgpath, subkey="conn")
 
-	if p_connkey is None:
-		if not conns.checkConn("dest"):
-			raise RuntimeError("default 'dest' connection not found, need to pass connection key to use")
-		else:
-			connkey = 'dest'
-	else:	
-		connkey = p_connkey		
+	if p_oper != "updref" and p_oper != "upddestscript":
+
+		if p_connkey is None:
+			if not conns.checkConn("dest"):
+				raise RuntimeError("default 'dest' connection not found, need to pass connection key to use")
+			else:
+				connkey = 'dest'
+		else:	
+			connkey = p_connkey		
 	
 	if p_oper == "updref":
 
