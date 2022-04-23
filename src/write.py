@@ -35,11 +35,15 @@ from copy import deepcopy
 
 # import pprint as pp
 
-SQL_CREATE_PK = """%s ADD CONSTRAINT %s PRIMARY KEY (%s)
+SQL_CREATE_PK_TBS = """%s ADD CONSTRAINT %s PRIMARY KEY (%s)
     USING INDEX TABLESPACE %s"""
     
-SQL_CREATE_UNIQUE = """%s ADD CONSTRAINT %s UNIQUE (%s)
+SQL_CREATE_UNIQUE_TBS = """%s ADD CONSTRAINT %s UNIQUE (%s)
     USING INDEX TABLESPACE %s"""
+
+SQL_CREATE_PK = """%s ADD CONSTRAINT %s PRIMARY KEY (%s)"""
+    
+SQL_CREATE_UNIQUE = """%s ADD CONSTRAINT %s UNIQUE (%s)"""	
 
 SQL_CREATE_CONSTR = "%s ADD CONSTRAINT %s %s"
 
@@ -216,7 +220,7 @@ def col_create(p_tname, p_colname, p_col):
 	
 	return colitems
 
-def table_operation(p_sch, p_tname, p_diff_item, p_delmode, p_out_sql_src):	
+def table_operation(p_sch, p_tname, p_diff_item, p_delmode, p_out_sql_src, usetbs=False):	
 
 	tmplt = "ALTER TABLE %s.%s"
 
@@ -267,7 +271,10 @@ def table_operation(p_sch, p_tname, p_diff_item, p_delmode, p_out_sql_src):
 		if "pkey" in p_diff_item["newvalue"].keys():										
 			for pkname in p_diff_item["newvalue"]["pkey"].keys():	
 				di = p_diff_item["newvalue"]["pkey"][pkname]
-				p_out_sql_src.append(SQL_CREATE_PK % (tmplt % (p_sch, p_tname), pkname, ",".join(di["columns"]), di["index_tablespace"]))	
+				if usetbs:
+					p_out_sql_src.append(SQL_CREATE_PK_TBS % (tmplt % (p_sch, p_tname), pkname, ",".join(di["columns"]), di["index_tablespace"]))	
+				else:
+					p_out_sql_src.append(SQL_CREATE_PK % (tmplt % (p_sch, p_tname), pkname, ",".join(di["columns"])))	
 
 		if "check" in p_diff_item["newvalue"].keys():	
 			for cname in p_diff_item["newvalue"]["check"].keys():	
@@ -282,12 +289,18 @@ def table_operation(p_sch, p_tname, p_diff_item, p_delmode, p_out_sql_src):
 		if "index" in p_diff_item["newvalue"].keys():	
 			for cname in p_diff_item["newvalue"]["index"].keys():	
 				di = p_diff_item["newvalue"]["index"][cname]
-				p_out_sql_src.append("%s TABLESPACE %s" % (di["idxdesc"], di["tablespace"]))						
+				if usetbs:
+					p_out_sql_src.append("%s TABLESPACE %s" % (di["idxdesc"], di["tablespace"]))				
+				else:
+					p_out_sql_src.append(di["idxdesc"])	
 
 		if "unique" in p_diff_item["newvalue"].keys():							
 			for cname in p_diff_item["newvalue"]["unique"].keys():	
 				di = p_diff_item["newvalue"]["unique"][cname]
-				p_out_sql_src.append(SQL_CREATE_UNIQUE % (tmplt % (p_sch, p_tname), cname, ",".join(di["columns"]), di["index_tablespace"]))									
+				if usetbs:
+					p_out_sql_src.append(SQL_CREATE_UNIQUE_TBS % (tmplt % (p_sch, p_tname), cname, ",".join(di["columns"]), di["index_tablespace"]))
+				else:
+					p_out_sql_src.append(SQL_CREATE_UNIQUE % (tmplt % (p_sch, p_tname), cname, ",".join(di["columns"])))								
 		if "trigger" in p_diff_item["newvalue"].keys():	
 			for trname in p_diff_item["newvalue"]["trigger"].keys():	
 				di = p_diff_item["newvalue"]["trigger"][trname]
@@ -367,92 +380,6 @@ def col_operation(docomment, p_sch, p_tname, p_colname, p_diff_item, p_delmode, 
 
 			p_out_sql_src.append("{} RENAME COLUMN {} TO {}".format(tmplt_new.format(p_sch, p_tname), p_colname, p_diff_item["newvalue"]))
 
-	# else:
-
-	# 	print("!! 362 !!:", list(p_diff_item.keys()))
-
-	# 	# TODO: verificar utilidade deste bloco que parece inalcancável
-		
-	# 	p_substitution = False
-	# 	for k in p_diff_item.keys():
-	# 		if k not in COL_ITEMS_CHG_AVOIDING_SUBSTITUTION:
-	# 			p_substitution = True
-	# 			break
-
-	# 	if not p_substitution:
-			
-	# 		for k in p_diff_item.keys():
-
-	# 			print("!! 372 !!:", k)
-				
-	# 			if not "operorder" in p_diff_item[k].keys():
-	# 				continue
-				
-	# 			if len(p_updates_ids_list) > 0 and not p_diff_item[k]["operorder"] in p_updates_ids_list:	
-	# 				continue
-					
-	# 			print_tablehdr(docomment, p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)	
-	# 			if docomment:			
-	# 				p_out_sql_src.append("-- Op #%d" % p_diff_item[k]["operorder"])	
-
-	# 			# if k == "defaultval":				
-	# 			# 	if p_diff_item[k]["diffoper"] == "delete":					
-	# 			# 		p_out_sql_src.append("ALTER TABLE %s.%s ALTER COLUMN %s DROP DEFAULT" % (p_sch, p_tname, p_colname))
-	# 			# 	elif p_diff_item[k]["diffoper"] in ("insert", "update"):	
-	# 			# 		newval = p_diff_item[k]["newvalue"]
-	# 			# 		if isinstance(newval, str):
-	# 			# 			tmpl = "ALTER TABLE %s.%s ALTER COLUMN %s SET DEFAULT '%s'"
-	# 			# 		else:
-	# 			# 			tmpl = "ALTER TABLE %s.%s ALTER COLUMN %s SET DEFAULT %s"
-	# 			# 		p_out_sql_src.append(tmpl % (p_sch, p_tname, p_colname, newval ))				
-	# 			if k == "defaultval":				
-	# 				if p_diff_item[k]["diffoper"] == "update":	
-	# 					newval = p_diff_item[k]["newvalue"]
-	# 					if newval != "NULL":
-	# 						if isinstance(newval, str):
-	# 							tmpl = "ALTER TABLE %s.%s ALTER COLUMN %s SET DEFAULT '%s'"
-	# 						else:
-	# 							tmpl = "ALTER TABLE %s.%s ALTER COLUMN %s SET DEFAULT %s"
-	# 						p_out_sql_src.append(tmpl % (p_sch, p_tname, p_colname, newval ))
-	# 					else:
-	# 						tmpl = "ALTER TABLE %s.%s ALTER COLUMN %s DROP DEFAULT"
-	# 						p_out_sql_src.append(tmpl % (p_sch, p_tname, p_colname ))
-	# 			elif k == "nullable":
-	# 				if p_diff_item[k]["diffoper"] == "update":
-	# 					if p_diff_item[k]["newvalue"] == "NO":
-	# 						p_out_sql_src.append("ALTER TABLE %s.%s ALTER COLUMN %s SET NOT NULL" % (p_sch, p_tname, p_colname))
-	# 					elif p_diff_item[k]["newvalue"] == "YES":
-	# 						p_out_sql_src.append("ALTER TABLE %s.%s ALTER COLUMN %s DROP NOT NULL" % (p_sch, p_tname, p_colname))
-							
-	# 	else:
-			
-	# 		print_tablehdr(docomment, p_sch, p_tname, p_out_sql_src, p_out_hdr_flag)
-			
-	# 		# remover ...
-	# 		p_out_sql_src.append(tmpltd % (p_sch, p_tname))
-			
-	# 		# ... e recriar
-	# 		colcreatitems = col_create(p_tname, p_colname, p_diff_item["newvalue"])
-	# 		cont0 = re.sub("\s\s+", " ",   "%s %s %s %s" % tuple(colcreatitems[1:]))
-	# 		p_out_sql_src.append("%s ADD COLUMN %s" % (tmplt % (p_sch, p_tname), cont0.strip()))
-
-# def update_search_path(p_function_body, p_schematrans):
-
-# 	global_changed = False
-# 	current_body = None
-
-# 	for trans_dict in p_schematrans:
-# 		# changed = False 
-# 		if current_body is None:
-# 			current_body = p_function_body
-# 		ret = re.sub(f"(search_path[%\('\sa-zA-Z_À-Ýà-ý0-9_\$,]+){trans_dict['src']}", f"\\1{trans_dict['dest']}", current_body)
-# 		if ret != current_body:
-# 			# changed = True
-# 			global_changed = True
-# 			current_body = ret
-
-# 	return global_changed, ret
-
 def transf_schema(p_function_body, p_schematrans):
 
 	current_body = None
@@ -467,7 +394,6 @@ def transf_schema(p_function_body, p_schematrans):
 			current_body = ret
 
 	return ret	
-
 
 def create_function_items(p_schema, p_name, p_args, p_rettype, p_langtype, p_owner, p_volatility, 
 	p_body, o_sql_linebuffer, return_table_defstr=None, replace=True):
@@ -590,7 +516,6 @@ def create_trigger(p_trname, p_schema, p_tname, p_new_value, o_sql_linebuffer):
 	o_sql_linebuffer.append("\tFOR EACH %s\n" % p_new_value["trigger_level"])
 	o_sql_linebuffer.append("\tEXECUTE PROCEDURE %s.%s();\n" % (p_new_value["function_schema"], p_new_value["function_name"]))
 	
-	
 def print_tablehdr(p_docomment, p_sch, p_name, p_out_sql_src, o_flag_byref):
 	if p_docomment and not o_flag_byref[0]:
 		p_out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Table %s.%s\n" % (p_sch, p_name) + "-- " + "".join(['#'] * 77))
@@ -606,7 +531,7 @@ def print_matviewhdr(p_docomment, p_sch, p_name, p_out_sql_src, o_flag_byref):
 		p_out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Materialized view %s.%s\n" % (p_sch, p_name) + "-- " + "".join(['#'] * 77))
 		o_flag_byref[0] = True
 
-def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomment=True):
+def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomment=True, usetbs=False):
 
 	diff_content = p_difdict["content"]	
 	if "transformschema" in p_difdict.keys():
@@ -919,7 +844,7 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 						print_tablehdr(docomment, sch, tname, out_sql_src, header_printed)	
 						if docomment:				
 							out_sql_src.append("-- Op #%d" % diff_item["operorder"])
-						table_operation(sch, tname, diff_item, delmode, out_sql_src)
+						table_operation(sch, tname, diff_item, delmode, out_sql_src, usetbs=usetbs)
 					
 				else:
 
@@ -953,7 +878,10 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 										if di["diffoper"] == "update":
 											out_sql_src.append(xtmpl % (tmpltd % (sch, tname), pkname))
 										nv = di["newvalue"]
-										out_sql_src.append(SQL_CREATE_PK % (tmplt % (sch, tname), pkname, ",".join(nv["columns"]), nv["index_tablespace"]))	
+										if usetbs:
+											out_sql_src.append(SQL_CREATE_PK_TBS % (tmplt % (sch, tname), pkname, ",".join(nv["columns"]), nv["index_tablespace"]))	
+										else:
+											out_sql_src.append(SQL_CREATE_PK % (tmplt % (sch, tname), pkname, ",".join(nv["columns"])))	
 									elif di["diffoper"] == "delete":
 										out_sql_src.append(xtmpl % (tmpltd % (sch, tname), pkname))								
 
@@ -1021,7 +949,10 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 										out_sql_src.append(xtmpl % (sch, cname))
 									if di["diffoper"] in ("insert", "update"):
 										nv = di["newvalue"]
-										out_sql_src.append("%s TABLESPACE %s" % (nv["idxdesc"], nv["tablespace"]))						
+										if usetbs:
+											out_sql_src.append("%s TABLESPACE %s" % (nv["idxdesc"], nv["tablespace"]))
+										else:
+											out_sql_src.append(nv["idxdesc"])						
 
 					if "unique" in diff_item.keys():							
 
@@ -1041,7 +972,10 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 										if di["diffoper"] == "update":
 											out_sql_src.append(xtmpl % (tmpltd % (sch, tname), pkname))
 										nv = di["newvalue"]
-										out_sql_src.append(SQL_CREATE_UNIQUE % (tmplt % (sch, tname), pkname, ",".join(nv["columns"]), nv["index_tablespace"]))									
+										if usetbs:
+											out_sql_src.append(SQL_CREATE_UNIQUE_TBS % (tmplt % (sch, tname), pkname, ",".join(nv["columns"]), nv["index_tablespace"]))
+										else:
+											out_sql_src.append(SQL_CREATE_UNIQUE % (tmplt % (sch, tname), pkname, ",".join(nv["columns"])))
 									elif di["diffoper"] == "delete":
 										out_sql_src.append(xtmpl % (tmpltd % (sch, tname), pkname))
 
@@ -1226,10 +1160,12 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 						if diff_item["diffoper"] in ("update", "delete"):
 							out_sql_src.append(tmplmvd % (sch,vname))
 						if diff_item["diffoper"] in ("update", "insert"):
-							# tmplv = "CREATE MATERIALIZED VIEW %s.%s TABLESPACE %s AS %s" 
-							# out_sql_src.append(tmplv % (sch,vname, di["vtablespace"], di["vdef"]))
-							tmplv = "CREATE MATERIALIZED VIEW %s.%s AS %s" 
-							out_sql_src.append(tmplv % (sch,vname, di["vdef"]))
+							if usetbs:
+								tmplv = "CREATE MATERIALIZED VIEW %s.%s TABLESPACE %s AS %s" 
+								out_sql_src.append(tmplv % (sch,vname, di["vtablespace"], di["vdef"]))
+							else:
+								tmplv = "CREATE MATERIALIZED VIEW %s.%s AS %s" 
+								out_sql_src.append(tmplv % (sch,vname, di["vdef"]))
 								
 							if "vowner" in di.keys():
 								out_sql_src.append("ALTER TABLE %s.%s OWNER to %s" % (sch, vname, di["vowner"]))

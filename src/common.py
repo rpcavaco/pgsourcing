@@ -4,7 +4,7 @@ import hashlib
 import logging
 
 ########################################################################
-# Instalation-relatec configs
+# Instalation-related configs
 ########################################################################
 
 # Config de logging

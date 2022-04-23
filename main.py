@@ -121,8 +121,8 @@ def parse_args():
 	project_oriented.add_argument("-o", "--output", help="Output file", action="store")
 	project_oriented.add_argument("-i", "--input", help="Input file (REQUIRED on 'oper' %s)" % ops_input, action="store")
 	project_oriented.add_argument("-c", "--connkey", help="Database connection key on project config (default is 'src' for 'chksrc' op)", action="store")
-	project_oriented.add_argument("-p", "--includepublic", help="Include public schema", action="store_true")
-	project_oriented.add_argument("-r", "--removecolorder", help="Remove table column ordering", action="store_true")
+	# project_oriented.add_argument("-p", "--includepublic", help="Include public schema", action="store_true")
+	# project_oriented.add_argument("-r", "--removecolorder", help="Remove table column ordering", action="store_true")
 	project_oriented.add_argument("-g", "--genprocsdir", help="Procedure source folder name to create", action="store")
 	project_oriented.add_argument("-d", "--updateids", help="Update ids list, to filter tasks in update operation", action="store")
 	project_oriented.add_argument("-a", "--addnewproc", help="Generate a new empty procedure source file", action="store_true")
@@ -345,8 +345,7 @@ def create_new_proj(p_newproj):
 # ##################################################_###################		
 
 def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir, 
-		p_outprocsdestdir, o_checkdict, o_replaces, p_connkey=None, 
-		include_public=False, include_colorder=False):
+		p_outprocsdestdir, o_checkdict, o_replaces, p_connkey=None):
 	
 	logger = logging.getLogger('pgsourcing')	
 	
@@ -401,8 +400,7 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 				o_replaces.update(filters_cfg["transformschema"])
 
 			dbreader(conns.getConn(connkey), filters_cfg, o_checkdict, p_outtables_dir, 
-					outprocs_dir=outprocs_dir, include_public=include_public, 
-					include_colorder=include_colorder, is_upstreamdb=is_upstreamdb, 
+					outprocs_dir=outprocs_dir, is_upstreamdb=is_upstreamdb, 
 					opt_rowcount_path=csv_rowcount_table_path)
 		
 	return ret, connkey
@@ -442,8 +440,7 @@ def process_intervals_string(p_input_str):
 	
 def update_oper_handler(p_proj, p_oper, diffdict, 
 		updates_ids=None, p_connkey=None, limkeys=None, 
-		include_public=False, include_colorder=False,
-		output=None, canuse_stdout=False, delmode="NODEL"):
+		output=None, canuse_stdout=False, delmode="NODEL", usetbs=False):
 
 	# delmode: NODEL DEL CASCADE 
 	
@@ -511,7 +508,7 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 		assert not diffdict is None
 		
 		out_sql_src = updatedb(diffdict, upd_ids_list, limkeys_list, delmode=delmode)		
-		do_linesoutput(out_sql_src, output=output, interactive=canuse_stdout)
+		do_linesoutput(out_sql_src, output=output, interactive=canuse_stdout, usetbs=usetbs)
 
 		logger.info("dest change script for proj. %s, %s" % (p_proj,output))
 		
@@ -520,7 +517,7 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 		assert not diffdict is None
 		
 		output = StringIO()
-		out_sql_src = updatedb(diffdict, upd_ids_list, limkeys_list, delmode=delmode, docomment=False)			
+		out_sql_src = updatedb(diffdict, upd_ids_list, limkeys_list, delmode=delmode, docomment=False, usetbs=usetbs)			
 		#do_linesoutput(out_sql_src, output=output, interactive=False)		
 		#script = output.getvalue()
 		
@@ -1090,8 +1087,8 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 
 
 def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=None, 
-		canuse_stdout=False, include_public=False, include_colorder=False, 
-		updates_ids=None, limkeys=None, delmode=None, simulupdcode=False):
+		canuse_stdout=False, updates_ids=None, limkeys=None, 
+		delmode=None, simulupdcode=False, usetbs=False):
 	
 	opordmgr = OpOrderMgr()
 	
@@ -1120,8 +1117,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 
 	comparison_mode, connkey = check_oper_handler(p_proj, p_oper, 
 		refcodedir, reftablesdir, destcodedir, check_dict, \
-		replacements, p_connkey=p_connkey, include_public=include_public, 
-		include_colorder=include_colorder)
+		replacements, p_connkey=p_connkey)
 
 	# print("check_dict:", p_oper, check_dict.keys())
 	
@@ -1293,9 +1289,8 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 			
 			update_oper_handler(p_proj, p_oper,  
 				diffdict, updates_ids=updates_ids, p_connkey=p_connkey, 
-				limkeys=limkeys, include_public=include_public, 
-				include_colorder=include_colorder, output=output, 
-				canuse_stdout=canuse_stdout, delmode=dlmd)
+				limkeys=limkeys, output=output, 
+				canuse_stdout=canuse_stdout, delmode=dlmd, usetbs=usetbs)
 					
 	
 # ######################################################################
@@ -1640,12 +1635,13 @@ def cli_main():
 						main(proj, operitem, args.connkey, args.genprocsdir, 
 								output=streams[1], inputf=streams[0], 
 								canuse_stdout=True, 
-								include_public=args.includepublic, 
-								include_colorder = not args.removecolorder,
+								# include_public=args.includepublic, 
+								# include_colorder = not args.removecolorder,
 								updates_ids = args.updateids,
 								limkeys = args.limkeys,
 								delmode = args.delmode,
-								simulupdcode = args.simulupdcode)
+								simulupdcode = args.simulupdcode,
+								usetbs = args.includetbspc)
 
 						if oi < len(operlist)-1:
 							
@@ -1661,12 +1657,13 @@ def cli_main():
 					main(proj, args.oper, args.connkey, args.genprocsdir, 
 							output=args.output, inputf=args.input, 
 							canuse_stdout=True, 
-							include_public=args.includepublic, 
-							include_colorder = not args.removecolorder,
+							# include_public=args.includepublic, 
+							# include_colorder = not args.removecolorder,
 							updates_ids = args.updateids,
 							limkeys = args.limkeys,
 							delmode = args.delmode,
-							simulupdcode = args.simulupdcode)
+							simulupdcode = args.simulupdcode,
+							usetbs = args.includetbspc)
 					
 	except:
 		logger.exception("")

@@ -263,7 +263,7 @@ def get_grants(p_the_dict, p_cursor, forschemata=False):
 			
 
 	
-def schemata(p_cursor, p_filters_cfg, p_include_public, p_db_direction, out_dict):
+def schemata(p_cursor, p_filters_cfg, p_db_direction, out_dict):
 	
 	if "schema" in p_filters_cfg and len(p_filters_cfg["schema"]) > 0:
 		sql = "%s %s" % (SQL["SCHEMAS"], gen_where_from_list("schema_name", p_filters_cfg["schema"]))
@@ -288,8 +288,8 @@ def schemata(p_cursor, p_filters_cfg, p_include_public, p_db_direction, out_dict
 		schema_owner = row["schema_owner"]
 		if schema_name.startswith("pg_") or schema_name == "information_schema":
 			continue
-		if schema_name == "public" and not p_include_public:
-			continue
+		# if schema_name == "public" and not p_include_public:
+		# 	continue
 
 		sch_found = True
 
@@ -625,7 +625,7 @@ def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict):
 			get_grants(the_dict, p_cursor)
 
 			
-def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
+def columns(p_cursor, o_unreadable_tables_dict, out_dict):
 	
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
 	
@@ -681,8 +681,8 @@ def columns(p_cursor, p_include_colorder, o_unreadable_tables_dict, out_dict):
 				# print("** row column_default", row["column_default"])
 
 				col_dict = cols_dict[row["column_name"]] = {}
-				if p_include_colorder:
-					col_dict["ordpos"] = row["ordinal_position"]
+				#if p_include_colorder:
+				col_dict["ordpos"] = row["ordinal_position"]
 				col_dict["type"] = dt
 				col_dict["nullable"] = row["is_nullable"]
 				if not row["column_default"] is None:
@@ -1246,8 +1246,7 @@ def paramtables(p_cursor, p_filters_cfg, p_gendumpsdir):
 				p_cursor.copy_to(fp, ftname)
 						
 def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir, 
-		outprocs_dir=None, include_public=False, include_colorder=False, 
-		is_upstreamdb=None, opt_rowcount_path=None):
+		outprocs_dir=None, is_upstreamdb=None, opt_rowcount_path=None):
 
 	logger = logging.getLogger('pgsourcing')
 	with p_conn as cnobj:
@@ -1273,7 +1272,7 @@ def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir,
 			
 			logger.info("reading roles and schemata ..")
 			
-			schemata(cr, p_filters_cfg, include_public, db_direction, out_dict)			
+			schemata(cr, p_filters_cfg, db_direction, out_dict)			
 			ownership(cr, p_filters_cfg, out_dict)		
 			roles(cr, p_filters_cfg, out_dict)
 			
@@ -1283,7 +1282,7 @@ def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir,
 			unreadable_tables = {}
 			
 			logger.info("reading cols ..")
-			columns(cr, include_colorder, unreadable_tables, out_dict)		
+			columns(cr, unreadable_tables, out_dict)		
 			
 			#print("ur tables:", unreadable_tables)
 			
