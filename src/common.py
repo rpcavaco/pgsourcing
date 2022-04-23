@@ -38,6 +38,7 @@ OPS_HELP = {
 		"chkdest": "compare reference local repository to destination (production) database",
 		"chksrccode": "compare source code files to reference local repository",
 		"dropref": "drop reference data, becase it became invalid, e.g., existing storage format version was superseded by a new one, imeplemented in the software",
+		# "getcode": "check source (development) database to just refill 'code' folder",
 		"updref": "update reference local repository from source (development) database",
 		"upddestscript": "generate SQL and DDL script to update destination (production) database, includes procedural code",
 		"upddestdirect": "directly update destination (production) database (should 'upddestscript' first to check all changes prior to update), includes procedural code",

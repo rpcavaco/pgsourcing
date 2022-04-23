@@ -360,7 +360,7 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 		conns = Connections(cfgpath, subkey="conn")
 		
 		if p_connkey is None:	
-			if p_oper == "chksrc":
+			if p_oper == "chksrc": # or p_oper == "getcode":
 				if not conns.checkConn("src"):
 					raise RuntimeError("Chksrc, implicit 'src' connection is not defined, must provide an explicit conn key using -c / --connkey option")
 				else:
@@ -376,6 +376,7 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 		csv_rowcount_table_path = get_rowcount_table_file(p_proj, connkey)
 
 		is_upstreamdb = None
+		code_only = False
 		
 		if p_oper == "chksrc":
 
@@ -390,7 +391,15 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 			outprocs_dir = p_outprocsdestdir
 			ret = "From REF"
 			is_upstreamdb = False
-		
+
+		# elif p_oper == "getcode":
+
+		# 	logger.info("checking source (get code only), proj:%s  oper:%s" % (p_proj,p_oper))
+		# 	outprocs_dir = p_outprocsdir
+		# 	ret = "From SRC"
+		# 	is_upstreamdb = True
+		# 	code_only = True
+					
 		if not connkey is None:
 			
 			filters_cfg = get_filters_cfg(p_proj, connkey)
@@ -401,7 +410,7 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 
 			dbreader(conns.getConn(connkey), filters_cfg, o_checkdict, p_outtables_dir, 
 					outprocs_dir=outprocs_dir, is_upstreamdb=is_upstreamdb, 
-					opt_rowcount_path=csv_rowcount_table_path)
+					opt_rowcount_path=csv_rowcount_table_path, code_only=code_only)
 		
 	return ret, connkey
 
@@ -1654,16 +1663,37 @@ def cli_main():
 
 				else:   # NOT args.oper in OPS_INPUT OR NOT args.input is None
 
-					main(proj, args.oper, args.connkey, args.genprocsdir, 
-							output=args.output, inputf=args.input, 
-							canuse_stdout=True, 
-							# include_public=args.includepublic, 
-							# include_colorder = not args.removecolorder,
-							updates_ids = args.updateids,
-							limkeys = args.limkeys,
-							delmode = args.delmode,
-							simulupdcode = args.simulupdcode,
-							usetbs = args.includetbspc)
+					operitem = args.oper
+					operlist = [args.oper]
+					streams = []
+					while operitem in OPS_PRECEDENCE.keys():					
+						operitem = OPS_PRECEDENCE[operitem]
+						operlist.insert(0, operitem)
+
+					for oi, operitem in enumerate(operlist):
+
+						# If op not in OPS_INPUT, op chain does not require chaining 
+						#   of input / output channels.
+						# Therefore, given input (if any) is passed to first op in chain
+						#   and given output (if any) is passed to last op in chain
+
+						inputf = None
+						outf = None
+						if oi == 0:
+							inputf = args.input
+						if oi == len(operlist)-1:
+							outf = args.output
+
+						main(proj, operitem, args.connkey, args.genprocsdir, 
+								output=outf, inputf=inputf, 
+								canuse_stdout=True, 
+								# include_public=args.includepublic, 
+								# include_colorder = not args.removecolorder,
+								updates_ids = args.updateids,
+								limkeys = args.limkeys,
+								delmode = args.delmode,
+								simulupdcode = args.simulupdcode,
+								usetbs = args.includetbspc)
 					
 	except:
 		logger.exception("")

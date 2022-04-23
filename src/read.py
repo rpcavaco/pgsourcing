@@ -1246,7 +1246,7 @@ def paramtables(p_cursor, p_filters_cfg, p_gendumpsdir):
 				p_cursor.copy_to(fp, ftname)
 						
 def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir, 
-		outprocs_dir=None, is_upstreamdb=None, opt_rowcount_path=None):
+		outprocs_dir=None, is_upstreamdb=None, opt_rowcount_path=None, code_only=False):
 
 	logger = logging.getLogger('pgsourcing')
 	with p_conn as cnobj:
@@ -1272,48 +1272,56 @@ def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir,
 			
 			logger.info("reading roles and schemata ..")
 			
-			schemata(cr, p_filters_cfg, db_direction, out_dict)			
-			ownership(cr, p_filters_cfg, out_dict)		
-			roles(cr, p_filters_cfg, out_dict)
-			
-			logger.info("reading tables ..")			
-			tables(cn, cr, p_filters_cfg, out_dict, opt_rowcount_path=opt_rowcount_path)
+			schemata(cr, p_filters_cfg, db_direction, out_dict)		
 
-			unreadable_tables = {}
+			if not code_only:
+
+				ownership(cr, p_filters_cfg, out_dict)		
+				roles(cr, p_filters_cfg, out_dict)
+				
+				logger.info("reading tables ..")			
+				tables(cn, cr, p_filters_cfg, out_dict, opt_rowcount_path=opt_rowcount_path)
+
+				unreadable_tables = {}
+				
+				logger.info("reading cols ..")
+				columns(cr, unreadable_tables, out_dict)		
+				
+				#print("ur tables:", unreadable_tables)
+				
+				logger.info("reading triggers ..")
+				triggers(cr, trigger_functions, out_dict)	
 			
-			logger.info("reading cols ..")
-			columns(cr, unreadable_tables, out_dict)		
-			
-			#print("ur tables:", unreadable_tables)
-			
-			logger.info("reading triggers ..")
-			triggers(cr, trigger_functions, out_dict)	
-			
-		logger.info("reading sequences ..")
-		sequences(cnobj, majorversion, out_dict)
+		if not code_only:
+			logger.info("reading sequences ..")
+			sequences(cnobj, majorversion, out_dict)
 		
 		with cn.cursor(cursor_factory=cnobj.dict_cursor_factory) as cr:
 			
-			logger.info("reading constraints ..")
-			constraints(cr, out_dict["pg_metadata"]["tablespace"], out_dict)
-			
-			logger.info("reading indexes ..")
-			indexes(cr, out_dict["pg_metadata"]["tablespace"], out_dict)
+			if not code_only:
 
-			logger.info("reading views ..")			
-			views(cr, p_filters_cfg, out_dict)
+				logger.info("reading constraints ..")
+				constraints(cr, out_dict["pg_metadata"]["tablespace"], out_dict)
+				
+				logger.info("reading indexes ..")
+				indexes(cr, out_dict["pg_metadata"]["tablespace"], out_dict)
 
-			logger.info("reading mat.views ..")			
-			matviews(cr, p_filters_cfg, 
-			out_dict["pg_metadata"]["tablespace"], out_dict)
+				logger.info("reading views ..")			
+				views(cr, p_filters_cfg, out_dict)
+
+				logger.info("reading mat.views ..")			
+				matviews(cr, p_filters_cfg, 
+				out_dict["pg_metadata"]["tablespace"], out_dict)
 					
 			logger.info("reading procedures ..")
 			procs(cr, p_filters_cfg, trigger_functions, majorversion, out_dict, genprocsdir=outprocs_dir)
 		
-		with cn.cursor() as cr:
+		if not code_only:
 
-			logger.info("reading parameter table data ..")
-			paramtables(cr, p_filters_cfg, outtables_dir)
+			with cn.cursor() as cr:
+
+				logger.info("reading parameter table data ..")
+				paramtables(cr, p_filters_cfg, outtables_dir)
 						
 		logger.info("reading finished.")
 			
