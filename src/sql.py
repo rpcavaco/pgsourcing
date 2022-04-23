@@ -207,12 +207,13 @@ SQL = {
 				pg_indexes
 			WHERE
 				schemaname = %s and tablename = %s""",
-	"PROCS_PRE11": """SELECT procedure_schema, procedure_name, args, return_type,
+	"PROCS_PRE11": """SELECT procedure_schema, procedure_name, args, fargs, return_type,
 				procedure_owner, language_type, %s, provolatile
 			FROM
 			  (SELECT p.pronamespace::regnamespace::text as procedure_schema, 
 				p.proname AS procedure_name,
 				pg_get_function_identity_arguments(p.oid) args, 
+				pg_get_function_arguments(p.oid) fargs, 
 				t1.typname AS return_type,
 				proowner::regrole::text AS procedure_owner,
 				l.lanname AS language_type,
@@ -225,12 +226,13 @@ SQL = {
 				-- and p.prokind in ('f', 'p')
 				AND NOT p.proisagg) a
 				where not procedure_schema in ('pg_catalog', 'information_schema')""" % (PROC_SRC_BODY_FNAME,PROC_SRC_BODY_FNAME),
-	"PROCS_FROM11": """SELECT procedure_schema, procedure_name, args, return_type,
+	"PROCS_FROM11": """SELECT procedure_schema, procedure_name, args, fargs, return_type,
 				procedure_owner, language_type, %s, provolatile
 			FROM
 			  (SELECT p.pronamespace::regnamespace::text as procedure_schema, 
 				p.proname AS procedure_name,
 				pg_get_function_identity_arguments(p.oid) args, 
+				pg_get_function_arguments(p.oid) fargs, 
 				t1.typname AS return_type,
 				proowner::regrole::text AS procedure_owner,
 				l.lanname AS language_type,

@@ -1073,7 +1073,7 @@ AS $BODY$\n"""
 	if return_type is None:
 		return_type = p_row["return_type"]
 
-	return template % (p_sch, p_row["procedure_name"], p_row["args"],
+	return template % (p_sch, p_row["procedure_name"], p_row["fargs"],
 		return_type, p_row["language_type"], volatdict[p_row["provolatile"]])
 
 def gen_proc_ftr(p_sch, p_row):
@@ -1085,6 +1085,7 @@ ALTER FUNCTION %s.%s(%s) OWNER TO %s;"""
 		p_row["procedure_owner"])
 
 def gen_proc_file(p_genprocsdir, p_schema, p_proc_row, winendings=False):
+	
 	fname = gen_proc_fname_row(p_proc_row)
 	complfname = "%s.%s.sql" % (p_schema, fname) 
 	
@@ -1120,7 +1121,7 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dic
 			trig_dict[tr_schema] = []
 		trig_dict[tr_schema].append(tr_funcname)
 
-	items = ["procedure_name", "args", "return_type", "procedure_owner", 
+	items = ["procedure_name", "args", "fargs", "return_type", "procedure_owner", 
 			 "language_type", PROC_SRC_BODY_FNAME, "provolatile"]
 
 	if p_majorversion < 11:

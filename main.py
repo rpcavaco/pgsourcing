@@ -668,10 +668,11 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 
 					patt1 = "function[\s]+([^\)]+\))"
 					patt2 = "\(([^\)]+)\)"
+					patt3 = "[\s]+default[\s]+[^,$]+"
 
 					mo = re.search(patt1, srca, re.I)
 					function_complete_name = None
-					args = None
+					fargs = None
 					if not mo is None:
 						function_complete_name = mo.group(1)
 					else:
@@ -680,14 +681,14 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 					assert not function_complete_name is None
 					mo2 = re.search(patt2, function_complete_name, re.I)
 					if not mo2 is None:
-						args = mo2.group(1)
+						fargs = mo2.group(1)
 
-					if not args is None:
-						args_str = args
+					if not fargs is None:
+						fargs_str = fargs
+						args_str = re.sub(patt3, '', fargs, flags=re.I)
 					else:
-						args_str = ""
-
-					# print(f" function '{fl}' args: '{args_str}'")
+						fargs_str = ""
+						args_str = ""					
 
 					# if procedure doesn't exist in 'code' transient folder
 					if not exists(topath):
@@ -702,7 +703,8 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 							di = procs_dict[revdict["procschema"]][revdict["procname"]] = {
 								"diffoper": "insert",
 								"fname": fll,
-								"args": args
+								"args": args_str,
+								"fargs": fargs_str
 							}
 							p_opordmgr.setord(di)
 						
@@ -731,7 +733,8 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 									"diffoper": "update",
 									"difflines": copy(diff),
 									"fname": fll,
-									"args": args
+									"args": args_str,
+									"fargs": fargs_str
 								}
 								p_opordmgr.setord(di)
 

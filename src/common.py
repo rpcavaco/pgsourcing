@@ -30,7 +30,7 @@ OPS_CODE = ["chksrccode", "updcodeinsrc"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
 
-STORAGE_VERSION = 7
+STORAGE_VERSION = 8
 
 OPS_HELP = {
 	"en": {
@@ -242,3 +242,4 @@ def reverse_proc_fname(p_fname, o_dict):
 # 4 > 5 (11/01/2022) - Changed source file naming convention, such names are procedure  unique in reference repositoru
 
 # 6 > 7 (23/04/2022) - Procedure source file naming was changed - function signatures in filename were normalized to short datatype aliases like varchar; also naming was different when read form database from when creating a new file
+# 7 > 8 (23/04/2022) - Procedure item 'fargs' containing full procedure args including defaults
