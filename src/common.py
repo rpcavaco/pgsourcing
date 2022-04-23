@@ -1,6 +1,7 @@
 import logging
 import re
 import hashlib
+import logging
 
 ########################################################################
 # Instalation-relatec configs
@@ -29,7 +30,7 @@ OPS_CODE = ["chksrccode", "updcodeinsrc"]
 PROJECTDIR = "projetos"
 PROC_SRC_BODY_FNAME = "body"
 
-STORAGE_VERSION = 6
+STORAGE_VERSION = 7
 
 OPS_HELP = {
 	"en": {
@@ -124,11 +125,44 @@ UPPERLEVELOPS = { "pkey": 1, "cols": 1, "check": 1, "index": 1, "unique": 1, "tr
 
 
 def _condensed_pgdtype(p_typestr):
-	if len(p_typestr) > 4:
-		hashv = hashlib.sha1(p_typestr.encode("UTF-8")).hexdigest()
-		ret = p_typestr[:2] + hashv[:2]
+
+	l_p_typestr = p_typestr.lower()
+	if l_p_typestr == "character varying":
+		typstr = "varchar"
+	elif l_p_typestr == "double precision":
+		typstr = "float8"
+	elif l_p_typestr == "bit varying":
+		typstr = "varbit"
+	elif l_p_typestr == "timestamp without timezone":
+		typstr = "timestamp"
+	elif l_p_typestr == "timestamp with timezone":
+		typstr = "timestamptz"
+	elif l_p_typestr == "time without timezone":
+		typstr = "time"
+	elif l_p_typestr == "time with timezone":
+		typstr = "timetz"
+	elif l_p_typestr == "bigint":
+		typstr = "int8"
+	elif l_p_typestr == "bigserial":
+		typstr = "serial8"
+	elif l_p_typestr == "character":
+		typstr = "char"
+	elif l_p_typestr == "integer":
+		typstr = "int4"
+	elif l_p_typestr == "real":
+		typstr = "float4"
+	elif l_p_typestr == "smallint":
+		typstr = "int2"
+	elif l_p_typestr == "smallserial":
+		typstr = "serial2"
 	else:
-		ret = p_typestr
+		typstr = l_p_typestr
+
+	if len(typstr) > 4:
+		hashv = hashlib.sha1(typstr.encode("UTF-8")).hexdigest()
+		ret = typstr[:2] + hashv[:2]
+	else:
+		ret = typstr
 	return ret
 
 def gen_proc_fname(p_pname, p_rettype, p_argtypes_list):
@@ -148,8 +182,27 @@ def gen_proc_fname(p_pname, p_rettype, p_argtypes_list):
 def gen_proc_fname_argsstr(p_pname, p_rettype, p_args):
 	
 	if p_args:
-		argtypeslist = [spl.split(" ")[1] for spl in re.split(",[ ]+", 
-		p_args)]
+		argtypeslist = []
+		for spl in re.split(",[ ]+", p_args):
+			splits = spl.split(" ")
+			if splits[1] == "character" and splits[2] == "varying":
+				typstr = splits[1] + " " + splits[2]
+			elif splits[1] == "double" and splits[2] == "precision":
+				typstr = splits[1] + " " + splits[2]
+			elif splits[1] == "bit" and splits[2] == "varying":
+				typstr = splits[1] + " " + splits[2]
+			elif splits[1] == "timestamp" and splits[2] == "without":
+				typstr = splits[1] + " " + splits[2] +  " " + splits[3]
+			elif splits[1] == "timestamp" and splits[2] == "with":
+				typstr = splits[1] + " " + splits[2] +  " " + splits[3]
+			elif splits[1] == "time" and splits[2] == "without":
+				typstr = splits[1] + " " + splits[2] +  " " + splits[3]
+			elif splits[1] == "time" and splits[2] == "with":
+				typstr = splits[1] + " " + splits[2] +  " " + splits[3]
+			else:
+				typstr = splits[1]
+			argtypeslist.append(typstr)
+		#argtypeslist = [spl.split(" ")[1] for spl in re.split(",[ ]+", p_args)]
 		ret = gen_proc_fname(p_pname, p_rettype, argtypeslist)
 	else:
 		ret = gen_proc_fname(p_pname, p_rettype, [])
@@ -162,8 +215,15 @@ def gen_proc_fname_row(p_row):
 			p_row["return_type"], p_row["args"])
 	
 def reverse_proc_fname(p_fname, o_dict):
-	
-	fullname, rest = p_fname.split("#")
+
+	logger = logging.getLogger('pgsourcing')
+
+	try:
+		fullname, rest = p_fname.split("#")
+	except Exception as e:
+		logger.exception(f"invalid procedure sorce file name '{p_fname}'")
+		raise
+		
 	schema, procname = fullname.split(".")
 	
 	if "$" in rest:
@@ -180,3 +240,5 @@ def reverse_proc_fname(p_fname, o_dict):
 # Storage version history
 # 
 # 4 > 5 (11/01/2022) - Changed source file naming convention, such names are procedure  unique in reference repositoru
+
+# 6 > 7 (23/04/2022) - Procedure source file naming was changed - function signatures in filename were normalized to short datatype aliases like varchar; also naming was different when read form database from when creating a new file

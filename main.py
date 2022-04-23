@@ -644,6 +644,8 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 					fll = fl.lower()
 					if not fll.endswith(".sql"):
 						continue
+					if fll.startswith("_"):
+						continue
 						
 					frompath = path_join(r, fl)
 					assert exists(frompath), f"missing source file: {frompath}"
@@ -766,8 +768,9 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 	else:
 		ck = "src"
 
-	cfgpath = get_conn_cfg_path(p_proj)
 	conns = Connections(cfgpath, subkey="conn")		
+	if not conns.checkConn(ck):
+		raise RuntimeError(f"default '{ck}' connection not found, need to pass connection key to use")
 
 	upd_ids_list = []
 	if not updates_ids is None:
@@ -779,17 +782,7 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 		elif isinstance(updates_ids, list):
 			upd_ids_list = updates_ids
 
-	if p_connkey is None:
-	
-		if not conns.checkConn("dest"):
-			raise RuntimeError("default 'dest' connection not found, need to pass connection key to use")
-		else:
-			connkey = 'dest'
-
-	else:	
-		connkey = p_connkey	
-
-	connobj = conns.getConn(connkey)
+	connobj = conns.getConn(ck)
 	
 	# pdb.set_trace()
 
@@ -1513,6 +1506,8 @@ def addnewprocedure_file(p_proj, conn=None, conf_obj=None):
 	if conf_obj is None:
 		## Accesses stdin and stdout to query user
 		newitems = gen_newprocfile_items()
+
+	# print(newitems)	
 		
 	if newitems is None:
 		
