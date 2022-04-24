@@ -516,8 +516,8 @@ def update_oper_handler(p_proj, p_oper, diffdict,
 
 		assert not diffdict is None
 		
-		out_sql_src = updatedb(diffdict, upd_ids_list, limkeys_list, delmode=delmode)		
-		do_linesoutput(out_sql_src, output=output, interactive=canuse_stdout, usetbs=usetbs)
+		out_sql_src = updatedb(diffdict, upd_ids_list, limkeys_list, delmode=delmode, usetbs=usetbs)		
+		do_linesoutput(out_sql_src, output=output, interactive=canuse_stdout)
 
 		logger.info("dest change script for proj. %s, %s" % (p_proj,output))
 		

@@ -569,10 +569,16 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 			
 			diff_item = currdiff_block[role]
 			assert "diffoper" in diff_item.keys()
-			assert "insert" in diff_item["diffoper"].keys() or "update" in diff_item["diffoper"].keys() or "delete" in diff_item["diffoper"].keys(), f"not 'inserting', not 'updating' and not 'deleting', diffoper:{diff_item['diffoper']}"
+			if isinstance(diff_item["diffoper"], dict):
+				assert "insert" in diff_item["diffoper"].keys() or "update" in diff_item["diffoper"].keys() or "delete" in diff_item["diffoper"].keys(), f"not 'inserting', not 'updating' and not 'deleting', diffoper:{diff_item['diffoper']}"
+			else:
+				assert diff_item["diffoper"] in ["insert", "update", "delete"], f"not 'inserting', not 'updating' and not 'deleting', diffoper:{diff_item['diffoper']}"
 
-			operorder = diff_item['newvalue']['operorder']
-			
+			if 'operorder' in diff_item['newvalue'].keys():
+				operorder = diff_item['newvalue']['operorder']
+			else:
+				operorder = diff_item['operorder']
+
 			if len(p_updates_ids_list) < 1 or operorder in p_updates_ids_list:	
 
 				if docomment and not header_printed:
