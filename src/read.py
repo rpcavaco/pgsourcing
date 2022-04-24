@@ -409,7 +409,7 @@ def roles(p_cursor, p_filters_cfg, out_dict):
 			"validuntil": validuntil
 		}
 
-def tables(p_conn, p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None):
+def udttypes(p_conn, p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None):
 
 	logger = logging.getLogger('pgsourcing')
 
@@ -493,6 +493,89 @@ def tables(p_conn, p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None):
 			p_conn.rollback()
 			logger.error("- table {}.{}, insuficient privileges for reading".format(rc_row[0], rc_row[1]))
 
+def tables(p_conn, p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None):
+
+	logger = logging.getLogger('pgsourcing')
+
+	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
+	# assert "schemata" in out_dict["content"].keys(), "'content.schemata' em falta no dic. de saida"
+	if "schemata" not in out_dict["content"].keys():
+		return
+
+	rowcounts = []
+
+	for sch in out_dict["content"]["schemata"]:
+
+		if "tables" in p_filters_cfg.keys():
+			if len(p_filters_cfg["tables"].keys()) > 0  and sch not in p_filters_cfg["tables"].keys():
+				continue 
+			
+		wherecl = gen_tables_where_from_re_list("tablename", sch, p_filters_cfg, dojoin=True, intersect=True)
+		if wherecl is None:
+			wherecl = "and schemaname = '%s'" % sch
+		else:
+			wherecl = "and schemaname = '%s' %s" % (sch, wherecl)
+
+		sql = "%s %s" % (SQL["TABLES"], wherecl)
+		#print(p_cursor.description)
+		
+		p_cursor.execute(sql)
+		#print(p_cursor.mogrify(sql))
+		the_dict = None
+
+		for row in p_cursor:
+
+			if not "tables" in out_dict["content"].keys():
+				out_dict["content"]["tables"] = {}
+			
+			the_dict = out_dict["content"]["tables"]
+
+			# if row["schemaname"] == "information_schema":
+				# continue
+			
+			# if row["schemaname"] == "public" and not p_include_public:
+				# continue
+				
+			## remover tabelas internas ArcGIS
+			m = re.match("[adi][\d]+", row["tablename"])
+			if not m is None:
+				continue
+
+			if not row["schemaname"] in the_dict.keys():
+				sch_dict = the_dict[row["schemaname"]] = {}	
+			else:
+				sch_dict = the_dict[row["schemaname"]]	
+				
+			sch_dict[row["tablename"]] = {
+				"owner": row["tableowner"]
+			}
+			
+			if not row["tablespace"] is None:
+				sch_dict[row["tablename"]]["tablespace"] = row["tablespace"]
+
+			if not opt_rowcount_path is None:
+				rowcounts.append([sch, row["tablename"], 0])
+
+		if not the_dict is None:
+			get_grants(the_dict, p_cursor)
+
+	if len(rowcounts) > 0:
+		try:
+			with open(opt_rowcount_path, 'w', newline='') as csvfl:
+				csvwriter = csv.writer(csvfl, delimiter=';',
+								quotechar='"', quoting=csv.QUOTE_MINIMAL)
+				csvwriter.writerow(('Schema', 'Table', 'Row count'))
+				for rc_row in rowcounts:
+					p_cursor.execute(SQL["ROW_COUNT"].format(rc_row[0], rc_row[1]))
+					frow = p_cursor.fetchone()
+					rc_row[2] = frow[0]
+					csvwriter.writerow(rc_row)
+		except PermissionError:
+			logger.error("- CSV file probably opened in Excel, must be closed first,")
+			logger.exception("------- tables --------")
+		except InsufficientPrivilege:
+			p_conn.rollback()
+			logger.error("- table {}.{}, insuficient privileges for reading".format(rc_row[0], rc_row[1]))
 
 def views(p_cursor, p_filters_cfg, out_dict):
 
@@ -623,7 +706,6 @@ def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict):
 		
 		if not the_dict is None:	
 			get_grants(the_dict, p_cursor)
-
 			
 def columns(p_cursor, o_unreadable_tables_dict, out_dict):
 	
@@ -674,6 +756,8 @@ def columns(p_cursor, o_unreadable_tables_dict, out_dict):
 					
 				if row["data_type"] == "USER-DEFINED":
 					dt = row["udt_name"]
+				elif row["data_type"] == "ARRAY" and row["udt_name"][0] == "_":
+					dt = row["udt_name"][1:] + "[]"
 				else:
 					dt = row["data_type"]
 
