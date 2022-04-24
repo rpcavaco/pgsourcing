@@ -148,7 +148,6 @@ def changegrp(p_chg_group, p_currdiff_block, p_updates_ids_list, p_keys_byref, p
 		changed = changed | changegrp_list(p_chg_group, p_currdiff_block, p_updates_ids_list) 
 			
 	return changed
-
 	
 def updateref(p_proj, p_difdict, updates_ids_list, limkeys_list):
 	
@@ -395,7 +394,7 @@ def transf_schema(p_function_body, p_schematrans):
 
 	return ret	
 
-def create_function_items(p_schema, p_name, p_args, p_rettype, p_langtype, p_owner, p_volatility, 
+def create_function_items(p_schema, p_name, p_fargs, p_args, p_rettype, p_langtype, p_owner, p_volatility, 
 	p_body, o_sql_linebuffer, return_table_defstr=None, replace=True):
 
 	if replace:
@@ -414,7 +413,7 @@ def create_function_items(p_schema, p_name, p_args, p_rettype, p_langtype, p_own
 		retstr = p_rettype
 		
 	o_sql_linebuffer.append(cr % (p_schema, p_name))	
-	o_sql_linebuffer.append("(%s)" % p_args)
+	o_sql_linebuffer.append("(%s)" % p_fargs)
 	o_sql_linebuffer.append("\n")
 	o_sql_linebuffer.append("\tRETURNS %s\n" % retstr)
 	o_sql_linebuffer.append("\tLANGUAGE '%s'\n" % p_langtype)
@@ -448,7 +447,7 @@ def create_function(p_schema, p_name, p_new_value, o_sql_linebuffer, schematrans
 	else:
 		fbody = p_new_value["body"]
 	
-	create_function_items(p_schema, p_name, p_new_value["args"],
+	create_function_items(p_schema, p_name, p_new_value["fargs"], p_new_value["args"],
 		p_new_value["return_type"], p_new_value["language_type"], 
 		p_new_value["procedure_owner"], p_new_value["provolatile"], 
 		fbody, o_sql_linebuffer, 
