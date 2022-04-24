@@ -1130,6 +1130,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		replacements, p_connkey=p_connkey, usetbs=usetbs)
 
 	# print("check_dict:", p_oper, check_dict.keys())
+	# print("content keys:", check_dict["content"].keys())
 	
 	# Se a operacao for chksrc ou chkdest o dicionario check_dict sera 
 	#  preenchido.

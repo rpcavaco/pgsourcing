@@ -368,7 +368,26 @@ SQL = {
 					exit;
 				end loop;
 			end$$;""",
-	"ROW_COUNT": "SELECT count(*) from {0}.{1}"
+	"ROW_COUNT": "SELECT count(*) from {0}.{1}",
+	"UDTENUMS": """select n.nspname as schema, t.typname, t.typowner::regrole typowner,
+				(select string_agg(enumlabel, ', ' order by enumsortorder) 
+				  from pg_enum
+				  where enumtypid = t.oid) labels
+			FROM       
+				pg_type t 
+			LEFT JOIN   
+				pg_catalog.pg_namespace n 
+			ON n.oid = t.typnamespace 
+			WHERE (t.typrelid = 0 OR 
+				(SELECT c.relkind = 'c' 
+					FROM pg_catalog.pg_class c 
+					WHERE c.oid = t.typrelid)) 
+			AND NOT EXISTS (
+				SELECT 1 FROM pg_catalog.pg_type el 
+				WHERE el.oid = t.typelem 
+				AND el.typarray = t.oid
+			) 
+			AND typtype = 'e'"""
 }
 
 # if __name__ == "__main__":

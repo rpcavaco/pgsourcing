@@ -59,6 +59,7 @@ SETUP_ZIP = "pgsourcing_setup.zip"
 BASE_FILTERS_RE = {
 	"schema": [],
 	"transformschema": {},
+	"udttypes": {},
 	"tables": {},
 	"views": {},
 	"matviews": {},
@@ -90,13 +91,13 @@ BASE_CONNCFG = {
 
 CFG_GROUPS = [
 	"owners", "roles", "schemata", 
-	"sequences", "tables", 
+	"sequences", "udttypes", "tables", 
 	"views", "matviews", "procedures"
 ]
 
 CFG_DEST_GROUPS = [
 	"roles", "schemata", 
-	"sequences", "tables", 
+	"sequences", "udttypes", "tables", 
 	"views", "matviews", "procedures"
 ]
 

@@ -94,12 +94,12 @@ def gen_where_from_list(p_filter_fieldname, p_re_list, dojoin=False, intersect=F
 	
 	return ret
 	
-def gen_tables_where_from_re_list(p_tablefilter_fieldname, p_curr_schema, p_filters_cfg, dojoin=False, intersect=False, table_key="tables"):
+def gen_obj_where_from_re_list(p_objfilter_fieldname, p_curr_schema, p_filters_cfg, dojoin=False, intersect=False, key=None):
 
 	wherecl = None
 
-	if table_key in p_filters_cfg and len(p_filters_cfg[table_key].keys()) > 0 and p_curr_schema in p_filters_cfg[table_key].keys():
-		wherecl = gen_where_from_re_list(p_tablefilter_fieldname, p_filters_cfg[table_key][p_curr_schema], dojoin=dojoin, intersect=intersect)
+	if key in p_filters_cfg and len(p_filters_cfg[key].keys()) > 0 and p_curr_schema in p_filters_cfg[key].keys():
+		wherecl = gen_where_from_re_list(p_objfilter_fieldname, p_filters_cfg[key][p_curr_schema], dojoin=dojoin, intersect=intersect)
 			
 	return wherecl
 
@@ -340,7 +340,7 @@ def ownership(p_cursor, p_filters_cfg, out_dict):
 	# Tables
 	for sch in out_dict["content"]["schemata"]:
 		
-		wherecl = gen_tables_where_from_re_list("tablename", sch, p_filters_cfg, dojoin=True, intersect=True)
+		wherecl = gen_obj_where_from_re_list("tablename", sch, p_filters_cfg, dojoin=True, intersect=True, key="tables")
 
 		if not wherecl is None:
 			sql = "%s %s" % (SQL["TABLE_SU_OWNED"], wherecl)
@@ -409,95 +409,64 @@ def roles(p_cursor, p_filters_cfg, out_dict):
 			"validuntil": validuntil
 		}
 
-def udttypes(p_conn, p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None):
+def udttypes(p_cursor, p_filters_cfg, out_dict):
 
-	logger = logging.getLogger('pgsourcing')
+	# logger = logging.getLogger('pgsourcing')
 
-	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
+	assert "content" in out_dict.keys(), "missing content in output dict"
 	# assert "schemata" in out_dict["content"].keys(), "'content.schemata' em falta no dic. de saida"
 	if "schemata" not in out_dict["content"].keys():
 		return
 
-	rowcounts = []
-
 	for sch in out_dict["content"]["schemata"]:
 
-		if "tables" in p_filters_cfg.keys():
-			if len(p_filters_cfg["tables"].keys()) > 0  and sch not in p_filters_cfg["tables"].keys():
+		if "udttypes" in p_filters_cfg.keys():
+			if len(p_filters_cfg["udttypes"].keys()) > 0  and sch not in p_filters_cfg["udttypes"].keys():
 				continue 
 			
-		wherecl = gen_tables_where_from_re_list("tablename", sch, p_filters_cfg, dojoin=True, intersect=True)
+		wherecl = gen_obj_where_from_re_list("t.typname", sch, p_filters_cfg, dojoin=True, intersect=True, key="udttypes")
 		if wherecl is None:
-			wherecl = "and schemaname = '%s'" % sch
+			wherecl = "and n.nspname = '%s'" % sch
 		else:
-			wherecl = "and schemaname = '%s' %s" % (sch, wherecl)
+			wherecl = "and n.nspname = '%s' %s" % (sch, wherecl)
 
-		sql = "%s %s" % (SQL["TABLES"], wherecl)
+		sql = "%s %s" % (SQL["UDTENUMS"], wherecl)
 		#print(p_cursor.description)
 		
 		p_cursor.execute(sql)
-		#print(p_cursor.mogrify(sql))
 		the_dict = None
 
 		for row in p_cursor:
 
-			if not "tables" in out_dict["content"].keys():
-				out_dict["content"]["tables"] = {}
+			if not "udttypes" in out_dict["content"].keys():
+				out_dict["content"]["udttypes"] = {}
 			
-			the_dict = out_dict["content"]["tables"]
+			the_dict = out_dict["content"]["udttypes"]
 
-			# if row["schemaname"] == "information_schema":
-				# continue
-			
 			# if row["schemaname"] == "public" and not p_include_public:
 				# continue
 				
-			## remover tabelas internas ArcGIS
-			m = re.match("[adi][\d]+", row["tablename"])
-			if not m is None:
-				continue
-
-			if not row["schemaname"] in the_dict.keys():
-				sch_dict = the_dict[row["schemaname"]] = {}	
+			if not row["schema"] in the_dict.keys():
+				sch_dict = the_dict[row["schema"]] = {}	
 			else:
-				sch_dict = the_dict[row["schemaname"]]	
+				sch_dict = the_dict[row["schema"]]	
 				
-			sch_dict[row["tablename"]] = {
-				"owner": row["tableowner"]
+			sch_dict[row["typname"]] = {
+				"udttype": "enum",
+				"labels": row["labels"],
+				"owner": row["typowner"]
 			}
 			
-			if not row["tablespace"] is None:
-				sch_dict[row["tablename"]]["tablespace"] = row["tablespace"]
+		# TODO - verificar se necessário
+		# if not the_dict is None:
+		# 	get_grants(the_dict, p_cursor)
 
-			if not opt_rowcount_path is None:
-				rowcounts.append([sch, row["tablename"], 0])
-
-		if not the_dict is None:
-			get_grants(the_dict, p_cursor)
-
-	if len(rowcounts) > 0:
-		try:
-			with open(opt_rowcount_path, 'w', newline='') as csvfl:
-				csvwriter = csv.writer(csvfl, delimiter=';',
-								quotechar='"', quoting=csv.QUOTE_MINIMAL)
-				csvwriter.writerow(('Schema', 'Table', 'Row count'))
-				for rc_row in rowcounts:
-					p_cursor.execute(SQL["ROW_COUNT"].format(rc_row[0], rc_row[1]))
-					frow = p_cursor.fetchone()
-					rc_row[2] = frow[0]
-					csvwriter.writerow(rc_row)
-		except PermissionError:
-			logger.error("- CSV file probably opened in Excel, must be closed first,")
-			logger.exception("------- tables --------")
-		except InsufficientPrivilege:
-			p_conn.rollback()
-			logger.error("- table {}.{}, insuficient privileges for reading".format(rc_row[0], rc_row[1]))
 
 def tables(p_conn, p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None, usetbs=False):
 
 	logger = logging.getLogger('pgsourcing')
 
-	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
+	assert "content" in out_dict.keys(), "missing content in output dict"
 	# assert "schemata" in out_dict["content"].keys(), "'content.schemata' em falta no dic. de saida"
 	if "schemata" not in out_dict["content"].keys():
 		return
@@ -510,7 +479,8 @@ def tables(p_conn, p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None, us
 			if len(p_filters_cfg["tables"].keys()) > 0  and sch not in p_filters_cfg["tables"].keys():
 				continue 
 			
-		wherecl = gen_tables_where_from_re_list("tablename", sch, p_filters_cfg, dojoin=True, intersect=True)
+		wherecl = gen_obj_where_from_re_list("tablename", sch, p_filters_cfg, dojoin=True, intersect=True, key="tables")
+
 		if wherecl is None:
 			wherecl = "and schemaname = '%s'" % sch
 		else:
@@ -580,7 +550,7 @@ def tables(p_conn, p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None, us
 def views(p_cursor, p_filters_cfg, out_dict):
 
 	# Previously tested on "tables"
-	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
+	assert "content" in out_dict.keys(), "missing content in output dict"
 	# assert "schemata" in out_dict["content"].keys(), "'content.schemata' em falta no dic. de saida"
 
 	if not "schemata" in out_dict["content"].keys():
@@ -640,7 +610,7 @@ def views(p_cursor, p_filters_cfg, out_dict):
 def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict, usetbs=False):
 
 	# Previously tested on "tables"
-	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
+	assert "content" in out_dict.keys(), "missing content in output dict"
 	# assert "schemata" in out_dict["content"].keys(), "'content.schemata' em falta no dic. de saida"
 
 	if not "schemata" in out_dict["content"].keys():
@@ -717,7 +687,7 @@ def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict, usetbs=False):
 			
 def columns(p_cursor, o_unreadable_tables_dict, out_dict):
 	
-	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
+	assert "content" in out_dict.keys(), "missing content in output dict"
 	
 	if not "tables" in out_dict["content"].keys():
 		return
@@ -866,7 +836,7 @@ def columns(p_cursor, o_unreadable_tables_dict, out_dict):
 
 def constraints(p_cursor, p_deftablespace, out_dict, usetbs=False):
 	
-	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
+	assert "content" in out_dict.keys(), "missing content in output dict"
 	if not "tables" in out_dict["content"].keys():
 		return
 	#assert "tables" in out_dict["content"].keys(), "'content.tables' em falta no dic. de saida"
@@ -963,7 +933,7 @@ def indexes(p_cursor, p_deftablespace, out_dict, usetbs=False):
 	# os indices associados a primary keys e que sao implicitos,
 	# nao precisando de ser listados.
 	
-	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
+	assert "content" in out_dict.keys(), "missing content in output dict"
 	if not "tables" in out_dict["content"].keys():
 		return
 	#assert "tables" in out_dict["content"].keys(), "'content.tables' em falta no dic. de saida"
@@ -1023,7 +993,7 @@ def indexes(p_cursor, p_deftablespace, out_dict, usetbs=False):
 
 def sequences(p_conn, p_majorversion, out_dict):
 	
-	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
+	assert "content" in out_dict.keys(), "missing content in output dict"
 
 	if not "sequences" in out_dict["content"].keys():
 		return
@@ -1083,7 +1053,7 @@ def sequences(p_conn, p_majorversion, out_dict):
 
 def triggers(p_cursor, out_trigger_functions, out_dict):
 	
-	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
+	assert "content" in out_dict.keys(), "missing content in output dict"
 	if not "tables" in out_dict["content"].keys():
 		return
 		
@@ -1209,7 +1179,7 @@ def gen_proc_file(p_genprocsdir, p_schema, p_proc_row, winendings=False):
 						
 def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dict, genprocsdir=None):
 	
-	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
+	assert "content" in out_dict.keys(), "missing content in output dict"
 	# assert "schemata" in out_dict["content"].keys(), "'content.schemata' em falta no dic. de saida"
 
 	if not "schemata" in out_dict["content"].keys():
@@ -1321,7 +1291,7 @@ def paramtables(p_cursor, p_filters_cfg, p_gendumpsdir):
 		
 		# for tname_patt in  p_filters_cfg["parameterstables"][sch]:
 
-		wherecl = gen_tables_where_from_re_list("tablename", sch, p_filters_cfg, dojoin=True, intersect=True, table_key="parameterstables")
+		wherecl = gen_obj_where_from_re_list("tablename", sch, p_filters_cfg, dojoin=True, intersect=True, key="parameterstables")
 		if wherecl is None:
 			wherecl = "and schemaname = '%s'" % sch
 		else:
@@ -1379,10 +1349,13 @@ def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir,
 
 				ownership(cr, p_filters_cfg, out_dict)		
 				roles(cr, p_filters_cfg, out_dict)
-				
+
 				logger.info("reading tables ..")			
 				tables(cn, cr, p_filters_cfg, out_dict, 
 					opt_rowcount_path=opt_rowcount_path, usetbs=usetbs)
+
+				logger.info("reading user datatypes (enums) ..")
+				udttypes(cr, p_filters_cfg, out_dict)
 
 				unreadable_tables = {}
 				

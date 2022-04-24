@@ -823,7 +823,47 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 								out_sql_src.append(xtmpl % (privs, sch, sname, user_name))
 							if di["diffoper"] in ("update", "insert"):
 								out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, sname, user_name))
-	
+
+	grpkey = "udttypes"	
+	if (len(p_limkeys_list) < 1 or grpkey in p_limkeys_list) and grpkey in diff_content.keys():
+
+		header_printed = False
+
+		currdiff_block = diff_content[grpkey]			
+		for sch in sorted(currdiff_block.keys()):
+			
+			if sch in dropped_schemata:
+				logger.warning("CONFLICT: schema to drop '%s' is in use in udttypes." % sch)
+			
+			for udtname in sorted(currdiff_block[sch].keys()):
+
+				diff_item = currdiff_block[sch][udtname]	
+				if "diffoper" in diff_item.keys():				
+					if len(p_updates_ids_list) < 1 or diff_item["operorder"] in p_updates_ids_list:	
+
+						if docomment and not header_printed:
+							out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- User-defined type %s.%s\n" % (sch, udtname) + "-- " + "".join(['#'] * 77))
+							header_printed = True
+						if docomment:
+							out_sql_src.append("-- Op #%d" % diff_item["operorder"])
+							
+						# assert "seqdetails" in diff_item["newvalue"].keys()
+
+						if diff_item["diffoper"] in ("update", "delete"):
+							out_sql_src.append(tmplsd % (sch, udtname))
+					
+						# TODO
+						# if diff_item["diffoper"] in ("update", "insert"):
+							
+						# 	flines = []
+						# 	create_sequence(sch, sname, diff_item["newvalue"], flines)						
+						# 	out_sql_src.append("".join(flines))
+
+						# 	if "grants" in diff_item["newvalue"].keys():
+						# 		for user_name in diff_item["newvalue"]["grants"].keys():
+						# 			privs = diff_item["newvalue"]["grants"][user_name]
+						# 			out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, sname, user_name))
+
 	grpkey = "tables"	
 	if (len(p_limkeys_list) < 1 or grpkey in p_limkeys_list) and grpkey in diff_content.keys():
 
