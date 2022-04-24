@@ -86,7 +86,7 @@ SQL = {
 			column_default, is_nullable, data_type,
 			character_maximum_length, numeric_precision,
 			numeric_precision_radix, numeric_scale, datetime_precision,
-			udt_name
+			udt_schema, udt_name
 		FROM information_schema.columns
 		WHERE table_schema = %s
 			AND table_name = %s

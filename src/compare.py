@@ -40,8 +40,13 @@ from src.common import PROC_SRC_BODY_FNAME, CFG_GROUPS, \
 		
 from src.fileandpath import load_currentref
 
-def do_transformschema(p_transformschema, p_obj, p_k):
-	if p_k == "idxdesc":
+def do_transformschema(p_transformschema, p_obj, p_k, objtype=None, comment=''):
+	if p_k == "type":
+		if objtype == "tables" and "tables" in p_transformschema["types"]: # needed for schema in user defined types
+			#print("46>> obj:", objtype, "comm:", comment, "k:", p_k, p_obj[p_k])
+			for trans in p_transformschema["trans"]:
+				p_obj[p_k] = p_obj[p_k].replace(trans["src"], trans["dest"])
+	elif p_k == "idxdesc":
 		if "tables" in p_transformschema["types"] or "indexes" in p_transformschema["types"]:
 			for trans in p_transformschema["trans"]:
 				p_obj[p_k] = p_obj[p_k].replace(trans["src"], trans["dest"])
@@ -70,7 +75,7 @@ def do_transformschema(p_transformschema, p_obj, p_k):
 			for trans in p_transformschema["trans"]:
 				p_obj[p_k] = p_obj[p_k].replace(trans["src"], trans["dest"])
 					
-def traverse_replaceval(p_transformschema, p_obj, p_mode):
+def traverse_replaceval(p_transformschema, p_obj, p_mode, lvl=0, objtype=None):
 
 	if not p_transformschema:
 		return
@@ -80,10 +85,10 @@ def traverse_replaceval(p_transformschema, p_obj, p_mode):
 		
 	for k in p_obj.keys():	
 		
-		do_transformschema(p_transformschema, p_obj, k)	
+		do_transformschema(p_transformschema, p_obj, k, objtype=objtype, comment=p_mode+f" l:{lvl}")	
 
 		if isinstance(p_obj[k], dict):
-			traverse_replaceval(p_transformschema, p_obj[k], p_mode)		
+			traverse_replaceval(p_transformschema, p_obj[k], p_mode, lvl=(lvl+1), objtype=objtype)		
 
 def get_prevlevel_diff(p_diff_dict, p_grpkeys):
 
@@ -281,7 +286,7 @@ def gen_update(p_transformschema, p_opordmgr, p_upperlevel_ops, p_keychain, p_di
 		newvalue = deepcopy(p_raw_parent_newvalue)
 	else:
 		newvalue = deepcopy(p_raw_newvalue)
-	traverse_replaceval(p_transformschema, newvalue, "doing gen_update")
+	traverse_replaceval(p_transformschema, newvalue, "doing gen_update", objtype=p_keychain[0])
 
 	# Prevent sequences with 'serialcols_dependencies' to be updated if only diiference is 
 	#  the current sequence value
@@ -385,7 +390,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						p_opordmgr.setord(diff_item[lzero_key][lk])
 						diff_item[lzero_key][lk]["diffoper"] = "insert"   
 						newvalue = deepcopy(tmp_l[lzero_key][lk])
-						traverse_replaceval(p_transformschema, newvalue, "insert A0")
+						traverse_replaceval(p_transformschema, newvalue, "insert A0", objtype=grpkey)
 						diff_item[lzero_key][lk]["newvalue"] = newvalue
 						new_grpkeys = grpkeys + [lzero_key] + [lk]
 						o_cd_ops["insert"].append(('a', new_grpkeys))
@@ -393,7 +398,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 				p_opordmgr.setord(diff_item)
 				diff_item["diffoper"] = "insert"   
 				newvalue = deepcopy(tmp_l)
-				traverse_replaceval(p_transformschema, newvalue, "insert A1")
+				traverse_replaceval(p_transformschema, newvalue, "insert A1", objtype=grpkey)
 				diff_item["newvalue"] = newvalue
 				
 				if grpkeys[0] == "procedures" and "procedure_name" in newvalue.keys():
@@ -485,7 +490,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 
 							p_opordmgr.setord(diff_item)
 							diff_item["diffoper"] = "insert"							
-							traverse_replaceval(p_transformschema, newvalue, "insert B")
+							traverse_replaceval(p_transformschema, newvalue, "insert B", objtype=klist[0])
 							diff_item["newvalue"] = newvalue
 
 							new_grpkeys = grpkeys + [k]
@@ -567,14 +572,14 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 					p_opordmgr.setord(diff_item)
 					diff_item["diffoper"] = "replace value with dict"
 					newvalue = deepcopy(tmp_l[k])
-					traverse_replaceval(p_transformschema, newvalue, "replace A")
+					traverse_replaceval(p_transformschema, newvalue, "replace A", objtype=grpkey)
 					diff_item["newvalue"] = newvalue
 				elif isinstance(tmp_r[k], dict):
 					assert not isinstance(tmp_l[k], list), "list a comparar com dict, chave: %s" % k
 					diff_item = get_diff_item(diff_dict, klist)
 					p_opordmgr.setord(diff_item)
 					newvalue = deepcopy(tmp_l[k])
-					traverse_replaceval(p_transformschema, newvalue, "replace B")
+					traverse_replaceval(p_transformschema, newvalue, "replace B", objtype=grpkey)
 					diff_item["newvalue"] = newvalue
 
 				else:
@@ -597,11 +602,13 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 							}
 								
 					else:
-						## Comparing LEAF values
+
+						## !! COMPARE LEAF VALUES !!
+
 						rightval = tmp_r[k]						
 						if p_transformschema:
 							# Apply schema transformation if adequate
-							do_transformschema(p_transformschema, tmp_l, k)	
+							do_transformschema(p_transformschema, tmp_l, k, objtype=klist[0], comment=grpkey)	
 						leftval = tmp_l[k]	
 						
 						if leftval != rightval:

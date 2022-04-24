@@ -763,7 +763,10 @@ def columns(p_cursor, o_unreadable_tables_dict, out_dict):
 					cols_dict = tables_root[schema_name][table_name]["cols"]
 					
 				if row["data_type"] == "USER-DEFINED":
-					dt = row["udt_name"]
+					if row["udt_schema"] != "public":
+						dt = row["udt_schema"] + "." + row["udt_name"]
+					else:
+						dt = row["udt_name"]
 				elif row["data_type"] == "ARRAY" and row["udt_name"][0] == "_":
 					dt = row["udt_name"][1:] + "[]"
 				else:
