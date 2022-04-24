@@ -493,7 +493,7 @@ def udttypes(p_conn, p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None):
 			p_conn.rollback()
 			logger.error("- table {}.{}, insuficient privileges for reading".format(rc_row[0], rc_row[1]))
 
-def tables(p_conn, p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None):
+def tables(p_conn, p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None, usetbs=False):
 
 	logger = logging.getLogger('pgsourcing')
 
@@ -550,7 +550,7 @@ def tables(p_conn, p_cursor, p_filters_cfg, out_dict, opt_rowcount_path=None):
 				"owner": row["tableowner"]
 			}
 			
-			if not row["tablespace"] is None:
+			if not row["tablespace"] is None and usetbs:
 				sch_dict[row["tablename"]]["tablespace"] = row["tablespace"]
 
 			if not opt_rowcount_path is None:
@@ -637,7 +637,7 @@ def views(p_cursor, p_filters_cfg, out_dict):
 		if not the_dict is None:
 			get_grants(the_dict, p_cursor)
 
-def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict):
+def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict, usetbs=False):
 
 	# Previously tested on "tables"
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
@@ -696,13 +696,21 @@ def matviews(p_cursor, p_filters_cfg, p_deftablespace, out_dict):
 			else:
 				tblspc = row["tablespace"]
 				
-			sch_dict[row["matviewname"]] = {
-				"mvdetails": {
-					"vowner": row["viewowner"],
-					"vdef": row["definition"],
-					"vtablespace": tblspc
+			if usetbs:
+				sch_dict[row["matviewname"]] = {
+					"mvdetails": {
+						"vowner": row["viewowner"],
+						"vdef": row["definition"],
+						"vtablespace": tblspc
+					}
 				}
-			}
+			else:
+				sch_dict[row["matviewname"]] = {
+					"mvdetails": {
+						"vowner": row["viewowner"],
+						"vdef": row["definition"]
+					}
+				}
 		
 		if not the_dict is None:	
 			get_grants(the_dict, p_cursor)
@@ -853,7 +861,7 @@ def columns(p_cursor, o_unreadable_tables_dict, out_dict):
 						
 		# print("unreadable_tables:", schema_name, unreadable_tables)
 
-def constraints(p_cursor, p_deftablespace, out_dict):
+def constraints(p_cursor, p_deftablespace, out_dict, usetbs=False):
 	
 	assert "content" in out_dict.keys(), "'content' em falta no dic. de saida"
 	if not "tables" in out_dict["content"].keys():
@@ -886,12 +894,12 @@ def constraints(p_cursor, p_deftablespace, out_dict):
 				else:
 					tblspc = row["idxtblspc"]
 
-				constr_list = constrs_dict[row["constraint_name"]] = {
-				
-					"index_tablespace": tblspc,
-					"columns": row["column_names"]
-				
+				constr_list = constrs_dict[row["constraint_name"]] = {				
+					"columns": row["column_names"]			
 				}
+
+				if usetbs:
+					constrs_dict[row["constraint_name"]]["index_tablespace"] = tblspc
 
 			p_cursor.execute(SQL["CHECKS"], (schema_name, table_name))
 
@@ -946,7 +954,7 @@ def constraints(p_cursor, p_deftablespace, out_dict):
 
 				schema_dependency(out_dict, row["schema_ref"], schema_name, "fkeys")
 
-def indexes(p_cursor, p_deftablespace, out_dict):
+def indexes(p_cursor, p_deftablespace, out_dict, usetbs=False):
 	
 	# ATENCAO - indexes deve ser corrido depois de constraints, para poder filtrar
 	# os indices associados a primary keys e que sao implicitos,
@@ -1000,10 +1008,15 @@ def indexes(p_cursor, p_deftablespace, out_dict):
 					else:
 						tblspc = row["tablespace"]
 
-					constrs_dict[row["indexname"]] = { 
-						"idxdesc": idxdef,
-						"tablespace": tblspc
-					}
+					if usetbs:
+						constrs_dict[row["indexname"]] = { 
+							"idxdesc": idxdef,
+							"tablespace": tblspc
+						}
+					else:
+						constrs_dict[row["indexname"]] = { 
+							"idxdesc": idxdef
+						}
 
 def sequences(p_conn, p_majorversion, out_dict):
 	
@@ -1330,7 +1343,8 @@ def paramtables(p_cursor, p_filters_cfg, p_gendumpsdir):
 				p_cursor.copy_to(fp, ftname)
 						
 def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir, 
-		outprocs_dir=None, is_upstreamdb=None, opt_rowcount_path=None, code_only=False):
+		outprocs_dir=None, is_upstreamdb=None, opt_rowcount_path=None, 
+		code_only=False, usetbs=False):
 
 	logger = logging.getLogger('pgsourcing')
 	with p_conn as cnobj:
@@ -1364,7 +1378,8 @@ def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir,
 				roles(cr, p_filters_cfg, out_dict)
 				
 				logger.info("reading tables ..")			
-				tables(cn, cr, p_filters_cfg, out_dict, opt_rowcount_path=opt_rowcount_path)
+				tables(cn, cr, p_filters_cfg, out_dict, 
+					opt_rowcount_path=opt_rowcount_path, usetbs=usetbs)
 
 				unreadable_tables = {}
 				
@@ -1385,17 +1400,17 @@ def dbreader(p_conn, p_filters_cfg, out_dict, outtables_dir,
 			if not code_only:
 
 				logger.info("reading constraints ..")
-				constraints(cr, out_dict["pg_metadata"]["tablespace"], out_dict)
+				constraints(cr, out_dict["pg_metadata"]["tablespace"], out_dict, usetbs=usetbs)
 				
 				logger.info("reading indexes ..")
-				indexes(cr, out_dict["pg_metadata"]["tablespace"], out_dict)
+				indexes(cr, out_dict["pg_metadata"]["tablespace"], out_dict, usetbs=usetbs)
 
 				logger.info("reading views ..")			
 				views(cr, p_filters_cfg, out_dict)
 
 				logger.info("reading mat.views ..")			
 				matviews(cr, p_filters_cfg, 
-				out_dict["pg_metadata"]["tablespace"], out_dict)
+				out_dict["pg_metadata"]["tablespace"], out_dict, usetbs=usetbs)
 					
 			logger.info("reading procedures ..")
 			procs(cr, p_filters_cfg, trigger_functions, majorversion, out_dict, genprocsdir=outprocs_dir)

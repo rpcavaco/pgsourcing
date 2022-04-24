@@ -345,7 +345,7 @@ def create_new_proj(p_newproj):
 # ##################################################_###################		
 
 def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir, 
-		p_outprocsdestdir, o_checkdict, o_replaces, p_connkey=None):
+		p_outprocsdestdir, o_checkdict, o_replaces, p_connkey=None, usetbs=False):
 	
 	logger = logging.getLogger('pgsourcing')	
 	
@@ -410,7 +410,8 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 
 			dbreader(conns.getConn(connkey), filters_cfg, o_checkdict, p_outtables_dir, 
 					outprocs_dir=outprocs_dir, is_upstreamdb=is_upstreamdb, 
-					opt_rowcount_path=csv_rowcount_table_path, code_only=code_only)
+					opt_rowcount_path=csv_rowcount_table_path, 
+					code_only=code_only, usetbs=usetbs)
 		
 	return ret, connkey
 
@@ -1126,7 +1127,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 
 	comparison_mode, connkey = check_oper_handler(p_proj, p_oper, 
 		refcodedir, reftablesdir, destcodedir, check_dict, \
-		replacements, p_connkey=p_connkey)
+		replacements, p_connkey=p_connkey, usetbs=usetbs)
 
 	# print("check_dict:", p_oper, check_dict.keys())
 	
