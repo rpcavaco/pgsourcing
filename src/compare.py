@@ -640,7 +640,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 									
 							if not pass_diff_construction:
 							
-								diff_item = get_diff_item('f', diff_dict, klist)
+								diff_item = get_diff_item(diff_dict, klist)
 								p_opordmgr.setord(diff_item)
 								diff_item["diffoper"] = "update"
 								diff_item["newvalue"] = leftval
