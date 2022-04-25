@@ -470,11 +470,34 @@ def create_role(p_rolename, p_new_value, o_sql_linebuffer):
 		o_sql_linebuffer.append("\tVALID UNTIL 'infinity'")
 	else:
 		o_sql_linebuffer.append("\tVALID UNTIL '%s'" % p_new_value["validuntil"])
-	
+
+def create_udtype(p_schema, p_name, p_new_value, o_sql_linebuffer):
+
+	if len(list(p_new_value.keys())) < 1:
+		raise RuntimeError(f"user defined type {p_schema}.{p_name}, empty definition")
+
+	assert p_new_value["udttype"] == "enum", "at rpesent, only ENUM type is supported for user defined types"
+
+	try:
+
+		cr = "CREATE TYPE {}.{} AS\n"			
+		o_sql_linebuffer.append(cr.format(p_schema, p_name))	
+
+		if p_new_value["udttype"] == "enum":
+			splits = re.split(",\s?", p_new_value["labels"])
+			o_sql_linebuffer.append("\tENUM ({});\n".format(", ".join(["'{}'".format(s) for s in splits])))
+			
+		o_sql_linebuffer.append("\nALTER TYPE {}.{} OWNER to {}".format(p_schema, p_name, p_new_value["owner"]))
+
+	except:
+		logger = logging.getLogger('pgsourcing')
+		logger.error(f"create_udtype, p_new_value parameter value: {str(p_new_value)}")
+		raise
+
 def create_sequence(p_schema, p_name, p_new_value, o_sql_linebuffer):
 
 	if len(list(p_new_value.keys())) < 1:
-		raise RuntimeError(f"sequence {p_name}, empty definition")
+		raise RuntimeError(f"sequence {p_schema}.{p_name}, empty definition")
 	
 	try:
 
@@ -547,12 +570,14 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 		tmpltd = "-- ALTER TABLE %s.%s"
 		tmplpd = "-- DROP FUNCTION %s.%s(%s)"
 		tmplsd = "-- DROP SEQUENCE %s.%s"
+		tmpltd = "-- DROP TYPE %s.%s"
 		tmplvd = "-- DROP VIEW %s.%s"
 		tmplmvd = "-- DROP MATERIALIZED VIEW %s.%s"
 	else:
 		tmpltd = "ALTER TABLE %s.%s"
 		tmplpd = "DROP FUNCTION %s.%s(%s)"
 		tmplsd = "DROP SEQUENCE %s.%s"
+		tmpltd = "DROP TYPE %s.%s"
 		tmplvd = "DROP VIEW %s.%s"
 		tmplmvd = "DROP MATERIALIZED VIEW %s.%s"
 		
@@ -850,19 +875,12 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 						# assert "seqdetails" in diff_item["newvalue"].keys()
 
 						if diff_item["diffoper"] in ("update", "delete"):
-							out_sql_src.append(tmplsd % (sch, udtname))
+							out_sql_src.append(tmpltd % (sch, udtname))
 					
-						# TODO
-						# if diff_item["diffoper"] in ("update", "insert"):
-							
-						# 	flines = []
-						# 	create_sequence(sch, sname, diff_item["newvalue"], flines)						
-						# 	out_sql_src.append("".join(flines))
-
-						# 	if "grants" in diff_item["newvalue"].keys():
-						# 		for user_name in diff_item["newvalue"]["grants"].keys():
-						# 			privs = diff_item["newvalue"]["grants"][user_name]
-						# 			out_sql_src.append("GRANT %s ON TABLE %s.%s TO %s" % (privs, sch, sname, user_name))
+						if diff_item["diffoper"] in ("update", "insert"):						
+							flines = []
+							create_udtype(sch, udtname, diff_item["newvalue"], flines)						
+							out_sql_src.append("".join(flines))
 
 	grpkey = "tables"	
 	if (len(p_limkeys_list) < 1 or grpkey in p_limkeys_list) and grpkey in diff_content.keys():
