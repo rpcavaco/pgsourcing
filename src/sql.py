@@ -18,6 +18,12 @@ SQL = {
 		ON t1.relnamespace = n1.oid
 		where nspname = %s
 		and t1.relname = %s""",
+	"UDTTYPE_CHECK": """select count(*) cnt
+		from pg_catalog.pg_type t
+		LEFT JOIN pg_catalog.pg_namespace n 
+		ON n.oid = t.typnamespace
+		where n.nspname = %s
+		and t.typname = %s""",
 	"INDEX_CHECK": """SELECT count(*)
 		FROM pg_indexes
 		WHERE schemaname = %s  

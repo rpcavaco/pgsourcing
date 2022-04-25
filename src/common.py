@@ -106,6 +106,20 @@ CFG_LISTGROUPS = ["owners"]
 CFG_SHALLOW_GROUPS = ["schemata", "roles"]
 SHALLOW_DEPTH = 2
 
+CHECK_DICTCHANGEOPS_GRPDEPTH_GENCHECK = {
+	"tables": 3, 
+	"sequences": 3, 
+	"views": 3, 
+	"matviews": 3
+}
+
+CHECK_DICTCHANGEOPS_GRP_OTHER = {
+	"udttypes": {
+		"depth": 3,
+		"sqlqry": "UDTTYPE_CHECK"
+	}
+}
+
 FLOAT_TYPES = ["numeric", "float"]
 INT_TYPES = ["integer", "smallint"]
 

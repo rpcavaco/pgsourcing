@@ -372,6 +372,8 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 	# TODO: permanente -- verificar que está vazio em produção
 	if grpkey in []: # ("sequences",):
 		printdbg = True
+	if grpkeys[0] in []: # ("udttypes",):
+		printdbg = True
 
 	if not grpkey in p_rightdic.keys():
 		
@@ -479,7 +481,8 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 												do_continue = False
 												break		
 
-					# print(" *** left only B:", grpkey, k, level, "do_continue:", do_continue)
+					if printdbg:
+						print(" *** left only B:", grpkey, k, level, "do_continue:", do_continue)
 
 					if do_continue:				
 					
@@ -537,6 +540,9 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						diff_item["diffoper"] = "rename"
 						diff_item["newvalue"] = renamed_tablename
 						changed = True
+
+				if printdbg:
+					print(" *** right only B:", grpkey, k, level, "changed:", changed)
 
 				if not changed:
 
@@ -639,6 +645,10 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 								diff_item["diffoper"] = "update"
 								diff_item["newvalue"] = leftval
 								diff_item["oldvalue"] = rightval
+
+						# else:
+
+						# 	print("{}, {} == {}".format(k, leftval, rightval))
 	
 	if ret_upperlevel_ops:
 

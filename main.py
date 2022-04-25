@@ -71,7 +71,9 @@ import re
 
 from src.common import LOG_CFG, LANG, OPS, OPS_INPUT, \
 		OPS_OUTPUT, OPS_HELP, OPS_CHECK, OPS_DBCHECK, OPS_CODE, OPS_PRECEDENCE, \
-		SETUP_ZIP, BASE_CONNCFG, PROC_SRC_BODY_FNAME, STORAGE_VERSION  #  BASE_FILTERS_RE
+		SETUP_ZIP, BASE_CONNCFG, PROC_SRC_BODY_FNAME, \
+		STORAGE_VERSION, CHECK_DICTCHANGEOPS_GRPDEPTH_GENCHECK, \
+		CHECK_DICTCHANGEOPS_GRP_OTHER
 
 from src.common import gen_proc_fname, reverse_proc_fname		
 from src.read import dbreader
@@ -1065,12 +1067,21 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 
 			if not already_tested:
 
-				if grpkeys[0] in ("tables", "sequences", "views", "matviews") and len(grpkeys) == 3:
+				if grpkeys[0] in CHECK_DICTCHANGEOPS_GRPDEPTH_GENCHECK.keys():
+					
+					if len(grpkeys) == CHECK_DICTCHANGEOPS_GRPDEPTH_GENCHECK[grpkeys[0]]:
+						p_cr.execute(SQL["GENERIC_CHECK"], (sch, name))
+						row = p_cr.fetchone()
+						if not row is None:
+							obj_exists = check_objtype(row[0], grpkeys[0])
 
-					p_cr.execute(SQL["GENERIC_CHECK"], (sch, name))
-					row = p_cr.fetchone()
-					if not row is None:
-						obj_exists = check_objtype(row[0], grpkeys[0])
+				elif grpkeys[0] in CHECK_DICTCHANGEOPS_GRP_OTHER.keys():
+
+					if len(grpkeys) == CHECK_DICTCHANGEOPS_GRP_OTHER[grpkeys[0]]["depth"]:
+						p_cr.execute(SQL[CHECK_DICTCHANGEOPS_GRP_OTHER[grpkeys[0]]["sqlqry"]], (sch, name))
+						row = p_cr.fetchone()
+						if not row is None:
+							obj_exists = (row[0] > 0)
 
 		if (p_isinsert and obj_exists) or \
 			(not p_isinsert and not obj_exists):
