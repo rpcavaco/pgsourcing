@@ -1225,9 +1225,6 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		# print("::1200::")
 		# pp.pprint(root_diff_dict["content"])
 			
-		## TODO: permanente - Verificacao final de coerencia - 
-		## Sequencias - tipo da seq. == tipo do campo serial em que e usada, etc. -- DONE
-
 		if "content" in root_diff_dict.keys() and root_diff_dict["content"]:
 
 			# pp.pprint(root_diff_dict["content"]["tables"]["estagio"]['import_stcp_nos'])
