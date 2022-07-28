@@ -201,8 +201,11 @@ def gen_proc_fname_argsstr(p_pname, p_rettype, p_args):
 		argtypeslist = []
 		for spl in re.split(",[ ]+", p_args):
 			splits = spl.split(" ")
-			if splits[1] == "character" and splits[2] == "varying":
-				typstr = splits[1] + " " + splits[2]
+			if splits[1] == "character":
+				if len(splits) == 2:
+					typstr = splits[1]
+				elif splits[2] == "varying":
+					typstr = splits[1] + " " + splits[2]
 			elif splits[1] == "double" and splits[2] == "precision":
 				typstr = splits[1] + " " + splits[2]
 			elif splits[1] == "bit" and splits[2] == "varying":
