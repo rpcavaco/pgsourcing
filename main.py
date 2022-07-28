@@ -1567,7 +1567,8 @@ def addnewprocedure_file(p_proj, conn=None, conf_obj=None):
 					sql_linebuffer = []
 					argslist = ["%s %s" % (chr(97+ti), ta) for ti, ta in enumerate(tiposargs)] 
 					args = ", ".join(argslist)
-					create_function_items(sch, nome, args, rettipo, "plpgsql", ownership, "v", 
+
+					create_function_items(sch, nome, args, args, rettipo, "plpgsql", ownership, "v", 
 						"DECLARE\n\tv_null integer;\nBEGIN\n\n\tv_null := 0;\n\tRETURN null;\n\nEND;", sql_linebuffer)
 						
 					if len(sql_linebuffer) > 0:

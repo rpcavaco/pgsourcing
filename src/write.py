@@ -446,7 +446,7 @@ def create_function(p_schema, p_name, p_new_value, o_sql_linebuffer, schematrans
 		fbody = transf_schema(p_new_value["body"], schematrans)		
 	else:
 		fbody = p_new_value["body"]
-	
+
 	create_function_items(p_schema, p_name, p_new_value["fargs"], p_new_value["args"],
 		p_new_value["return_type"], p_new_value["language_type"], 
 		p_new_value["procedure_owner"], p_new_value["provolatile"], 
