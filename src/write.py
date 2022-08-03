@@ -27,6 +27,7 @@
 
 import re
 import logging 
+import json
 
 
 from src.fileandpath import load_currentref
@@ -89,6 +90,11 @@ def changegrp_list(p_chg_group_list, p_currdiff_block_list, p_updates_ids_list):
 def changegrp(p_chg_group, p_currdiff_block, p_updates_ids_list, p_keys_byref, p_limkeys_list):	
 
 	changed = False
+
+	# if "paragens" in p_keys_byref:
+	# 	print(">>", p_keys_byref, p_currdiff_block, p_limkeys_list)
+	# 	print(">> chg_group:", json.dumps(p_chg_group, indent=4))
+	# 	print(">> currdiff_block:", json.dumps(p_currdiff_block, indent=4))
 	
 	if len(p_keys_byref) > 15:
 		raise RuntimeError("changegrp excessive recursion, key seq: %s" % str(p_keys_byref))
@@ -110,13 +116,18 @@ def changegrp(p_chg_group, p_currdiff_block, p_updates_ids_list, p_keys_byref, p
 				p_chg_group[k] = {}
 
 			# objects that can occur within other objects
-			if k in ["index"]:
+			if k in ["index"] and not ("diffoper" in p_currdiff_block[k].keys() or "operorder" in p_currdiff_block[k].keys()):
 
 				changed = changed | changegrp(p_chg_group[k], p_currdiff_block[k], p_updates_ids_list, p_keys_byref+[k], p_limkeys_list) 
 
 			else:
 
 				diff_item = p_currdiff_block[k]
+
+				if isinstance(diff_item, str):
+					print(">> currdiff_block:", json.dumps(p_currdiff_block, indent=4))
+					print(">> diff_item:", diff_item, "k:", k, "keys_byref:", p_keys_byref)
+					raise RuntimeError("Error in changegrp (write.py) - string typed diff item (instead of dict)")
 
 				if isinstance(diff_item, list):
 					assert isinstance(p_chg_group, list), "Incoerencia: list diff para alterar dicionario: '%s'" % str(diff_item)
