@@ -139,11 +139,50 @@ INT_TYPES = ["integer", "smallint"]
 #
 UPPERLEVELOPS = { "pkey": 1, "cols": 1, "check": 1, "index": 1, "unique": 1, "trigger": 1, "procedures": 2, "roles": 1, "schdetails": (0, True), "seqdetails": (0, True), "vdetails": (0, True), "mvdetails": (0, True) }
 
+def reverse_shortpgdtype(p_typestr):
+
+	l_p_typestr = p_typestr.lower()
+	if l_p_typestr == "bool":
+		typstr = "boolean"
+	elif l_p_typestr == "varchar":
+		typstr = "character varying"
+	elif l_p_typestr == "float8":
+		typstr = "double precision"
+	elif l_p_typestr == "varbit":
+		typstr = "bit varying"
+	elif l_p_typestr == "timestamp":
+		typstr = "timestamp without timezone"
+	elif l_p_typestr == "timestampz":
+		typstr = "timestamp with timezone"
+	elif l_p_typestr == "time":
+		typstr = "time without timezone"
+	elif l_p_typestr == "timetz":
+		typstr = "time with timezone"
+	elif l_p_typestr == "int8":
+		typstr = "bigint"
+	elif l_p_typestr == "serial8":
+		typstr = "bigserial"
+	elif l_p_typestr == "char":
+		typstr = "character"
+	elif l_p_typestr == "int4":
+		typstr = "integer"
+	elif l_p_typestr == "float4":
+		typstr = "real"
+	elif l_p_typestr == "int2":
+		typstr = "smallint"
+	elif l_p_typestr == "serial2":
+		typstr = "smallserial"
+	else:
+		typstr = l_p_typestr
+
+	return typstr
 
 def _condensed_pgdtype(p_typestr):
 
 	l_p_typestr = p_typestr.lower()
-	if l_p_typestr == "character varying":
+	if l_p_typestr == "boolean":
+		typstr = "bool"
+	elif l_p_typestr == "character varying":
 		typstr = "varchar"
 	elif l_p_typestr == "double precision":
 		typstr = "float8"
@@ -179,6 +218,9 @@ def _condensed_pgdtype(p_typestr):
 		ret = typstr[:2] + hashv[:2]
 	else:
 		ret = typstr
+
+#	print(">> _condensed_pgdtype:", typstr, ret)
+
 	return ret
 
 def gen_proc_fname(p_pname, p_rettype, p_argtypes_list):

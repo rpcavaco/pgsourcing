@@ -35,7 +35,7 @@ from psycopg2.errors import UndefinedFunction, InsufficientPrivilege
 from shutil import rmtree
 
 from src.sql import SQL
-from src.common import PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_LISTGROUPS, OPS_DBCHECK, FLOAT_TYPES, INT_TYPES, gen_proc_fname_row
+from src.common import PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_LISTGROUPS, OPS_DBCHECK, FLOAT_TYPES, INT_TYPES, gen_proc_fname_row, reverse_shortpgdtype
 from src.fileandpath import clear_dir
 
 WARN_KEYS = {
@@ -1240,7 +1240,10 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dic
 			pdict = schdict[procfname] = {}
 			for item in items:
 				if not row[item] is None:
-					pdict[item] = row[item]
+					if item == "return_type":
+						pdict[item] = reverse_shortpgdtype(row[item]) 
+					else:
+						pdict[item] = row[item]
 
 	for schname in the_dict.keys():
 		schdict = the_dict[schname]

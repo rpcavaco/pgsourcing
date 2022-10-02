@@ -9,6 +9,5 @@ lib64
 bin/
 pyvenv.cfg
 Scripts/
-
-
+tarefas.txt
 

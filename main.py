@@ -660,7 +660,8 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 					assert exists(frompath), f"missing source file: {frompath}"
 
 					topath = path_join(p_outprocsdir, fll)
-					# print("  topath:", topath)
+					# print("  >> frompath:", frompath)
+					# print("  >> topath:", topath)
 
 					fname, ext = splitext(fll)
 					revdict = {}
@@ -700,6 +701,8 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 						args_str = ""					
 
 					# if procedure doesn't exist in 'code' transient folder
+					# print("topath:", topath)
+
 					if not exists(topath):
 
 						if procs_dict is None:
@@ -709,6 +712,9 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 						if not revdict["procschema"] in procs_dict.keys():
 							procs_dict[revdict["procschema"]] = {}
 						if not revdict["procname"] in procs_dict[revdict["procschema"]].keys():
+
+							# print(">> PROC: ", revdict["procname"], "not in",  procs_dict[revdict["procschema"]].keys(), "schema:", revdict["procschema"])
+
 							di = procs_dict[revdict["procschema"]][revdict["procname"]] = {
 								"diffoper": "insert",
 								"fname": fll,
@@ -846,6 +852,7 @@ def updcode_handler(p_proj, p_diffdict, updates_ids=None, p_connkey=None,
 													changed = True
 													break
 												except InvalidFunctionDefinition:
+													logger.exception("--- Invalid Function Def ----")
 													drop_first = True
 													cn.rollback()
 													# (continue)

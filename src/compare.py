@@ -139,14 +139,52 @@ def sources_to_lists(p_src_a, p_src_b, p_list_a, p_list_b):
 	del p_list_a[:]
 	del p_list_b[:]
 
-	rawlistA = p_src_a.splitlines(True)
-	rawlistB = p_src_b.splitlines(True)
+	rawlistA = p_src_a.splitlines(False)
+	rawlistB = p_src_b.splitlines(False)
+
+	# To lower case, collapse whitespace, collect only non empty lines
+	lA = [re.sub("\s+", " ", ln.lower()) for ln in rawlistA if len(ln.strip()) > 0]
+	lB = [re.sub("\s+", " ", ln.lower()) for ln in rawlistB if len(ln.strip()) > 0]
+
+	# remove comments, whole line or merely partial
+	deletions = []
+	for li, lst in enumerate([lA, lB]):
+
+		del deletions[:]
 	
-	patt = r"^--(.*)$"
-	substitute = r"/* \1 */"
-	p_list_a.extend([re.sub(patt, substitute, ln.strip()).lower() for ln in rawlistA if len(ln.strip()) > 0])
-	p_list_b.extend([re.sub(patt, substitute, ln.strip()).lower() for ln in rawlistB if len(ln.strip()) > 0])
-	
+		for lni, ln in enumerate(lst):
+
+			fnd = ln.find('--')
+			if fnd < 0:
+				wrkln = ln.strip()
+			else:
+				wrkln = ln[:fnd].strip()
+
+			if len(wrkln) < 1:
+				deletions.append(lni)
+			else:
+				lst[lni] = wrkln
+
+		for di in reversed(deletions):
+			del lst[di]
+
+	# Remove eventual line break before procedure OWNER designation
+	for lst in [lA, lB]:
+		
+		joinlineidxs = []
+		for lni, ln in enumerate(lst):
+			if ln.lower().strip().startswith('owner'):
+				joinlineidxs.append(lni)
+
+		for idx in reversed(joinlineidxs):
+			if idx > 0:
+				lst[idx-1] = lst[idx-1] + " " + lst[idx]
+				del lst[idx]
+
+
+	p_list_a.extend(lA)
+	p_list_b.extend(lB)
+
 def sourcediff(p_srca, p_srcb, p_transformschema, out_dellist): #, out_addlist):
 	
 	del out_dellist[:]
@@ -188,7 +226,7 @@ def sourcediff(p_srca, p_srcb, p_transformschema, out_dellist): #, out_addlist):
 	# listA = [re.sub(patt, substitute, ln.strip()).lower() for ln in rawlistA if len(ln.strip()) > 0]
 	# listB = [re.sub(patt, substitute, ln.strip()).lower() for ln in rawlistB if len(ln.strip()) > 0]
 	
-	diff = [l.strip() for l in list(dodiff(listA, listB)) if l.strip()]
+	diff = [l for l in list(dodiff(listA, listB, lineterm="")) if len(l.strip()) > 0]
 	
 	out_dellist.extend(diff)
 	
@@ -594,6 +632,9 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						# source de funcao / procedimento
 						difflist = []
 						newleft = sourcediff(tmp_l[k], tmp_r[k], p_transformschema, difflist)
+
+						#print("difflist:", difflist)
+
 						if len(difflist) > 0:
 							# ki = grpkeys.index("procedures")
 							curr_ulop = ret_upperlevel_ops
