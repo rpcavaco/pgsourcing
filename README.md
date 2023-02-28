@@ -20,6 +20,12 @@ O repositório e as alterações que reflete podem ser aplicadas em diferentes d
 O funcionamento da ferramenta baseia-se nas seguintes operações prinicipais:
 
 
+----------
+
+ASPETOS EM FALTA:
+
+Remover GRANTS em excesso no destino
+
 
 
 

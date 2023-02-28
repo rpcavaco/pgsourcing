@@ -218,7 +218,7 @@ SQL = {
 			FROM
 			  (SELECT p.pronamespace::regnamespace::text as procedure_schema, 
 				p.proname AS procedure_name,
-				pg_get_function_identity_arguments(p.oid) args, 
+				pg_get_function_identity_arguments(p.oid) args, -- without default values, if any
 				pg_get_function_arguments(p.oid) fargs, 
 				t1.typname AS return_type,
 				proowner::regrole::text AS procedure_owner,
@@ -237,7 +237,7 @@ SQL = {
 			FROM
 			  (SELECT p.pronamespace::regnamespace::text as procedure_schema, 
 				p.proname AS procedure_name,
-				pg_get_function_identity_arguments(p.oid) args, 
+				pg_get_function_identity_arguments(p.oid) args, -- without default values, if any
 				pg_get_function_arguments(p.oid) fargs, 
 				t1.typname AS return_type,
 				proowner::regrole::text AS procedure_owner,
@@ -257,6 +257,18 @@ SQL = {
 		where p.pronamespace::regnamespace::text = %s
 		and p.proname = %s
 		and t.arg_mode = 't'""",
+	"PROCS_XACL": """select case when nome = '' then 'PUBLIC'
+		else nome end nome
+		from (
+			select left(a.acl::text, position('=X/' in a.acl::text)-1) nome, proowner
+			from (
+				select unnest(proacl) acl, proname, proowner::regrole::text
+				from pg_proc
+				where pronamespace::regnamespace::text = %s
+				and proname = %s
+			) a
+		) b
+		where nome != proowner""",
 	"TRIGGERS": """select
 				 		ns1.nspname as table_schema,
 				 		c.relname as table_name,

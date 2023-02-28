@@ -273,7 +273,7 @@ def gen_proc_fname_argsstr(p_pname, p_rettype, p_args):
 def gen_proc_fname_row(p_row):
 	
 	return gen_proc_fname_argsstr(p_row["procedure_name"], 
-			p_row["return_type"], p_row["args"])
+			p_row["return_type"], p_row["fargs"])
 	
 def reverse_proc_fname(p_fname, o_dict):
 

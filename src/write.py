@@ -31,7 +31,7 @@ import json
 
 
 from src.fileandpath import load_currentref
-from src.common import CFG_GROUPS, CFG_LISTGROUPS #, COL_ITEMS_CHG_AVOIDING_SUBSTITUTION
+from src.common import CFG_GROUPS, CFG_LISTGROUPS, PROC_SRC_BODY_FNAME #, COL_ITEMS_CHG_AVOIDING_SUBSTITUTION
 from copy import deepcopy
 
 # import pprint as pp
@@ -406,12 +406,12 @@ def transf_schema(p_function_body, p_schematrans):
 	return ret	
 
 def create_function_items(p_schema, p_name, p_fargs, p_args, p_rettype, p_langtype, p_owner, p_volatility, 
-	p_body, o_sql_linebuffer, return_table_defstr=None, replace=True):
+	p_body, p_exec_acl, o_sql_linebuffer, return_table_defstr=None, replace=True):
 
 	if replace:
-		cr = "CREATE OR REPLACE FUNCTION %s.%s"
+		cr = "CREATE OR REPLACE FUNCTION %s.%s(%s)"
 	else:
-		cr = "CREATE FUNCTION %s.%s"
+		cr = "CREATE FUNCTION %s.%s(%s)"
 
 	retstr = None
 	if p_rettype == "record":
@@ -423,8 +423,7 @@ def create_function_items(p_schema, p_name, p_fargs, p_args, p_rettype, p_langty
 	if retstr is None:
 		retstr = p_rettype
 		
-	o_sql_linebuffer.append(cr % (p_schema, p_name))	
-	o_sql_linebuffer.append("(%s)" % p_fargs)
+	o_sql_linebuffer.append(cr % (p_schema, p_name, p_fargs))	
 	o_sql_linebuffer.append("\n")
 	o_sql_linebuffer.append("\tRETURNS %s\n" % retstr)
 	o_sql_linebuffer.append("\tLANGUAGE '%s'\n" % p_langtype)
@@ -442,8 +441,17 @@ def create_function_items(p_schema, p_name, p_fargs, p_args, p_rettype, p_langty
 	o_sql_linebuffer.append("AS $BODY$\n")
 	o_sql_linebuffer.append(p_body.strip())
 	o_sql_linebuffer.append("\n$BODY$;\n\n")
+
 	
-	o_sql_linebuffer.append("ALTER FUNCTION %s.%s(%s) OWNER to %s" % (p_schema, p_name, p_args, p_owner))
+	# args = ", ".join([" ".join(frstsplit.split()[1:]) for frstsplit in re.split("[\s]?\,[\s]?", p_args) if len(frstsplit)>0])
+	# print("447 args:", args)
+	
+	o_sql_linebuffer.append("ALTER FUNCTION %s.%s(%s) OWNER to %s;" % (p_schema, p_name, p_args, p_owner))
+
+	for role in p_exec_acl:
+		o_sql_linebuffer.append("\n\nGRANT EXECUTE ON FUNCTION %s.%s(%s) to %s;" % (p_schema, p_name, p_args, role))
+
+
 					
 def create_function(p_schema, p_name, p_new_value, o_sql_linebuffer, schematrans=None, replace=True):
 
@@ -453,15 +461,20 @@ def create_function(p_schema, p_name, p_new_value, o_sql_linebuffer, schematrans
 		return_table_defstr = None
 
 	if not schematrans is None:
-		# _bodychanged, fbody = update_search_path(p_new_value["body"], schematrans)
-		fbody = transf_schema(p_new_value["body"], schematrans)		
+		# _bodychanged, fbody = update_search_path(p_new_value[PROC_SRC_BODY_FNAME], schematrans)
+		fbody = transf_schema(p_new_value[PROC_SRC_BODY_FNAME], schematrans)		
 	else:
-		fbody = p_new_value["body"]
+		fbody = p_new_value[PROC_SRC_BODY_FNAME]
+
+	if "exec_acl" in p_new_value.keys():
+		exec_acl = p_new_value["exec_acl"]
+	else:
+		exec_acl = []
 
 	create_function_items(p_schema, p_name, p_new_value["fargs"], p_new_value["args"],
 		p_new_value["return_type"], p_new_value["language_type"], 
 		p_new_value["procedure_owner"], p_new_value["provolatile"], 
-		fbody, o_sql_linebuffer, 
+		fbody, exec_acl, o_sql_linebuffer, 
 		return_table_defstr=return_table_defstr, replace=replace)
 
 def create_role(p_rolename, p_new_value, o_sql_linebuffer):
@@ -761,46 +774,64 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 			for procname in sorted(currdiff_block[sch].keys()):
 
 				proc_blk = currdiff_block[sch][procname]
-				newval = proc_blk["newvalue"]	
-				usable_proc = newval['procedure_name']
 
-				if "diffoper" in proc_blk.keys():
-					
-					if len(p_updates_ids_list) < 1 or proc_blk["operorder"] in p_updates_ids_list:
+				if list(proc_blk.keys()) == ['exec_acl']:
 
-						if docomment:
-							out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Function %s.%s\n" % (sch, usable_proc) + "-- " + "".join(['#'] * 77))
-							out_sql_src.append("-- Op #%d" % proc_blk["operorder"])
-					
-						if proc_blk["diffoper"] == "insert":
-							
-							flines = []
-							create_function(sch, usable_proc, proc_blk["newvalue"], flines, schematrans=schema_trans, replace=True)						
-							out_sql_src.append("".join(flines))
-							
-						elif proc_blk["diffoper"] == "delete":
-							
-							if delmode == "CASCADE":
-								out_sql_src.append((tmplpd + " CASCADE") % (sch, usable_proc, proc_blk['args']))
+					if proc_blk['exec_acl']["diffoper"] == "delete":
+
+						# print("780:", procname, currdiff_block[sch][procname])
+						raise RuntimeError(f"Not implemented: revoking function grants, procedure {procname} {currdiff_block[sch][procname]}")
+
+
+						# proc_blk["newvalue"]
+						# out_sql_src.append("REVOKE EXECUTE ON FUNCTION %s.%s(%s) to PUBLIC;" % (sch, procname, p_args))
+
+				else:
+				
+					try:
+						newval = proc_blk["newvalue"]	
+					except:
+						print("newvalue exception:", procname, proc_blk.keys(), proc_blk)
+						raise
+					usable_proc = newval['procedure_name']
+
+					if "diffoper" in proc_blk.keys():
+						
+						if len(p_updates_ids_list) < 1 or proc_blk["operorder"] in p_updates_ids_list:
+
+							if docomment:
+								out_sql_src.append("\n-- " + "".join(['#'] * 77) + "\n" + "-- Function %s.%s\n" % (sch, usable_proc) + "-- " + "".join(['#'] * 77))
+								out_sql_src.append("-- Op #%d" % proc_blk["operorder"])
+						
+							if proc_blk["diffoper"] == "insert":
+								
+								flines = []
+								create_function(sch, usable_proc, proc_blk["newvalue"], flines, schematrans=schema_trans, replace=True)						
+								out_sql_src.append("".join(flines))
+								
+							elif proc_blk["diffoper"] == "delete":
+								
+								if delmode == "CASCADE":
+									out_sql_src.append((tmplpd + " CASCADE") % (sch, usable_proc, proc_blk['args']))
+								else:
+									out_sql_src.append(tmplpd % (sch, usable_proc, proc_blk['args']))
+						
+							elif proc_blk["diffoper"] == "update":
+								
+								# se os parametros de entrada ou de saida forem diferentes ....
+								do_replace = True
+								if "return_type" in proc_blk["changedkeys"].split(", ") or "args" in proc_blk["changedkeys"].split(", "):	
+									do_replace = False						
+									out_sql_src.append(tmplpd % (sch, usable_proc, proc_blk['args']))
+								# e "create function"
+								
+								flines = []
+								create_function(sch, usable_proc, proc_blk["newvalue"], flines, schematrans=schema_trans, replace=do_replace)						
+								out_sql_src.append("".join(flines))
+								
 							else:
-								out_sql_src.append(tmplpd % (sch, usable_proc, proc_blk['args']))
-					
-						elif proc_blk["diffoper"] == "update":
-							
-							# se os parametros de entrada ou de saida forem diferentes ....
-							do_replace = True
-							if "return_type" in proc_blk["changedkeys"].split(", ") or "args" in proc_blk["changedkeys"].split(", "):	
-								do_replace = False						
-								out_sql_src.append(tmplpd % (sch, usable_proc, proc_blk['args']))
-							# e "create function"
-							
-							flines = []
-							create_function(sch, usable_proc, proc_blk["newvalue"], flines, schematrans=schema_trans, replace=do_replace)						
-							out_sql_src.append("".join(flines))
-							
-						else:
-							
-							raise RuntimeError("function %s.%s, wrong diffoper: %s" % (sch, usable_proc, proc_blk["diffoper"]))
+								
+								raise RuntimeError("function %s.%s, wrong diffoper: %s" % (sch, usable_proc, proc_blk["diffoper"]))
 					
 	grpkey = "sequences"	
 	if (len(p_limkeys_list) < 1 or grpkey in p_limkeys_list) and grpkey in diff_content.keys():

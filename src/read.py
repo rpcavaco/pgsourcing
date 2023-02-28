@@ -38,6 +38,8 @@ from src.sql import SQL
 from src.common import PROC_SRC_BODY_FNAME, CFG_GROUPS, CFG_LISTGROUPS, OPS_DBCHECK, FLOAT_TYPES, INT_TYPES, gen_proc_fname_row, reverse_shortpgdtype
 from src.fileandpath import clear_dir
 
+from src.write import create_function
+
 WARN_KEYS = {
 	"PROC_SU_OWNED": "Procedimentos cujo owner e' 'postgres'",
 	"TABLE_SU_OWNED": "Tabelas cujo owner e' 'postgres'"
@@ -841,7 +843,7 @@ def constraints(p_cursor, p_deftablespace, out_dict, usetbs=False):
 		return
 	#assert "tables" in out_dict["content"].keys(), "'content.tables' em falta no dic. de saida"
 
-	pattern = re.compile(r"foreign \s+ key \s+ \([^\)\s]+\) \s+ references \s+ (?P<schema>[^\.]+) \. (?P<tname>[^\(]+)", re.VERBOSE | re.IGNORECASE)			
+	# pattern = re.compile(r"foreign \s+ key \s+ \([^\)\s]+\) \s+ references \s+ (?P<schema>[^\.]+) \. (?P<tname>[^\(]+)", re.VERBOSE | re.IGNORECASE)			
 		
 	tables_root = out_dict["content"]["tables"]
 
@@ -867,7 +869,7 @@ def constraints(p_cursor, p_deftablespace, out_dict, usetbs=False):
 				else:
 					tblspc = row["idxtblspc"]
 
-				constr_list = constrs_dict[row["constraint_name"]] = {				
+				constrs_dict[row["constraint_name"]] = {				
 					"columns": row["column_names"]			
 				}
 
@@ -896,7 +898,7 @@ def constraints(p_cursor, p_deftablespace, out_dict, usetbs=False):
 				else:
 					constrs_dict = tables_root[schema_name][table_name][dk]
 
-				constr_list = constrs_dict[row["constraint_name"]] = {
+				constrs_dict[row["constraint_name"]] = {
 				
 					"index_tablespace": row["idxtblspc"],
 					"columns": row["column_names"]
@@ -1123,7 +1125,7 @@ def gen_proc_hdr(p_sch, p_row):
 	%s 
 AS $BODY$\n""" 
 
-# 1024: dict_keys(['procedure_name', 'args', 'return_type', 'procedure_owner', 'language_type', 'body', 'provolatile'])
+# 1024: dict_keys(['procedure_name', 'args', 'return_type', 'procedure_owner', 'language_type', 'body' (PROC_SRC_BODY_FNAME), 'provolatile'])
 
 
 	# if p_row["return_type"] == "record" and "return_table" in p_row.keys():
@@ -1158,24 +1160,41 @@ def gen_proc_file(p_genprocsdir, p_schema, p_proc_row, winendings=False):
 	
 	fname = gen_proc_fname_row(p_proc_row)
 	complfname = "%s.%s.sql" % (p_schema, fname) 
+
+	flines = []
+	# print(">>", p_proc_row.keys())
+	# dict_keys(['procedure_name', 'args', 'fargs', 'return_type', 'procedure_owner', 'language_type', 'body', 'provolatile'])
+
+	usable_proc = p_proc_row['procedure_name']
+	create_function(p_schema, usable_proc, p_proc_row, flines, replace=True)	
+	# print("...", flines[3:])					
 	
-	try:
-		procsrc = p_proc_row[PROC_SRC_BODY_FNAME].decode('utf-8')
-	except AttributeError:
-		procsrc = p_proc_row[PROC_SRC_BODY_FNAME]
+	# try:
+	# 	procsrc = p_proc_row[PROC_SRC_BODY_FNAME].decode('utf-8')
+	# except AttributeError:
+	# 	procsrc = p_proc_row[PROC_SRC_BODY_FNAME]
+
+	content = "\n".join(flines)
+
+	with codecs.open(path_join(p_genprocsdir, complfname), "wb", "utf-8") as fl:
+			#print("......", str(type(row[PROC_SRC_BODY_FNAME])))
+		if winendings:
+			fl.write(content.replace("\n","\r\n"))
+		else:
+			fl.write(content)
 	
-	if winendings:
-		with codecs.open(path_join(p_genprocsdir, complfname), "wb", "utf-8") as fl:
-			#print("......", str(type(row[PROC_SRC_BODY_FNAME])))
-			fl.write(gen_proc_hdr(p_schema, p_proc_row).replace("\n","\r\n"))
-			fl.write(procsrc.replace("\n","\r\n"))									
-			fl.write(gen_proc_ftr(p_schema, p_proc_row).replace("\n","\r\n"))
-	else:
-		with codecs.open(path_join(p_genprocsdir, complfname), "w", "utf-8") as fl:
-			#print("......", str(type(row[PROC_SRC_BODY_FNAME])))
-			fl.write(gen_proc_hdr(p_schema, p_proc_row))
-			fl.write(procsrc)									
-			fl.write(gen_proc_ftr(p_schema, p_proc_row))						
+	# if winendings:
+	# 	with codecs.open(path_join(p_genprocsdir, complfname), "wb", "utf-8") as fl:
+	# 		#print("......", str(type(row[PROC_SRC_BODY_FNAME])))
+	# 		fl.write(gen_proc_hdr(p_schema, p_proc_row).replace("\n","\r\n"))
+	# 		fl.write(procsrc.replace("\n","\r\n"))									
+	# 		fl.write(gen_proc_ftr(p_schema, p_proc_row).replace("\n","\r\n"))
+	# else:
+	# 	with codecs.open(path_join(p_genprocsdir, complfname), "w", "utf-8") as fl:
+	# 		#print("......", str(type(row[PROC_SRC_BODY_FNAME])))
+	# 		fl.write(gen_proc_hdr(p_schema, p_proc_row))
+	# 		fl.write(procsrc)									
+	# 		fl.write(gen_proc_ftr(p_schema, p_proc_row))						
 						
 def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dict, genprocsdir=None):
 	
@@ -1184,6 +1203,8 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dic
 
 	if not "schemata" in out_dict["content"].keys():
 		return
+
+	patt = "[\s]?\,[\s]?"
 
 	trig_dict = {}
 	for tr_schema, tr_funcname in in_trigger_functions:
@@ -1242,20 +1263,33 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dic
 				if not row[item] is None:
 					if item == "return_type":
 						pdict[item] = reverse_shortpgdtype(row[item]) 
+					elif item == "args":
+						pdict[item] = ", ".join([" ".join(frstsplit.split()[1:]) for frstsplit in re.split(patt, row[item]) if len(frstsplit)>0])
+						# print("1268 pdict[item]:", pdict[item])
 					else:
 						pdict[item] = row[item]
 
 	for schname in the_dict.keys():
+
 		schdict = the_dict[schname]
 		for procfname in schdict.keys():
+
 			pdict = schdict[procfname]
+
 			if "return_type" in pdict.keys() and pdict["return_type"] == "record":
 				p_cursor.execute(SQL["PROCS_RETTYPE_TABLE"], (schname, pdict["procedure_name"]))		
 				row = p_cursor.fetchone()
 				pdict["return_table"] = row[0] 
 
+			p_cursor.execute(SQL["PROCS_XACL"], (schname, pdict["procedure_name"]))
+			for row in p_cursor:
+				if not "exec_acl" in pdict.keys():
+					pdict["exec_acl"] = []
+				pdict["exec_acl"].append(row["nome"])
+
 			if not genprocsdir is None:
 				gen_proc_file(genprocsdir, schname, pdict)
+
 
 	# trigger funcs
 	if len(tr_funcnames) > 0:

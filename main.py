@@ -679,10 +679,12 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 					patt1 = "function[\s]+([^\)]+\))"
 					patt2 = "\(([^\)]+)\)"
 					patt3 = "[\s]+default[\s]+[^,$]+"
+					patt4 = "[\s]?\,[\s]?"
 
 					mo = re.search(patt1, srca, re.I)
 					function_complete_name = None
 					fargs = None
+
 					if not mo is None:
 						function_complete_name = mo.group(1)
 					else:
@@ -696,6 +698,7 @@ def chkcode_handler(p_proj, p_outprocsdir, p_opordmgr, p_connkey=None, output=No
 					if not fargs is None:
 						fargs_str = fargs
 						args_str = re.sub(patt3, '', fargs, flags=re.I)
+						args_str = ", ".join([" ".join(frstsplit.split()[1:]) for frstsplit in re.split(patt4, args_str) if len(frstsplit)>0])
 					else:
 						fargs_str = ""
 						args_str = ""					
@@ -921,13 +924,21 @@ def check_objtype(p_relkind, p_typestr):
 def erase_diff_item(p_diff_dict, p_grpkeys):
 
 	# print("erase_diff_item:", p_diff_dict, p_grpkeys)
-	logger = logging.getLogger('pgsourcing')	
+	# logger = logging.getLogger('pgsourcing')	
 	
 	diff_dict = p_diff_dict
 	last_key = p_grpkeys[-1]
+	do_exit = False
+
 	for k in p_grpkeys:
+
 		if k != last_key:
-			diff_dict = diff_dict[k]
+			try:
+				diff_dict = diff_dict[k]
+			except:
+				print("erase_diff_item, break:", k, p_grpkeys,diff_dict.keys()) 
+				do_exit = True
+				break
 		else:
 			if k in diff_dict.keys():
 				del diff_dict[k]
@@ -939,26 +950,28 @@ def erase_diff_item(p_diff_dict, p_grpkeys):
 			# 	logger.error(f"** diff_dict keys: {diff_dict.keys()}")
 			# 	raise
 
-	# Clean empty branches
-	count = 0
-	# max diff tree depth never bigger than 15
-	while count < 15:
-		
-		outerbreak = True
-		count += 1
-		diff_dict = p_diff_dict
-		
-		for k in p_grpkeys:
-			if k in diff_dict.keys():
-				if len(diff_dict[k].keys()) == 0:
-					del diff_dict[k]
-					outerbreak = False
-					break
-				else:
-					diff_dict = diff_dict[k]
-				
-		if outerbreak:
-			break
+	if not do_exit:		
+
+		# Clean empty branches
+		count = 0
+		# max diff tree depth never bigger than 15
+		while count < 15:
+			
+			outerbreak = True
+			count += 1
+			diff_dict = p_diff_dict
+			
+			for k in p_grpkeys:
+				if k in diff_dict.keys():
+					if len(diff_dict[k].keys()) == 0:
+						del diff_dict[k]
+						outerbreak = False
+						break
+					else:
+						diff_dict = diff_dict[k]
+					
+			if outerbreak:
+				break
 				
 # Check change dict ops, clearing redundancies and spurious (mostly incomplete) entries		
 def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
@@ -1003,13 +1016,18 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 				logger.error(f"p_op: {p_op}")
 				raise
 
-			assert len(op_content) == 3, f"length of {op_content} != 3"
+			if op_content[-1] == "exec_acl":
+				range_len = 4
+			else:
+				range_len = 3
+
+			assert len(op_content) == range_len, f"length of {op_content} != {range_len}"
 
 			# print("op_content:", op_content)
 			# print("p_diff_dict:", json.dumps(p_diff_dict, indent=4))
 
 			curr_dicttree_level = p_diff_dict
-			for li in range(3):
+			for li in range(range_len):
 				
 				# if li == 2:
 				# 	new_proc_dict = {curr_dicttree_level[k]["newvalue"]["procedure_name"]:curr_dicttree_level[k] for k in curr_dicttree_level.keys()}	
@@ -1020,7 +1038,7 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 				assert op_content[li] in curr_dicttree_level.keys(), f"{op_content[li]} not in {curr_dicttree_level.keys()}"
 				curr_dicttree_level = curr_dicttree_level[op_content[li]]
 
-			assert "diffoper" in curr_dicttree_level.keys(), f"'diffoper' not in {curr_dicttree_level.keys()}"
+			assert "diffoper" in curr_dicttree_level.keys(), f"'diffoper' not in {curr_dicttree_level.keys()} diff dict:{curr_dicttree_level}"
 
 			if curr_dicttree_level["diffoper"] in ("insert", "update"):
 
