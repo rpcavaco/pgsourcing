@@ -1050,6 +1050,9 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 					logger.exception("checkCDOps")
 					raise
 
+				if isinstance(newvalue, list):
+					raise RuntimeError(f"newval: {newvalue}, grpkeys: {grpkeys}")
+
 				assert 'args' in newvalue.keys(), f"'args' not in {newvalue.keys()}"
 				assert 'return_type' in newvalue.keys(), f"'return_type' not in {newvalue.keys()}"
 
@@ -1594,8 +1597,8 @@ def addnewprocedure_file(p_proj, conn=None, conf_obj=None):
 					args = ", ".join(argslist)
 
 					create_function_items(sch, nome, args, args, rettipo, "plpgsql", ownership, "v", 
-						"DECLARE\n\tv_null integer;\nBEGIN\n\n\tv_null := 0;\n\tRETURN null;\n\nEND;", sql_linebuffer)
-						
+						"DECLARE\n\tv_null integer;\nBEGIN\n\n\tv_null := 0;\n\tRETURN null;\n\nEND;", [], sql_linebuffer)
+
 					if len(sql_linebuffer) > 0:
 						with codecs.open(fullenewpath, "w", "utf-8") as newfl:
 							newfl.write("%s;" % "".join(sql_linebuffer))

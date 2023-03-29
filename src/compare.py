@@ -185,7 +185,7 @@ def sources_to_lists(p_src_a, p_src_b, p_list_a, p_list_b):
 	p_list_a.extend(lA)
 	p_list_b.extend(lB)
 
-def sourcediff(p_srca, p_srcb, p_transformschema, out_dellist): #, out_addlist):
+def sourcediff(p_srca, p_srcb, p_transformschema, out_dellist, b_comparefromref=False): #, out_addlist):
 	
 	del out_dellist[:]
 
@@ -226,7 +226,10 @@ def sourcediff(p_srca, p_srcb, p_transformschema, out_dellist): #, out_addlist):
 	# listA = [re.sub(patt, substitute, ln.strip()).lower() for ln in rawlistA if len(ln.strip()) > 0]
 	# listB = [re.sub(patt, substitute, ln.strip()).lower() for ln in rawlistB if len(ln.strip()) > 0]
 	
-	diff = [l for l in list(dodiff(listA, listB, lineterm="")) if len(l.strip()) > 0]
+	if b_comparefromref:
+		diff = [l for l in list(dodiff(listB, listA, lineterm="")) if len(l.strip()) > 0]
+	else:
+		diff = [l for l in list(dodiff(listA, listB, lineterm="")) if len(l.strip()) > 0]
 	
 	out_dellist.extend(diff)
 	
@@ -383,7 +386,7 @@ def check_tbl_renaming_right(p_tmp_l, p_tmp_r, p_k):
 
 	return ret
 																			
-def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops, level=0, b_dbgflag=False): 
+def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops, level=0, b_comparefromref=False, b_dbgflag=False): 
 	
 	logger = logging.getLogger('pgsourcing')
 
@@ -482,7 +485,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 					for newkey in tmp_l[k].keys():
 					
 						newklist  = klist+[newkey]		
-						upperlevel_ops = comparegrp(tmp_l[k], tmp_r, newklist, p_transformschema, p_opordmgr, diff_dict, o_cd_ops, level=level+1)
+						upperlevel_ops = comparegrp(tmp_l[k], tmp_r, newklist, p_transformschema, p_opordmgr, diff_dict, o_cd_ops, level=level+1, b_comparefromref=b_comparefromref)
 						if upperlevel_ops:
 							dictupdate(ret_upperlevel_ops, upperlevel_ops)
 				
@@ -601,7 +604,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 
 				if isinstance(tmp_l[k], dict) and isinstance(tmp_r[k], dict):
 					dbgflag = False
-					upperlevel_ops = comparegrp(tmp_l, tmp_r, klist, p_transformschema, p_opordmgr, diff_dict, o_cd_ops, level=level+1, b_dbgflag=dbgflag)
+					upperlevel_ops = comparegrp(tmp_l, tmp_r, klist, p_transformschema, p_opordmgr, diff_dict, o_cd_ops, level=level+1, b_comparefromref=b_comparefromref, b_dbgflag=dbgflag)
 					if upperlevel_ops:
 						dictupdate(ret_upperlevel_ops, upperlevel_ops)
 
@@ -631,7 +634,8 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 						
 						# source de funcao / procedimento
 						difflist = []
-						newleft = sourcediff(tmp_l[k], tmp_r[k], p_transformschema, difflist)
+
+						newleft = sourcediff(tmp_l[k], tmp_r[k], p_transformschema, difflist, b_comparefromref=b_comparefromref)
 
 						#print("difflist:", difflist)
 
@@ -854,7 +858,7 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 		if grp in CFG_LISTGROUPS:
 			ret = comparegrp_list(l_dict, r_dict, [grp], p_opordmgr, o_diff_dict)
 		else:	
-			ret = comparegrp(l_dict, r_dict, [grp], p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops)
+			ret = comparegrp(l_dict, r_dict, [grp], p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops, False, (p_comparison_mode == "From REF"))
 		
 		if ret:
 			dictupdate(upperlevel_ops, ret)
