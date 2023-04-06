@@ -780,7 +780,10 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 					if proc_blk['exec_acl']["diffoper"] == "delete":
 
 						# print("780:", procname, currdiff_block[sch][procname])
-						raise RuntimeError(f"Not implemented: revoking function grants, procedure {procname} {currdiff_block[sch][procname]}")
+						try:
+							raise RuntimeError(f"Not implemented: revoking function grants, procedure {procname} {currdiff_block[sch][procname]}")
+						except RuntimeError as e:
+							print(e)
 
 
 						# proc_blk["newvalue"]

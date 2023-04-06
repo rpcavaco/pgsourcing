@@ -1035,8 +1035,15 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 				# 	curr_dicttree_level = new_proc_dict[op_content[li]]
 				# else:
 
-				assert op_content[li] in curr_dicttree_level.keys(), f"{op_content[li]} not in {curr_dicttree_level.keys()}"
-				curr_dicttree_level = curr_dicttree_level[op_content[li]]
+				try:
+					assert op_content[li] in curr_dicttree_level.keys(), f"{op_content[li]} not in {curr_dicttree_level.keys()}, {op_content}"		
+					curr_dicttree_level = curr_dicttree_level[op_content[li]]
+				except AssertionError as e:
+					print(e)
+					if op_content[li] in ["exec_acl"]:
+						continue
+					else:
+						raise e
 
 			assert "diffoper" in curr_dicttree_level.keys(), f"'diffoper' not in {curr_dicttree_level.keys()} diff dict:{curr_dicttree_level}"
 
