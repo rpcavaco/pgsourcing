@@ -400,15 +400,15 @@ def roles(p_cursor, p_filters_cfg, out_dict):
 		if rolename not in ownerfilter:
 				continue 
 				
-		if row["rolvaliduntil"] is None:
-			validuntil = "None"
-		else:
-			validuntil = row["rolvaliduntil"].isoformat()
+		# if row["rolvaliduntil"] is None:
+		# 	validuntil = "None"
+		# else:
+		# 	validuntil = row["rolvaliduntil"].isoformat()
 			
 		rl_dict[rolename] = {
 			"inherit": str(row["rolinherit"]),
-			"canlogin": str(row["rolcanlogin"]),
-			"validuntil": validuntil
+			"canlogin": str(row["rolcanlogin"])
+			# "validuntil": validuntil
 		}
 
 def udttypes(p_cursor, p_filters_cfg, out_dict):
@@ -1133,7 +1133,7 @@ AS $BODY$\n"""
 	# else:
 	# 	return_type = p_row["return_type"]
 
-	# print("1024:", p_row.keys())
+	print("1136:", p_row.keys())
 
 	return_type = None
 	if p_row["return_type"] == "record":
@@ -1224,6 +1224,7 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dic
 		clear_dir(genprocsdir, ".sql")
 
 	tr_funcnames = []
+	the_dict = {}
 	for sch in out_dict["content"]["schemata"]:
 		
 		if "procedures" in p_filters_cfg.keys():			
@@ -1245,6 +1246,8 @@ def procs(p_cursor, p_filters_cfg, in_trigger_functions, p_majorversion, out_dic
 			out_dict["content"]["procedures"] = {}
 		
 		the_dict = out_dict["content"]["procedures"]
+
+		# print("sql:", sql)
 		
 		p_cursor.execute(sql)		
 		for row in p_cursor:

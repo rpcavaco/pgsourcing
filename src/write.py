@@ -422,6 +422,8 @@ def create_function_items(p_schema, p_name, p_fargs, p_args, p_rettype, p_langty
 
 	if retstr is None:
 		retstr = p_rettype
+
+	# print("425:", p_name, p_rettype, return_table_defstr)
 		
 	o_sql_linebuffer.append(cr % (p_schema, p_name, p_fargs))	
 	o_sql_linebuffer.append("\n")
@@ -454,6 +456,8 @@ def create_function_items(p_schema, p_name, p_fargs, p_args, p_rettype, p_langty
 
 					
 def create_function(p_schema, p_name, p_new_value, o_sql_linebuffer, schematrans=None, replace=True):
+
+	# print("p_new_value:", p_new_value)
 
 	if "return_table" in p_new_value.keys():
 		return_table_defstr = p_new_value["return_table"]
@@ -490,10 +494,10 @@ def create_role(p_rolename, p_new_value, o_sql_linebuffer):
 		o_sql_linebuffer.append("\tINHERIT\n")
 	else:
 		o_sql_linebuffer.append("\tNOINHERIT\n")
-	if p_new_value["validuntil"] == "None":
-		o_sql_linebuffer.append("\tVALID UNTIL 'infinity'")
-	else:
-		o_sql_linebuffer.append("\tVALID UNTIL '%s'" % p_new_value["validuntil"])
+	# if p_new_value["validuntil"] == "None":
+	# 	o_sql_linebuffer.append("\tVALID UNTIL 'infinity'")
+	# else:
+	# 	o_sql_linebuffer.append("\tVALID UNTIL '%s'" % p_new_value["validuntil"])
 
 def create_udtype(p_schema, p_name, p_new_value, o_sql_linebuffer):
 
@@ -580,6 +584,9 @@ def print_matviewhdr(p_docomment, p_sch, p_name, p_out_sql_src, o_flag_byref):
 def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomment=True, usetbs=False):
 
 	diff_content = p_difdict["content"]	
+
+	##print(json.dumps(diff_content, indent=4))
+
 	if "transformschema" in p_difdict.keys():
 		transformschema = p_difdict["transformschema"]	
 	else:
@@ -766,11 +773,14 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 				schema_trans = transformschema["trans"]
 
 		currdiff_block = diff_content[grpkey]			
+
 		for sch in sorted(currdiff_block.keys()):
 
 			if sch in dropped_schemata:
 				logger.warning("CONFLICT: schema to drop '%s' is in use in procedures." % sch)
-			
+
+
+
 			for procname in sorted(currdiff_block[sch].keys()):
 
 				proc_blk = currdiff_block[sch][procname]
@@ -790,13 +800,18 @@ def updatedb(p_difdict, p_updates_ids_list, p_limkeys_list, delmode=None, docomm
 						# out_sql_src.append("REVOKE EXECUTE ON FUNCTION %s.%s(%s) to PUBLIC;" % (sch, procname, p_args))
 
 				else:
-				
+
+					# print("804:", sch, procname, json.dumps(currdiff_block[sch][procname], indent=4))
+
 					try:
 						newval = proc_blk["newvalue"]	
+						usable_proc = newval['procedure_name']
 					except:
-						print("newvalue exception:", procname, proc_blk.keys(), proc_blk)
-						raise
-					usable_proc = newval['procedure_name']
+						# print("newvalue exception:", procname, proc_blk.keys(), proc_blk)
+						# raise
+
+						newval = None
+						usable_proc = proc_blk['procedure_name']
 
 					if "diffoper" in proc_blk.keys():
 						

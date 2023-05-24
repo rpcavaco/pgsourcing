@@ -401,6 +401,8 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 		# 	ret = "From SRC"
 		# 	is_upstreamdb = True
 		# 	code_only = True
+
+		# print("::main.405:: connkey:", connkey)
 					
 		if not connkey is None:
 			
@@ -414,7 +416,9 @@ def check_oper_handler(p_proj, p_oper, p_outprocsdir, p_outtables_dir,
 					outprocs_dir=outprocs_dir, is_upstreamdb=is_upstreamdb, 
 					opt_rowcount_path=csv_rowcount_table_path, 
 					code_only=code_only, usetbs=usetbs)
-		
+
+	# print("::main.420:: ret, connkey:", ret, connkey)
+
 	return ret, connkey
 
 def process_intervals_string(p_input_str):
@@ -1058,18 +1062,23 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 					raise
 
 				if isinstance(newvalue, list):
-					raise RuntimeError(f"newval: {newvalue}, grpkeys: {grpkeys}")
 
-				assert 'args' in newvalue.keys(), f"'args' not in {newvalue.keys()}"
-				assert 'return_type' in newvalue.keys(), f"'return_type' not in {newvalue.keys()}"
+					logger.error(f"a passar ... newval: {newvalue}, grpkeys: {grpkeys}")
+					obj_exists = True
+					# raise RuntimeError(f"newval: {newvalue}, grpkeys: {grpkeys}")
 
-				args = newvalue['args']
-				return_type = newvalue['return_type']
+				else:
 
-				p_cr.execute(SQL["PROC_CHECK"], (sch, name))
-				row = p_cr.fetchone()
-				if not row is None:
-					obj_exists = (row[0] == args and row[1] == return_type)
+					assert 'args' in newvalue.keys(), f"'args' not in {newvalue.keys()}"
+					assert 'return_type' in newvalue.keys(), f"'return_type' not in {newvalue.keys()}"
+
+					args = newvalue['args']
+					return_type = newvalue['return_type']
+
+					p_cr.execute(SQL["PROC_CHECK"], (sch, name))
+					row = p_cr.fetchone()
+					if not row is None:
+						obj_exists = (row[0] == args and row[1] == return_type)
 
 			else:
 
@@ -1084,14 +1093,20 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 			already_tested = False
 			if grpkeys[0] == "tables" and len(grpkeys) > 3 and grpkeys[3] == "index":
 
-				sch = grpkeys[1]
-				tabname = grpkeys[2]
-				idxname = grpkeys[4]
-				p_cr.execute(SQL["INDEX_CHECK"], (sch, tabname, idxname))
-				row = p_cr.fetchone()
-				if row[0] > 0:
+				if len(grpkeys) < 5:
+
 					obj_exists = True
-				already_tested = True
+
+				else:
+
+					sch = grpkeys[1]
+					tabname = grpkeys[2]
+					idxname = grpkeys[4]
+					p_cr.execute(SQL["INDEX_CHECK"], (sch, tabname, idxname))
+					row = p_cr.fetchone()
+					if row[0] > 0:
+						obj_exists = True
+					already_tested = True
 
 			elif grpkeys[0] == "tables" and len(grpkeys) > 3 and grpkeys[3] == "pkey":
 
@@ -1125,6 +1140,8 @@ def checkCDOps(p_proj, p_cd_ops, p_connkey, p_diff_dict):
 		if ret:
 			erase_diff_item(p_pdiff_dict, grpkeys)
 				
+
+	#print("p_cd_ops:", p_cd_ops, p_diff_dict)
 
 	cfgpath = get_conn_cfg_path(p_proj)
 	conns = Connections(cfgpath, subkey="conn")
@@ -1175,7 +1192,7 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		refcodedir, reftablesdir, destcodedir, check_dict, \
 		replacements, p_connkey=p_connkey, usetbs=usetbs)
 
-	# print("check_dict:", p_oper, check_dict.keys())
+	# print("::main.1178::check_dict:", p_oper, check_dict["content"].keys())
 	# print("content keys:", check_dict["content"].keys())
 	
 	# Se a operacao for chksrc ou chkdest o dicionario check_dict sera 
@@ -1239,6 +1256,8 @@ def main(p_proj, p_oper, p_connkey, newgenprocsdir=None, output=None, inputf=Non
 		
 		cd_ops = { "insert": [], "delete": [] }
 		if do_compare:
+
+			# print("check_dict['content']:", check_dict["content"])
 
 			comparing(p_proj, check_dict["content"], 
 				comparison_mode, replacements, opordmgr, 

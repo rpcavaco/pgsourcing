@@ -411,7 +411,7 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 	printdbg = False
 
 	# TODO: permanente -- verificar que está vazio em produção
-	if grpkey in []: # ("sequences",):
+	if grpkey in ["procedures"]: # ("sequences",):
 		printdbg = True
 	if grpkeys[0] in []: # ("udttypes",):
 		printdbg = True
@@ -423,6 +423,9 @@ def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_
 		
 		try:
 			diff_item = get_diff_item(diff_dict, grpkeys)
+			# raise RuntimeError("assdasdasd")
+			# print("diff_item 425:", level, diff_item, grpkeys)
+
 			
 			if level == 0:
 				# lzero_key is a schema, if not exists is created elsewhere
@@ -829,7 +832,10 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 			
 		r_dict = p_check_dict		
 		l_dict = ref_json
-		
+
+		# print("A l_dict:", list(l_dict["procedures"]['sup_ap_dev'].keys()))
+		# print("B r_dict:", list(r_dict.keys()))
+
 		if p_transformschema:
 						
 			first_schema_names = list(l_dict["schemata"].keys())
@@ -858,7 +864,8 @@ def comparing(p_proj, p_check_dict, p_comparison_mode, p_transformschema, p_opor
 		if grp in CFG_LISTGROUPS:
 			ret = comparegrp_list(l_dict, r_dict, [grp], p_opordmgr, o_diff_dict)
 		else:	
-			ret = comparegrp(l_dict, r_dict, [grp], p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops, False, (p_comparison_mode == "From REF"))
+#def comparegrp(p_leftdic, p_rightdic, grpkeys, p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops, level=0, b_comparefromref=False, b_dbgflag=False): 
+			ret = comparegrp(l_dict, r_dict, [grp], p_transformschema, p_opordmgr, o_diff_dict, o_cd_ops,  b_comparefromref=(p_comparison_mode == "From REF"))
 		
 		if ret:
 			dictupdate(upperlevel_ops, ret)
