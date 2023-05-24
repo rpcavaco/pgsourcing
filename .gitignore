@@ -11,7 +11,9 @@ pyvenv.cfg
 Scripts/
 tarefas.txt
 temp.*
-out.sql
+*.sql
+*.json
+
 
 
 
